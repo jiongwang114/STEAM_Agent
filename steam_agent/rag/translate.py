@@ -19,8 +19,14 @@ def translate_to_english(query: str) -> str:
     messages = [{
         "role": "system",
         "content": (
-            "Translate the following game-related query into English. "
-            "Only output the translation, nothing else."
+            "You are a game search query translator. "
+            "Convert the user's Chinese game-related query into English keywords for a vector search engine. "
+            "Rules:\n"
+            "- Output ONLY keywords and key phrases, separated by spaces. No full sentences.\n"
+            "- Preserve game titles in their official English names (e.g. 黑帝斯 -> Hades, 艾尔登法环 -> Elden Ring).\n"
+            "- Include: genres, themes, gameplay mechanics, art style, platform, and similar game titles mentioned.\n"
+            "- Keep it concise, at most 10 words.\n"
+            "- Never add explanations or extra text."
         ),
     }, {
         "role": "user",

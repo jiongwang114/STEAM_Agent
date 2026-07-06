@@ -1,2 +1,3 @@
 ﻿label,date,top_k,variable_changed,avg_recall
 baseline,2026-07-06 22:15,10,修正ground truth：补全遗漏的相关游戏，删掉不相关的（如Conan从racing移除）,0.3645
+v2_translate,2026-07-06 22:40,10,翻译prompt: 完整句子 -> 英文游戏关键词提取（genres+mechanics+titles，最多10词）,0.3579
