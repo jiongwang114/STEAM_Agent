@@ -2,11 +2,13 @@
 RAG retrieval evaluation — only measures Recall@K.
 No LLM calls, no token cost. Pure vector search.
 
+Each run appends a recall_{label} column to rag_eval_results.csv and
+records the change metadata in rag_eval_changelog.csv.
+
 Usage:
-    python -m steam_agent.tests.rag_eval                         # all queries, auto label
-    python -m steam_agent.tests.rag_eval --label v2              # named version
-    python -m steam_agent.tests.rag_eval --label baseline        # first baseline
-    python -m steam_agent.tests.rag_eval --top-k 5 --label top5  # override top_k
+    python -m steam_agent.tests.rag_eval --label baseline
+    python -m steam_agent.tests.rag_eval --label v2 --note "embedder: MiniLM -> multilingual-MiniLM"
+    python -m steam_agent.tests.rag_eval --top-k 5 --label top5 --note "top_k: 10 -> 5"
     python -m steam_agent.tests.rag_eval --query-id 3            # single query, no csv
 """
 
@@ -21,10 +23,10 @@ from ..tools.rag_search import rag_search_similar_games
 
 CSV_PATH = Path(__file__).resolve().parent / "rag_ground_truth.csv"
 RESULT_CSV_PATH = Path(__file__).resolve().parent / "rag_eval_results.csv"
+CHANGELOG_CSV_PATH = Path(__file__).resolve().parent / "rag_eval_changelog.csv"
 
 
 def recall_at_k(retrieved: list[str], relevant: list[str]) -> float:
-    """Fraction of relevant items found in top-K results."""
     if not relevant:
         return 1.0
     return sum(1 for r in relevant if r in retrieved) / len(relevant)
@@ -71,6 +73,8 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
     return results
 
 
+# ── result CSV ────────────────────────────────────────────────────────
+
 def _read_existing_csv() -> tuple[list[str], list[dict]]:
     if not RESULT_CSV_PATH.exists():
         return [], []
@@ -115,6 +119,29 @@ def write_results(results: list[dict], label: str):
     print(f"  [{label}] Recall avg={avg_r:.3f}")
 
 
+# ── changelog CSV ─────────────────────────────────────────────────────
+
+def write_changelog(label: str, note: str, avg_recall: float, top_k: int):
+    """Append a row to the changelog to track what changed in each run."""
+    file_exists = CHANGELOG_CSV_PATH.exists()
+
+    with open(CHANGELOG_CSV_PATH, "a", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["label", "date", "top_k", "variable_changed", "avg_recall"])
+        writer.writerow([
+            label,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            top_k,
+            note,
+            f"{avg_recall:.4f}",
+        ])
+
+    print(f"  -> 写入 {CHANGELOG_CSV_PATH.name}: {note or '(无变更说明)'}")
+
+
+# ── summary ───────────────────────────────────────────────────────────
+
 def print_summary(results: list[dict]):
     n = len(results)
     avg_recall = sum(r["recall"] for r in results) / n
@@ -141,6 +168,8 @@ def print_summary(results: list[dict]):
                 print(f"    got:      {r['retrieved_appids']}")
 
 
+# ── main ──────────────────────────────────────────────────────────────
+
 def main():
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
@@ -148,6 +177,7 @@ def main():
     parser.add_argument("--top-k", type=int, help="Override top_k")
     parser.add_argument("--query-id", type=int, help="Single query by index (1-based)")
     parser.add_argument("--label", default="", help="Version label (auto timestamp if empty)")
+    parser.add_argument("--note", default="", help="What variable changed and what it changed to")
     args = parser.parse_args()
 
     cases = load_ground_truth(CSV_PATH)
@@ -161,7 +191,10 @@ def main():
 
     if not args.query_id:
         label = args.label or datetime.now().strftime("%m%d_%H%M")
+        top_k = args.top_k or cases[0]["top_k"]
+        avg_r = sum(r["recall"] for r in results) / len(results)
         write_results(results, label)
+        write_changelog(label, args.note, avg_r, top_k)
 
 
 if __name__ == "__main__":
