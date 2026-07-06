@@ -20,3 +20,6 @@ rag/data/
 # OS
 .DS_Store
 Thumbs.db
+
+#技术文档
+DESIGN.md
