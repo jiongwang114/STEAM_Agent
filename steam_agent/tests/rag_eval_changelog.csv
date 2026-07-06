@@ -1,2 +1,2 @@
 ﻿label,date,top_k,variable_changed,avg_recall
-baseline,2026-07-06 21:55,10,初始基线，未做任何改动,0.3567
+baseline,2026-07-06 22:15,10,修正ground truth：补全遗漏的相关游戏，删掉不相关的（如Conan从racing移除）,0.3645
