@@ -1,5 +1,6 @@
 from ..rag.translate import translate_to_english
 from ..rag.vector_store import get_games_collection
+from ..rag.embedder import embed_query
 
 
 def rag_search_similar_games(
@@ -22,9 +23,10 @@ def rag_search_similar_games(
         search_query = query
 
     collection = get_games_collection()
+    query_embedding = embed_query([search_query])
 
     kwargs = {
-        "query_texts": [search_query],
+        "query_embeddings": query_embedding,
         "n_results": top_k,
     }
     if filter_tags:

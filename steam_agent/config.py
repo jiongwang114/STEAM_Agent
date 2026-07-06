@@ -19,7 +19,7 @@ STEAM_API_URL: str = "https://api.steampowered.com"
 STEAM_STORE_URL: str = "https://store.steampowered.com/api"
 
 # --- Embedding ---
-EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 
 # --- Chroma ---
 CHROMA_PERSIST_DIR: str = os.environ.get(

@@ -2,8 +2,9 @@
 Offline data ingestion script for the Steam game knowledge base.
 
 Usage:
-    python -m steam_agent.rag.ingest          # full rebuild (default)
-    python -m steam_agent.rag.ingest --mode append  # append new games only
+    python -m steam_agent.rag.ingest                     # fetch from API + rebuild (saves cache)
+    python -m steam_agent.rag.ingest --from-cache          # rebuild from local cache (no API calls)
+    python -m steam_agent.rag.ingest --mode append         # fetch new games only
 """
 
 import argparse
@@ -21,10 +22,10 @@ STEAM_TOP_GAMES_URL = "https://api.steampowered.com/ISteamChartsService/GetMostP
 STEAM_APP_LIST_URL = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
+CACHE_PATH = DATA_DIR / "game_cache.json"
 
 
 def fetch_top_appids(count: int = 250) -> list[int]:
-    """Fetch the top played game appids from Steam charts."""
     appids = []
     try:
         response = httpx.get(STEAM_TOP_GAMES_URL, params={"key": "PLACEHOLDER"}, timeout=15.0)
@@ -37,7 +38,6 @@ def fetch_top_appids(count: int = 250) -> list[int]:
 
 
 def fetch_app_details(appid: int) -> dict | None:
-    """Fetch game details from Steam appdetails API."""
     url = f"{STEAM_STORE_URL}/appdetails"
     params = {"appids": appid, "l": "en"}
     try:
@@ -51,7 +51,6 @@ def fetch_app_details(appid: int) -> dict | None:
 
 
 def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
-    """Build a text chunk and metadata from game detail."""
     name = detail.get("name", f"Game {appid}")
     tags = [g["description"] for g in detail.get("genres", [])]
     categories = [c["description"] for c in detail.get("categories", [])]
@@ -76,8 +75,31 @@ def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
     return str(appid), metadata, text
 
 
-def ingest_full(appids: list[int]):
-    """Full rebuild: delete existing collection and rebuild from scratch."""
+# ── local cache ───────────────────────────────────────────────────────
+
+def save_cache(records: list[dict]):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(records, f, ensure_ascii=False, indent=2)
+    print(f"  Saved {len(records)} games to {CACHE_PATH.name}")
+
+
+def load_cache() -> list[dict]:
+    if not CACHE_PATH.exists():
+        print(f"  No cache found at {CACHE_PATH}. Run without --from-cache first.")
+        return []
+    with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ── ingest modes ──────────────────────────────────────────────────────
+
+def ingest_from_cache():
+    """Rebuild collection from local JSON cache — no API calls needed."""
+    records = load_cache()
+    if not records:
+        return
+
     client = _get_client()
     existing = [c.name for c in client.list_collections()]
     if "games" in existing:
@@ -88,6 +110,36 @@ def ingest_full(appids: list[int]):
     metadatas_list = []
     documents_list = []
 
+    for rec in records:
+        doc_id, metadata, text = build_chunk(rec["appid"], rec["detail"])
+        ids_list.append(doc_id)
+        metadatas_list.append(metadata)
+        documents_list.append(text)
+
+    if ids_list:
+        embeddings = embed(documents_list)
+        collection.add(
+            ids=ids_list,
+            embeddings=embeddings,
+            metadatas=metadatas_list,
+            documents=documents_list,
+        )
+
+    print(f"Cache rebuild complete: {len(ids_list)} games indexed.")
+
+
+def ingest_full(appids: list[int]):
+    client = _get_client()
+    existing = [c.name for c in client.list_collections()]
+    if "games" in existing:
+        client.delete_collection("games")
+
+    collection = get_games_collection()
+    ids_list = []
+    metadatas_list = []
+    documents_list = []
+    cache_records: list[dict] = []
+
     for i, appid in enumerate(appids):
         detail = fetch_app_details(appid)
         if detail is None or detail.get("type") != "game":
@@ -97,6 +149,7 @@ def ingest_full(appids: list[int]):
         ids_list.append(doc_id)
         metadatas_list.append(metadata)
         documents_list.append(text)
+        cache_records.append({"appid": appid, "detail": detail})
 
         if (i + 1) % 10 == 0:
             print(f"  Fetched {i + 1}/{len(appids)} games...")
@@ -111,13 +164,16 @@ def ingest_full(appids: list[int]):
             documents=documents_list,
         )
 
+    save_cache(cache_records)
     print(f"Full rebuild complete: {len(ids_list)} games indexed.")
 
 
 def ingest_append(appids: list[int]):
-    """Append mode: only add games not already in the collection."""
     collection = get_games_collection()
     existing_ids = set(collection.get()["ids"])
+
+    # Also load existing cache to append to it
+    cache_records = load_cache() if CACHE_PATH.exists() else []
 
     new_ids = []
     new_metadatas = []
@@ -135,6 +191,7 @@ def ingest_append(appids: list[int]):
         new_ids.append(doc_id)
         new_metadatas.append(metadata)
         new_documents.append(text)
+        cache_records.append({"appid": appid, "detail": detail})
 
         if (i + 1) % 10 == 0:
             print(f"  Fetched {i + 1} new appids...")
@@ -148,9 +205,12 @@ def ingest_append(appids: list[int]):
             metadatas=new_metadatas,
             documents=new_documents,
         )
+        save_cache(cache_records)
 
     print(f"Append complete: {len(new_ids)} new games added.")
 
+
+# ── main ──────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="Steam game knowledge base ingestion")
@@ -162,7 +222,17 @@ def main():
         "--count", type=int, default=250,
         help="Number of top games to fetch (default: 250)",
     )
+    parser.add_argument(
+        "--from-cache", action="store_true",
+        help="Rebuild from local cache instead of calling Steam API. "
+             "Use this when switching embedding models — no API calls, just re-embed.",
+    )
     args = parser.parse_args()
+
+    if args.from_cache:
+        print("Rebuilding from local cache (no API calls)...")
+        ingest_from_cache()
+        return
 
     print(f"Fetching top {args.count} games from Steam Charts...")
     appids = fetch_top_appids(args.count)
@@ -179,7 +249,6 @@ def main():
 
 
 def _load_fallback_appids(count: int) -> list[int]:
-    """Fallback: load appids from Steam's full app list."""
     try:
         response = httpx.get(STEAM_APP_LIST_URL, timeout=30.0)
         response.raise_for_status()
