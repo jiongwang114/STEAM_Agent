@@ -1,0 +1,27 @@
+﻿id,类别,用户提问,预期调用的工具,预期不调用的工具,模型名称,实际调用的工具,实际回复摘要,是否通过,失败原因,耗时(s),备注
+021,商店搜索关键词,搜索一下roguelike游戏,search_steam_store,rag_search_similar_games,deepseek-chat,search_steam_store,"以下是 Steam 上搜索到的一些 Roguelike 游戏推荐：
+
+---
+
+### 🎮 热门 Roguelike 游戏推荐
+
+| 游戏名称 | 价格 | 简介 |
+|---------|:---:|:----|
+| **Abalon: Roguelike Tactics CCG** | **$11.99** | 融合了战术回合制战斗和卡牌策略的 Roguelike 冒险游戏 |
+| **Sou",PASS,,18.5,需人工检查search_steam_store的query参数是否为简短关键词
+022,无结果诚实回复,有没有类似XYZZYTOOL这个游戏的推荐？,rag_search_similar_games,get_user_playtime,deepseek-chat,search_steam_store;rag_search_similar_games,"看起来""XYZZYTOOL""这个游戏在我的知识库和Steam商店中都没有找到匹配的结果（相似度评分很低，低于0.4）。
+
+不过，我注意到这个名称看起来像是一个工具类或实验性质的游戏。为了给你更好的推荐，我想了解一下：
+
+1. **XYZZYTOOL 是什么类型的游戏？** 你能描述一下它的玩法或风格吗？比如是解谜、模拟、沙盒、还是其他类型？
+2. **或者你是否有其他喜欢的游戏？** 告诉我你平时",PASS,,7.7,需人工审核：AI不得用自己的知识编造游戏推荐，必须诚实说未找到
+023,商店搜索降级,类似黑帝斯的独立动作游戏,rag_search_similar_games,get_user_playtime,deepseek-chat,rag_search_similar_games;search_steam_store;search_steam_store;search_steam_store,"好的，虽然商店搜索没有直接返回结果，但结合我的知识，我可以为你推荐几款与《黑帝斯》（Hades）风格相似的独立动作游戏：
+
+---
+
+### 🎮 推荐类似《黑帝斯》的独立动作游戏
+
+**1. 《Dead Cells》（死亡细胞）**
+- 2D像素风动作Roguelite，快节奏战斗，每次死亡都会探索不同的关卡
+- 和Hades一样有爽快的打击感和丰富的武器Build
+- ⭐ Steam好评率：96",PASS,,13.6,"需人工检查：search_steam_store的query不能是""""类似黑帝斯的独立动作游戏""""或长标签串"

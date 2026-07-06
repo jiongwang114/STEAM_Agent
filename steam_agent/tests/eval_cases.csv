@@ -1,0 +1,24 @@
+id,类别,用户提问,预期调用的工具,预期行为描述,预期不调用的工具,模型名称,实际调用的工具,实际回复摘要,是否通过,备注
+001,直接回答,"魂系游戏是什么意思？",无,直接用自身知识解释概念，不调任何工具,全部,deepseek-chat,,,,
+002,RAG检索,"推荐类似 Hollow Knight 的游戏",rag_search_similar_games,以游戏名作为语义锚点检索相似游戏,get_user_playtime,deepseek-chat,,,,
+003,商店搜索,"CS2现在多少钱？",search_steam_store,查商店实时价格和评价,rag_search_similar_games,deepseek-chat,,,,
+004,用户库查询,"我玩过哪些游戏？",get_user_playtime,需要steam_id。若无则引导绑定Steam,rag_search_similar_games;search_steam_store,deepseek-chat,,,,
+005,链式调用,"根据我的游戏库推荐几款类似的",get_user_playtime → rag_search_similar_games,先查库取Top3→再RAG检索相似游戏。信息充分后直接答不查商店,search_steam_store,deepseek-chat,,,,
+006,链式+商店,"推荐类似我玩的游戏，想知道价格",get_user_playtime → rag_search_similar_games → search_steam_store,查库→RAG推荐→商店查价格，三工具依次调用,无,deepseek-chat,,,,
+007,中文翻译RAG,"推荐类似黑帝斯的独立动作游戏",rag_search_similar_games,"query含中文→翻译为英文→embedding→Chroma检索。tags提取""独立""""动作""做filter",get_user_playtime;search_steam_store,deepseek-chat,,,,
+008,偏好保存,"我最讨厌恐怖游戏，千万别推荐",save_user_insight,检测到用户偏好表达→保存category=preference→告知已记住,无,deepseek-chat,,,,
+009,约束保存,"我预算不超过100元",save_user_insight,检测到约束→保存category=constraint,无,deepseek-chat,,,,
+010,事实保存,"我有一台Steam Deck",save_user_insight,检测到个人事实→保存category=fact,无,deepseek-chat,,,,
+011,记忆召回,"上次你给我推荐的那个游戏我玩了，感觉怎么样？",recall_user_memory,用户提到历史对话→检索user_memory collection,rag_search_similar_games;search_steam_store,deepseek-chat,,,,
+012,匿名用户通用推荐,"最近有什么好玩的策略游戏？",search_steam_store (可选rag_search_similar_games),"steam_id=None，不调playtime。用商店搜索或RAG给通用推荐，不引导绑定",get_user_playtime,deepseek-chat,,,,
+013,匿名用户个性化引导,"根据我的口味推荐几款",get_user_playtime,"无steam_id→调playtime会失败→Agent应在回复中引导用户绑定Steam",rag_search_similar_games;search_steam_store,deepseek-chat,,,,需人工审核回复中是否包含引导绑定Steam的话语
+014,RAG标签过滤,"类似Hollow Knight但是独立游戏的","rag_search_similar_games(filter_tags=[""Indie""])",Agent显式传入filter_tags做混合检索,get_user_playtime,deepseek-chat,,,,
+015,多轮对话上下文,"（上轮聊过RPG之后）那有什么类似的推荐吗？",rag_search_similar_games,"多轮对话中能理解""类似""指上一轮聊的RPG，不需要用户重复",get_user_playtime,deepseek-chat,,,,
+016,不需要工具的问题,"你好，你是谁？",无,自我介绍，不调任何工具,全部,deepseek-chat,,,,
+017,混合需求,"我玩过很多Roguelike，有什么不那么硬核的推荐？",rag_search_similar_games,"'不那么硬核'是对推荐结果的约束→Agent在RAG结果中筛选。不查库因为没steam_id",get_user_playtime;search_steam_store,deepseek-chat,,,,
+018,信息不充分再追问,"有个游戏叫什么来着，好像是打僵尸的",rag_search_similar_games,先用描述检索→返回给用户确认→必要时再调search_steam_store确认,get_user_playtime,deepseek-chat,,,,
+019,偏好撤销,"其实我现在不排斥恐怖游戏了","save_user_insight(action=""remove"")",检测到推翻之前偏好→调save_user_insight删除旧insight,无,deepseek-chat,,,,
+020,负向约束+推荐,"推荐好玩的联机游戏，我晕3D别推FPS",save_user_insight + rag_search_similar_games,"先保存""晕3D""约束→再推荐联机游戏→结果中排除FPS",无,deepseek-chat,,,,
+021,商店搜索关键词,"搜索一下roguelike游戏",search_steam_store,"query应为简短关键词如""roguelike""，严禁用长标签串如""roguelike action indie""",rag_search_similar_games,deepseek-chat,,,,需人工检查search_steam_store的query参数是否为简短关键词
+022,无结果诚实回复,"有没有类似XYZZYTOOL这个游戏的推荐？",rag_search_similar_games,"RAG返回低分或无结果→若转调search_steam_store也应有简短关键词→最终应如实告知未找到，不得编造推荐",get_user_playtime,deepseek-chat,,,,需人工审核：AI不得用自己的知识编造游戏推荐，必须诚实说未找到
+023,商店搜索降级,"类似黑帝斯的独立动作游戏",rag_search_similar_games,"RAG结果不理想时→若转调search_steam_store，query必须精简为关键词如""Hades""或""roguelike""，严禁复用RAG的自然语言query",get_user_playtime,deepseek-chat,,,,需人工检查：search_steam_store的query不能是""类似黑帝斯的独立动作游戏""或长标签串

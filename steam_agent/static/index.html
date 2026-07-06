@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steam 游戏推荐助手</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface2: #0f3460;
+  --accent: #e94560;
+  --text: #eaeaea;
+  --text-muted: #a0a0b0;
+  --user-bubble: #0f3460;
+  --assistant-bubble: #16213e;
+  --border: #2a2a4a;
+  --tool-bg: #1a3a1a;
+  --tool-text: #7ecb7e;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header .subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.thread-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.thread-bar button {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.thread-bar button:hover { background: var(--accent); }
+
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+
+.message {
+  display: flex;
+  gap: 10px;
+  max-width: 85%;
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.message.user { align-self: flex-end; flex-direction: row-reverse; }
+.message.assistant { align-self: flex-start; }
+.message.system { align-self: center; max-width: 100%; }
+
+.avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.message.user .avatar { background: var(--accent); }
+.message.assistant .avatar { background: var(--surface2); }
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.message.user .bubble { background: var(--user-bubble); border-bottom-right-radius: 4px; }
+.message.assistant .bubble { background: var(--assistant-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+
+.tool-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--tool-bg);
+  color: var(--tool-text);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  margin: 4px 4px 4px 0;
+}
+.tool-badge .icon { font-size: 14px; }
+
+.loading {
+  display: flex; gap: 4px; padding: 10px 14px;
+}
+.loading .dot {
+  width: 6px; height: 6px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+.loading .dot:nth-child(1) { animation-delay: -0.32s; }
+.loading .dot:nth-child(2) { animation-delay: -0.16s; }
+@keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  flex-shrink: 0;
+}
+.input-row {
+  display: flex; gap: 8px;
+}
+.input-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-row input:focus { border-color: var(--accent); }
+.input-row input::placeholder { color: #555; }
+.input-row button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.input-row button:hover { opacity: 0.9; }
+.input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Steam 游戏推荐助手</h1>
+    <div class="subtitle">基于 AI 的个性化游戏推荐</div>
+  </div>
+  <div class="thread-bar">
+    会话: <strong id="threadLabel">—</strong>
+    <button onclick="newThread()">新会话</button>
+  </div>
+</header>
+
+<main id="chat"></main>
+
+<footer>
+  <div class="input-row">
+    <input id="input" type="text" placeholder="输入消息，例如：推荐类似 Hollow Knight 的游戏..." autofocus
+           onkeydown="if(event.key==='Enter')send()" />
+    <button id="sendBtn" onclick="send()">发送</button>
+  </div>
+  <div class="hint">支持多轮对话，Agent 会自动调用工具来为你推荐游戏</div>
+</footer>
+
+<script>
+const chat = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const threadLabel = document.getElementById('threadLabel');
+
+const USER_ID = 'web_user';
+let threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+threadLabel.textContent = threadId.slice(0, 8);
+let isStreaming = false;
+
+function newThread() {
+  threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+  threadLabel.textContent = threadId.slice(0, 8);
+  chat.innerHTML = '';
+  addMessage('system', '新会话已开始。你可以输入消息来获得游戏推荐。');
+}
+
+function addMessage(role, text, toolNames) {
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+
+  if (role === 'system') {
+    div.innerHTML = `<div class="bubble" style="color:var(--text-muted);font-size:12px;text-align:center">${text}</div>`;
+  } else {
+    const avatar = role === 'user' ? '😀' : '🤖';
+    div.innerHTML = `<div class="avatar">${avatar}</div><div class="bubble">${text}</div>`;
+
+    if (toolNames && toolNames.length > 0) {
+      const toolsHtml = toolNames.map(t =>
+        `<span class="tool-badge"><span class="icon">🔧</span>${t}</span>`
+      ).join('');
+      div.querySelector('.bubble').insertAdjacentHTML('beforeend',
+        `<div style="margin-top:8px">${toolsHtml}</div>`);
+    }
+  }
+
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function addStreamingMessage() {
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.innerHTML = `<div class="avatar">🤖</div>
+    <div class="bubble"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>`;
+  div.id = 'streaming-msg';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function send() {
+  const msg = input.value.trim();
+  if (!msg || isStreaming) return;
+
+  isStreaming = true;
+  input.value = '';
+  input.disabled = true;
+  sendBtn.disabled = true;
+
+  addMessage('user', msg);
+  const streamDiv = addStreamingMessage();
+  const bubble = streamDiv.querySelector('.bubble');
+
+  let fullReply = '';
+  const tools = [];
+
+  try {
+    const resp = await fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        thread_id: threadId,
+        user_id: USER_ID,
+        message: msg,
+        steam_id: null
+      })
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('data: ')) {
+          const data = trimmed.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const evt = JSON.parse(data);
+            if (evt.event === 'token') {
+              fullReply += evt.data;
+              bubble.textContent = fullReply;
+              chat.scrollTop = chat.scrollHeight;
+            } else if (evt.event === 'tool_call') {
+              tools.push(evt.data);
+            }
+          } catch (e) {
+            try {
+              const multi = JSON.parse('[' + trimmed.slice(6).split('\n').filter(l => l.startsWith('{')).join(',') + ']');
+              for (const evt of multi) {
+                if (evt.event === 'token') { fullReply += evt.data; bubble.textContent = fullReply; }
+                else if (evt.event === 'tool_call') tools.push(evt.data);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
+    if (fullReply) {
+      bubble.textContent = fullReply;
+    } else {
+      bubble.textContent = '(无回复)';
+    }
+
+    if (tools.length > 0) {
+      const toolsHtml = tools.map(t =>
+        `<span class="tool-badge"><span class="icon">🔧</span>${t}</span>`
+      ).join('');
+      bubble.insertAdjacentHTML('beforeend', `<div style="margin-top:8px">${toolsHtml}</div>`);
+    }
+
+    streamDiv.removeAttribute('id');
+  } catch (err) {
+    bubble.innerHTML = `<span style="color:var(--accent)">请求失败: ${err.message}</span>`;
+    streamDiv.removeAttribute('id');
+  } finally {
+    isStreaming = false;
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+    chat.scrollTop = chat.scrollHeight;
+  }
+}
+
+addMessage('system', '欢迎使用 Steam 游戏推荐助手！你可以直接提问，例如：\n• "推荐类似 Hollow Knight 的游戏"\n• "最近有什么好玩的策略游戏"\n• "我玩过很多Roguelike，还有什么推荐"');
+</script>
+</body>
+</html>
