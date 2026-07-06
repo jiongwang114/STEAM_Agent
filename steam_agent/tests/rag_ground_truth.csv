@@ -1,0 +1,31 @@
+query,top_k,relevant_appids,notes
+"open world rpg",10,"1091500;1245620;489830;1174180;3321460;271590;3240220;892970;3041230;1086940",Cyberpunk/Elden Ring/Skyrim/RDR2 等
+"类似艾尔登法环的游戏",10,"1245620;2622370;3321460;2344520;2694490;1086940;3041230;1551360;489830;1142710",魂系/动作RPG/开放世界
+"roguelike deck builder",5,"646570;2868840;2379780;250900;3526710",Slay the Spire/Balatro/Isaac
+"survival crafting game",10,"252490;105600;892970;264710;108600;251570;322330;284160;294100;221100",Rust/Terraria/Valheim/Subnautica/Project Zomboid 等
+"free to play fps",10,"730;1172470;578080;2357570;440;1938090;2073850;230410;2507950;2767030",CS2/Apex/PUBG/OW/TF2/CoD 等
+"military simulation",5,"236390;284160;1938090;2507950;359550",War Thunder/BeamNG/CoD/Delta Force/R6
+"sports game",5,"3405690;3472040;252950;1665460;1551360",FC26/NBA2K26/Rocket League/eFootball/Forza
+"cozy farming game",5,"413150;105600;1222670;2300320;4025700",Stardew/Terraria/Sims/Farming Sim/Heartopia
+"multiplayer survival",5,"252490;892970;322330;108600;251570",Rust/Valheim/DST/Project Zomboid/7 Days
+"strategy war game",5,"289070;1142710;394360;1158310;813780",Civ6/Total War Warhammer/HOI4/CK3/AoE2
+"horror co-op",5,"739630;381210;594650;322330;252490",Phasmophobia/DBD/Hunt/DST/Rust
+"indie game with deep mechanics",5,"646570;294100;2379780;413150;105600",Slay the Spire/RimWorld/Balatro/Stardew/Terraria
+"best rpg 2023",5,"1086940;1245620;1091500;2344520;489830",BG3/Elden Ring/Cyberpunk/Diablo4/Skyrim
+"relaxing game no combat",5,"413150;1222670;2300320;4025700;3419430",Stardew/Sims/Farming Sim/Heartopia/Bongo Cat
+"competitive shooter",5,"730;578080;1172470;359550;2767030",CS2/PUBG/Apex/R6/Marvel Rivals
+"动作角色扮演 中文",5,"1245620;1086940;1091500;3321460;2344520",Elden Ring/BG3/Cyberpunk/Crimson Desert/Diablo4
+"baldur's gate 3 similar",5,"1086940;1245620;2694490;1158310;489830",BG3本身/Elden Ring/PoE2/CK3/Skyrim
+"恐怖游戏 多人",5,"739630;381210;594650;322330;252490",Phasmophobia/DBD/Hunt/DST/Rust
+"racing sim",5,"244210;1551360;284160;252950;440900",Assetto Corsa/Forza/BeamNG/Rocket League/Conan Exiles
+"base building strategy",5,"294100;289070;251570;892970;108600",RimWorld/Civ6/7 Days/Valheim/Project Zomboid
+"card game roguelike steam",5,"2379780;646570;2868840;250900;3526710",Balatro/StS/StS2/Isaac/Crab
+"太空 探索 建造",5,"264710;105600;252490;892970;322330",Subnautica/Terraria/Rust/Valheim/DST
+"類似黑暗之魂的遊戲",5,"1245620;2622380;2344520;3321460;3041230",Elden Ring/NIGHTREIGN/Diablo4/Crimson Desert/Windrose
+"multiplayer battle royale",5,"578080;1172470;2767030;2073850;2073620",PUBG/Apex/Marvel Rivals/THE FINALS/Arena Breakout
+"pixel art indie",5,"413150;105600;2379780;646570;250900",Stardew/Terraria/Balatro/StS/Isaac
+"grand strategy historical",5,"394360;289070;1158310;1142710;813780",HOI4/Civ6/CK3/Total War/AoE2
+"vr social",5,"438100;431960;4000;3419430;4025700",VRChat/Wallpaper Engine/GMod/Bongo Cat/Heartopia
+"f2p mmorpg",5,"39210;3513350;1203220;230410;3564740",FFXIV/Wuthering Waves/NARAKA/Warframe/Where Winds Meet
+"英雄射击 免费",5,"2357570;2767030;1172470;440;2073850",Overwatch/Marvel Rivals/Apex/TF2/THE FINALS
+"top metroidvania indie",5,"105600;250900;646570;322330;413150",Terraria/Isaac/StS/DST/Stardew (库里没有纯metroidvania)
