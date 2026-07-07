@@ -1,0 +1,2 @@
+﻿label,date,top_k,variable_changed,avg_recall
+baseline,2026-07-07 14:55,10,过滤基线：修复ChromaDB $contains语法,0.5967

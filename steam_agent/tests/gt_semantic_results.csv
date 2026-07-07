@@ -1,0 +1,21 @@
+﻿query,top_k,relevant_appids,recall_baseline,filters,retrieved_names
+roguelike card game,5,646570;2868840;2379780;250900;3526710,0.4000,,Slay the Spire;Balatro;Heroes of Might and Magic: Olden Era;Yu-Gi-Oh! Master Duel;Gamble With Your Friends
+survival crafting open world,10,252490;105600;892970;264710;108600;251570;322330;440900;221100;294100,0.7000,,Project Zomboid;Where Winds Meet;DayZ;Rust;Terraria;Subnautica;Don't Starve Together;7 Days to Die;Sid Meier’s Civilization® VI;Heartopia
+cozy farming life sim,5,413150;1222670;2300320;4025700;105600,1.0000,,Farming Simulator 25;The Sims™ 4;Stardew Valley;Terraria;Heartopia
+competitive multiplayer fps,10,730;578080;1172470;359550;2767030;2357570;2073850;1938090;440;594650,0.4000,,THE FINALS;Marvel Rivals;PUBG: BATTLEGROUNDS;EA SPORTS FC™ 26;Brawlhalla;War Thunder;Dota 2;NBA 2K26;Tom Clancy's Rainbow Six Siege;FINAL FANTASY XIV Online
+multiplayer survival horror,5,739630;381210;594650;322330;1144200;3764200,0.3333,,DayZ;Project Zomboid;Dead by Daylight;Phasmophobia;Rust
+base building colony sim,5,294100;251570;892970;108600;289070,0.2000,,The Sims™ 4;Farming Simulator 25;RimWorld;Schedule I;Bloons TD 6
+space exploration survival,5,264710;105600;252490;892970;322330,0.6000,,Subnautica;Sid Meier’s Civilization® VI;Terraria;Don't Starve Together;Project Zomboid
+battle royale multiplayer,5,578080;1172470;2767030;2073850;2073620,0.4000,,PUBG: BATTLEGROUNDS;War Thunder;THE FINALS;Warframe;Don't Starve Together
+vr social hangout,5,438100;4000;3419430;4025700;431960,0.4000,,VRChat;Gamble With Your Friends;Phasmophobia;R.E.P.O.;Heartopia
+metroidvania 2d indie,5,105600;250900;322330;264710;413150,0.0000,,Geometry Dash;Umamusume: Pretty Derby;Age of Empires II: Definitive Edition;Path of Exile 2;Assetto Corsa
+medieval strategy grand strategy,5,394360;289070;1158310;1142710;813780,0.4000,,Crusader Kings III;Mount & Blade II: Bannerlord;Hearts of Iron IV;Heroes of Might and Magic: Olden Era;Valheim
+action rpg dark fantasy,10,1245620;2622380;3321460;2344520;2694490;3041230;1086940;489830;261550;1091500,0.5000,,FINAL FANTASY XIV Online;ELDEN RING;Valheim;Path of Exile 2;Mount & Blade II: Bannerlord;Cyberpunk 2077;Crimson Desert;Warframe;Where Winds Meet;Far Far West
+story rich single player rpg,5,1086940;1091500;1245620;489830;1174180,0.0000,,FINAL FANTASY XIV Online;Gamble With Your Friends;Valheim;Mount & Blade II: Bannerlord;PUBG: BATTLEGROUNDS
+relaxing casual no combat,5,413150;1222670;2300320;4025700;3419430,0.0000,,Battlefield™ 6;Warframe;Don't Starve Together;Rust;Terraria
+indie pixel art game,5,413150;105600;2379780;646570;322170;250900,0.3333,,Stardew Valley;Terraria;R.E.P.O.;FINAL FANTASY XIV Online;Wallpaper Engine
+动作角色扮演 开放世界,10,1245620;1086940;1091500;3321460;2344520;489830;2694490;261550;3564740;3513350,0.4000,,Where Winds Meet;Warframe;FINAL FANTASY XIV Online;Terraria;THE FINALS;Path of Exile 2;Mount & Blade II: Bannerlord;R.E.P.O.;ELDEN RING;Age of Empires II: Definitive Edition
+恐怖合作生存,5,739630;381210;594650;322330;1144200;3764200,0.3333,,R.E.P.O.;Project Zomboid;Dead by Daylight;Phasmophobia;DayZ
+魂系动作RPG,5,1245620;2622380;2344520;3321460;3041230;2694490,0.1667,,Diablo® IV;Terraria;Mount & Blade II: Bannerlord;Heartopia;FINAL FANTASY XIV Online
+卡牌策略roguelike,5,646570;2868840;2379780;250900;3526710,0.6000,,Slay the Spire;Balatro;Heroes of Might and Magic: Olden Era;Yu-Gi-Oh! Master Duel;Everything is Crab: The Animal Evolution Roguelite
+模拟经营管理,5,294100;289070;2300320;413150;1222670,0.4000,,Farming Simulator 25;Heartopia;The Sims™ 4;BeamNG.drive;Euro Truck Simulator 2

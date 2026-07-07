@@ -1,0 +1,21 @@
+query,top_k,relevant_appids,notes
+"roguelike card game",5,"646570;2868840;2379780;250900;3526710",Slay the Spire/Slay the Spire 2/Balatro/Isaac/Crab
+"survival crafting open world",10,"252490;105600;892970;264710;108600;251570;322330;440900;221100;294100",Rust/Terraria/Valheim/Subnautica/ProjectZomboid/7Days/DST/ConanExiles/DayZ/RimWorld
+"cozy farming life sim",5,"413150;1222670;2300320;4025700;105600",Stardew/Sims4/FarmingSim25/Heartopia/Terraria
+"competitive multiplayer fps",10,"730;578080;1172470;359550;2767030;2357570;2073850;1938090;440;594650",CS2/PUBG/Apex/R6/MarvelRivals/Overwatch/THEFINALS/CoD/TF2/HuntShowdown
+"multiplayer survival horror",5,"739630;381210;594650;322330;1144200;3764200",Phasmophobia/DBD/HuntShowdown/DST/ReadyOrNot/RE
+"base building colony sim",5,"294100;251570;892970;108600;289070",RimWorld/7Days/Valheim/ProjectZomboid/Civ6
+"space exploration survival",5,"264710;105600;252490;892970;322330",Subnautica/Terraria/Rust/Valheim/DST
+"battle royale multiplayer",5,"578080;1172470;2767030;2073850;2073620",PUBG/Apex/MarvelRivals/THEFINALS/ArenaBreakout
+"vr social hangout",5,"438100;4000;3419430;4025700;431960",VRChat/GMod/BongoCat/Heartopia/WallpaperEngine
+"metroidvania 2d indie",5,"105600;250900;322330;264710;413150",库里无纯metroidvania/近似Terraria/Isaac/DST/Subnautica/Stardew
+"medieval strategy grand strategy",5,"394360;289070;1158310;1142710;813780",HOI4/Civ6/CK3/TotalWarWH3/AoE2
+"action rpg dark fantasy",10,"1245620;2622380;3321460;2344520;2694490;3041230;1086940;489830;261550;1091500",EldenRing/NIGHTREIGN/CrimsonDesert/Diablo4/PoE2/Windrose/BG3/Skyrim/MountBlade2/Cyberpunk
+"story rich single player rpg",5,"1086940;1091500;1245620;489830;1174180",BG3/Cyberpunk/EldenRing/Skyrim/RDR2
+"relaxing casual no combat",5,"413150;1222670;2300320;4025700;3419430",Stardew/Sims4/FarmingSim25/Heartopia/BongoCat
+"indie pixel art game",5,"413150;105600;2379780;646570;322170;250900",Stardew/Terraria/Balatro/StS/GeometryDash/Isaac
+"动作角色扮演 开放世界",10,"1245620;1086940;1091500;3321460;2344520;489830;2694490;261550;3564740;3513350",EldenRing/BG3/Cyberpunk/CrimsonDesert/Diablo4/Skyrim/PoE2/MountBlade2/WhereWindsMeet/WutheringWaves
+"恐怖合作生存",5,"739630;381210;594650;322330;1144200;3764200",Phasmophobia/DBD/HuntShowdown/DST/ReadyOrNot/RE
+"魂系动作RPG",5,"1245620;2622380;2344520;3321460;3041230;2694490",EldenRing/NIGHTREIGN/Diablo4/CrimsonDesert/Windrose/PoE2
+"卡牌策略roguelike",5,"646570;2868840;2379780;250900;3526710",StS/StS2/Balatro/Isaac/Crab
+"模拟经营管理",5,"294100;289070;2300320;413150;1222670",RimWorld/Civ6/FarmingSim25/Stardew/Sims4

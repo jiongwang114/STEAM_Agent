@@ -1,0 +1,11 @@
+﻿query,top_k,relevant_appids,recall_baseline,filters,retrieved_names
+free to play competitive fps,10,730;1172470;578080;2357570;440;2073850;230410;2507950;2767030,0.6667,free,PUBG: BATTLEGROUNDS;Brawlhalla;Yu-Gi-Oh! Master Duel;War Thunder;Dota 2;THE FINALS;Counter-Strike 2;Warframe;Delta Force;Apex Legends™
+best rpg after 2023,5,1086940;1091500;2344520;2694490,0.7500,"y>=2023, tags=RPG",Heroes of Might and Magic: Olden Era;Path of Exile 2;Baldur's Gate 3;Diablo® IV;Where Winds Meet
+racing simulation game,5,244210;1551360;284160;252950;227300,0.8000,tags=Racing,Forza Horizon 5;BeamNG.drive;Rocket League®;Assetto Corsa;Grand Theft Auto V Enhanced
+strategy war game historical,5,394360;289070;1142710;1158310;813780,0.6000,tags=Strategy,Hearts of Iron IV;Total War: WARHAMMER III;Bloons TD 6;Crusader Kings III;Heroes of Might and Magic: Olden Era
+sports simulation,5,3405690;3472040;252950;1665460;1551360;3551340,0.6667,tags=Sports,EA SPORTS FC™ 26;Football Manager 26;Umamusume: Pretty Derby;Rocket League®;NBA 2K26
+indie roguelike strategy,5,646570;2868840;2379780;294100;3526710,0.6000,tags=Indie,Slay the Spire;Everything is Crab: The Animal Evolution Roguelite;Balatro;Gamble With Your Friends;Valheim
+f2p mmorpg online,5,3513350;1203220;230410;3564740,0.7500,"free, tags=RPG",Warframe;Arena Breakout: Infinite;Where Winds Meet;Wuthering Waves
+military simulation shooter,5,236390;1938090;2507950;359550;1144200,0.2000,tags=Simulation,Hearts of Iron IV;War Thunder;Yu-Gi-Oh! Master Duel;Mount & Blade II: Bannerlord;Heartopia
+英雄射击 多人,5,2357570;2767030;1172470;440;2073850,0.6000,free,THE FINALS;Apex Legends™;Brawlhalla;Marvel Rivals;Dota 2
+像素风独立游戏 indie,5,413150;105600;2379780;646570;322170;250900,0.3333,tags=Indie,Terraria;Stardew Valley;Subnautica;Project Zomboid;Assetto Corsa

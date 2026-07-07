@@ -42,7 +42,10 @@ def rag_search_similar_games(
     # Build ChromaDB where clause from metadata filters.
     conditions = []
     if filter_tags:
-        conditions.append({"tags": {"$in": filter_tags}})
+        if len(filter_tags) == 1:
+            conditions.append({"tags": {"$contains": filter_tags[0]}})
+        else:
+            conditions.append({"$or": [{"tags": {"$contains": t}} for t in filter_tags]})
     if free_only:
         conditions.append({"is_free": True})
     if min_metacritic is not None:

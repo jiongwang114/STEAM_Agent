@@ -1,0 +1,2 @@
+﻿label,date,top_k,variable_changed,avg_recall
+baseline,2026-07-07 14:53,5,纯语义基线：BGE + 紧凑chunk,0.3783

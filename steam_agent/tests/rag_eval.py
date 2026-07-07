@@ -1,15 +1,14 @@
 """
-RAG retrieval evaluation — only measures Recall@K.
-No LLM calls, no token cost. Pure vector search.
+RAG retrieval evaluation — Recall@K only. No LLM calls, no token cost.
 
-Each run appends a recall_{label} column to rag_eval_results.csv and
-records the change metadata in rag_eval_changelog.csv.
+Each ground truth CSV gets its own results and changelog files:
+  gt_semantic.csv -> gt_semantic_results.csv + gt_semantic_changelog.csv
 
 Usage:
     python -m steam_agent.tests.rag_eval --label baseline
-    python -m steam_agent.tests.rag_eval --label v2 --note "embedder: MiniLM -> multilingual-MiniLM"
-    python -m steam_agent.tests.rag_eval --top-k 5 --label top5 --note "top_k: 10 -> 5"
-    python -m steam_agent.tests.rag_eval --query-id 3            # single query, no csv
+    python -m steam_agent.tests.rag_eval -g gt_semantic --label v2 --note "chunk: v1 -> v2"
+    python -m steam_agent.tests.rag_eval -g gt_filtered --label v1 --note "filter: off -> on"
+    python -m steam_agent.tests.rag_eval -g gt_semantic --query-id 3
 """
 
 import argparse
@@ -21,9 +20,8 @@ from pathlib import Path
 
 from ..tools.rag_search import rag_search_similar_games
 
-CSV_PATH = Path(__file__).resolve().parent / "rag_ground_truth.csv"
-RESULT_CSV_PATH = Path(__file__).resolve().parent / "rag_eval_results.csv"
-CHANGELOG_CSV_PATH = Path(__file__).resolve().parent / "rag_eval_changelog.csv"
+TESTS_DIR = Path(__file__).resolve().parent
+DEFAULT_GT = "gt_semantic.csv"
 
 
 def recall_at_k(retrieved: list[str], relevant: list[str]) -> float:
@@ -32,30 +30,24 @@ def recall_at_k(retrieved: list[str], relevant: list[str]) -> float:
     return sum(1 for r in relevant if r in retrieved) / len(relevant)
 
 
-def _filter_summary(case: dict) -> str:
-    parts = []
-    if case.get("free_only"):
-        parts.append("free_only")
-    if case.get("min_year"):
-        parts.append(f"year>={case['min_year']}")
-    if case.get("filter_tags"):
-        parts.append(f"tags={','.join(case['filter_tags'])}")
-    return ", ".join(parts)
-
-
 def load_ground_truth(path: Path) -> list[dict]:
+    """Load CSV. Auto-detect filter columns (free_only, filter_tags, min_year)."""
     with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        headers = reader.fieldnames or []
+        has_filters = any(h in headers for h in ["free_only", "filter_tags", "min_year"])
+
         cases = []
-        for row in csv.DictReader(f):
+        for row in reader:
             row["top_k"] = int(row["top_k"])
             row["relevant_appids"] = [
                 aid.strip() for aid in row["relevant_appids"].split(";") if aid.strip()
             ]
-            # Parse optional filter columns
-            row["free_only"] = row.get("free_only", "").strip() == "1"
-            row["min_year"] = int(row["min_year"]) if row.get("min_year", "").strip() else None
-            raw_tags = row.get("filter_tags", "").strip()
-            row["filter_tags"] = [t.strip() for t in raw_tags.split(",") if t.strip()] if raw_tags else None
+            if has_filters:
+                row["free_only"] = row.get("free_only", "").strip() == "1"
+                row["min_year"] = int(row["min_year"]) if row.get("min_year", "").strip() else None
+                raw_tags = row.get("filter_tags", "").strip()
+                row["filter_tags"] = [t.strip() for t in raw_tags.split(",") if t.strip()] if raw_tags else None
             cases.append(row)
         return cases
 
@@ -73,12 +65,19 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
             filter_tags=case.get("filter_tags"),
             free_only=case.get("free_only", False),
             min_year=case.get("min_year"),
-            min_similarity=0,  # eval: no threshold, measure raw retrieval
+            min_similarity=0,
         )
         items = rag_result.get("results", [])
         retrieved = [item["appid"] for item in items]
-
         recall = recall_at_k(retrieved, relevant)
+
+        filters_used = []
+        if case.get("free_only"):
+            filters_used.append("free")
+        if case.get("min_year"):
+            filters_used.append(f"y>={case['min_year']}")
+        if case.get("filter_tags"):
+            filters_used.append(f"tags={','.join(case['filter_tags'])}")
 
         results.append({
             "query": query,
@@ -87,36 +86,40 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
             "retrieved_appids": ";".join(retrieved),
             "retrieved_names": ";".join(item["name"] for item in items),
             "recall": recall,
-            "filters_used": _filter_summary(case),
+            "filters": ", ".join(filters_used),
         })
 
-        filters_str = _filter_summary(case)
+        filter_str = f"  [{', '.join(filters_used)}]" if filters_used else ""
         status = "OK" if recall >= 0.5 else "LOW"
         print(f"{i+1:2d}/{len(cases)} [{status}] {query[:45]:<45s} "
-              f"recall={recall:.2f}  top={items[0]['name'][:20] if items else 'N/A'}"
-              f"{'  [' + filters_str + ']' if filters_str else ''}")
+              f"recall={recall:.2f}  top={items[0]['name'][:20] if items else 'N/A'}{filter_str}")
 
     return results
 
 
-# ── result CSV ────────────────────────────────────────────────────────
+# ── CSV I/O ────────────────────────────────────────────────────────────
 
-def _read_existing_csv() -> tuple[list[str], list[dict]]:
-    if not RESULT_CSV_PATH.exists():
-        return [], []
-    with open(RESULT_CSV_PATH, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        headers = reader.fieldnames or []
-        rows = list(reader)
-    return headers, rows
+def _derive_paths(gt_path: Path) -> tuple[Path, Path]:
+    """gt_xxx.csv -> (gt_xxx_results.csv, gt_xxx_changelog.csv)."""
+    stem = gt_path.stem  # e.g. "gt_semantic"
+    return (
+        gt_path.parent / f"{stem}_results.csv",
+        gt_path.parent / f"{stem}_changelog.csv",
+    )
 
 
-def write_results(results: list[dict], label: str):
-    existing_headers, existing_rows = _read_existing_csv()
+def write_results(results: list[dict], label: str, result_path: Path):
+    existing_headers, existing_rows = [], []
+    if result_path.exists():
+        with open(result_path, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            existing_headers = reader.fieldnames or []
+            existing_rows = list(reader)
+
     recall_col = f"recall_{label}"
 
     if not existing_headers:
-        headers = ["query", "top_k", "relevant_appids", recall_col, "retrieved_names"]
+        headers = ["query", "top_k", "relevant_appids", recall_col, "filters", "retrieved_names"]
         rows_out = []
         for r in results:
             rows_out.append({
@@ -124,6 +127,7 @@ def write_results(results: list[dict], label: str):
                 "top_k": str(r["top_k"]),
                 "relevant_appids": r["relevant_appids"],
                 recall_col: f"{r['recall']:.4f}",
+                "filters": r["filters"],
                 "retrieved_names": r["retrieved_names"],
             })
     else:
@@ -134,24 +138,19 @@ def write_results(results: list[dict], label: str):
             row[recall_col] = f"{r['recall']:.4f}"
             rows_out.append(row)
 
-    with open(RESULT_CSV_PATH, "w", newline="", encoding="utf-8-sig") as f:
+    with open(result_path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=headers)
         writer.writeheader()
         writer.writerows(rows_out)
 
     n = len(results)
     avg_r = sum(r["recall"] for r in results) / n
-    print(f"\n  -> 写入 {RESULT_CSV_PATH.name}")
-    print(f"  [{label}] Recall avg={avg_r:.3f}")
+    print(f"\n  -> {result_path.name}  [{label}] Recall avg={avg_r:.3f}")
 
 
-# ── changelog CSV ─────────────────────────────────────────────────────
-
-def write_changelog(label: str, note: str, avg_recall: float, top_k: int):
-    """Append a row to the changelog to track what changed in each run."""
-    file_exists = CHANGELOG_CSV_PATH.exists()
-
-    with open(CHANGELOG_CSV_PATH, "a", newline="", encoding="utf-8-sig") as f:
+def write_changelog(label: str, note: str, avg_recall: float, top_k: int, cl_path: Path):
+    file_exists = cl_path.exists()
+    with open(cl_path, "a", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(["label", "date", "top_k", "variable_changed", "avg_recall"])
@@ -162,16 +161,14 @@ def write_changelog(label: str, note: str, avg_recall: float, top_k: int):
             note,
             f"{avg_recall:.4f}",
         ])
+    print(f"  -> {cl_path.name}: {note or '(无)'}")
 
-    print(f"  -> 写入 {CHANGELOG_CSV_PATH.name}: {note or '(无变更说明)'}")
 
-
-# ── summary ───────────────────────────────────────────────────────────
+# ── summary ────────────────────────────────────────────────────────────
 
 def print_summary(results: list[dict]):
     n = len(results)
     avg_recall = sum(r["recall"] for r in results) / n
-
     perfect = sum(1 for r in results if r["recall"] >= 1.0)
     good = sum(1 for r in results if 0.5 <= r["recall"] < 1.0)
     poor = sum(1 for r in results if r["recall"] < 0.5)
@@ -194,20 +191,29 @@ def print_summary(results: list[dict]):
                 print(f"    got:      {r['retrieved_appids']}")
 
 
-# ── main ──────────────────────────────────────────────────────────────
+# ── main ───────────────────────────────────────────────────────────────
 
 def main():
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
     parser = argparse.ArgumentParser(description="RAG recall evaluation")
-    parser.add_argument("--top-k", type=int, help="Override top_k")
+    parser.add_argument("-g", "--ground-truth", default=DEFAULT_GT,
+                        help=f"Ground truth CSV (default: {DEFAULT_GT})")
+    parser.add_argument("--top-k", type=int, help="Override top_k for all queries")
     parser.add_argument("--query-id", type=int, help="Single query by index (1-based)")
     parser.add_argument("--label", default="", help="Version label (auto timestamp if empty)")
     parser.add_argument("--note", default="", help="What variable changed and what it changed to")
     args = parser.parse_args()
 
-    cases = load_ground_truth(CSV_PATH)
-    print(f"Loaded {len(cases)} RAG ground truth queries\n")
+    gt_path = TESTS_DIR / args.ground_truth
+    if not gt_path.exists():
+        print(f"ERROR: {gt_path} not found")
+        sys.exit(1)
+
+    result_path, changelog_path = _derive_paths(gt_path)
+
+    cases = load_ground_truth(gt_path)
+    print(f"Loaded {len(cases)} queries from {gt_path.name}\n")
 
     if args.query_id:
         cases = [cases[args.query_id - 1]]
@@ -219,8 +225,8 @@ def main():
         label = args.label or datetime.now().strftime("%m%d_%H%M")
         top_k = args.top_k or cases[0]["top_k"]
         avg_r = sum(r["recall"] for r in results) / len(results)
-        write_results(results, label)
-        write_changelog(label, args.note, avg_r, top_k)
+        write_results(results, label, result_path)
+        write_changelog(label, args.note, avg_r, top_k, changelog_path)
 
 
 if __name__ == "__main__":
