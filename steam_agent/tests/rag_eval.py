@@ -52,7 +52,7 @@ def load_ground_truth(path: Path) -> list[dict]:
         return cases
 
 
-def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict]:
+def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: float = 0) -> list[dict]:
     results = []
     for i, case in enumerate(cases):
         k = top_k_override or case["top_k"]
@@ -65,7 +65,7 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
             filter_tags=case.get("filter_tags"),
             free_only=case.get("free_only", False),
             min_year=case.get("min_year"),
-            min_similarity=0,
+            min_similarity=min_sim,
         )
         items = rag_result.get("results", [])
         retrieved = [item["appid"] for item in items]
@@ -203,6 +203,7 @@ def main():
     parser.add_argument("--query-id", type=int, help="Single query by index (1-based)")
     parser.add_argument("--label", default="", help="Version label (auto timestamp if empty)")
     parser.add_argument("--note", default="", help="What variable changed and what it changed to")
+    parser.add_argument("--min-sim", type=float, default=0, help="min_similarity threshold (default 0=off)")
     args = parser.parse_args()
 
     gt_path = TESTS_DIR / args.ground_truth
@@ -218,7 +219,7 @@ def main():
     if args.query_id:
         cases = [cases[args.query_id - 1]]
 
-    results = run_batch(cases, top_k_override=args.top_k)
+    results = run_batch(cases, top_k_override=args.top_k, min_sim=args.min_sim)
     print_summary(results)
 
     if not args.query_id:
