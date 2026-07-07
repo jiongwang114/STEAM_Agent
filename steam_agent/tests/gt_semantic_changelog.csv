@@ -1,6 +1,4 @@
 ﻿label,date,top_k,variable_changed,avg_recall
-sim0,2026-07-07 17:12,10,min_similarity=0,0.6583
-sim02,2026-07-07 17:12,10,min_similarity=0.2,0.6583
-sim03,2026-07-07 17:13,10,min_similarity=0.3,0.6583
-sim05,2026-07-07 17:14,10,min_similarity=0.5,0.5583
-sim04,2026-07-07 17:14,10,min_similarity=0.4,0.6583
+sentence,2026-07-07 17:23,10,翻译: 完整自然句子（关键词→句子）,0.6367
+sentence,2026-07-07 17:24,10,翻译: 完整自然句子,0.6367
+keywords,2026-07-07 17:25,10,翻译: 关键词风格,0.6583
