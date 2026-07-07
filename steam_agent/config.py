@@ -24,7 +24,7 @@ EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5"
 # --- Chroma ---
 CHROMA_PERSIST_DIR: str = os.environ.get(
     "CHROMA_PERSIST_DIR",
-    str(BASE_DIR / "rag" / "data"),
+    str(BASE_DIR / "rag" / "chroma_data"),
 )
 
 # --- SQLite ---

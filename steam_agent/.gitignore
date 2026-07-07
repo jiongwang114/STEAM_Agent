@@ -4,8 +4,9 @@ __pycache__/
 dist/
 build/
 
-# Chroma
-rag/data/
+# Chroma (vector DB files, cache is source of truth)
+rag/chroma_data/*
+!rag/chroma_data/game_cache.json
 
 # SQLite
 *.db
