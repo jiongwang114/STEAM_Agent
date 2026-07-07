@@ -10,17 +10,22 @@ def rag_search_similar_games(
     free_only: bool = False,
     min_metacritic: int | None = None,
     min_year: int | None = None,
+    min_similarity: float = 0.3,
 ) -> dict:
     """
     Semantic search over the game knowledge base.
     Translates Chinese queries to English, embeds, and queries Chroma.
-    Supports optional filtering.
+    Supports optional filtering and similarity threshold.
 
     Filters (applied as exact metadata constraints, not semantic):
     - filter_tags: only return games matching these genre tags
     - free_only: if True, only return free-to-play games
     - min_metacritic: only return games with metacritic >= this score
     - min_year: only return games released in or after this year
+
+    Quality control:
+    - min_similarity: drop results below this cosine similarity score.
+      Default 0.3. Set to 0 to disable. Lower = more tolerant, may include noise.
 
     IMPORTANT: Call this tool at most once per user turn. If results are poor
     (similarity_score < 0.4), do NOT retry with different keywords — use
@@ -64,10 +69,13 @@ def rag_search_similar_games(
     if raw["ids"] and raw["ids"][0]:
         for i in range(len(raw["ids"][0])):
             meta = raw["metadatas"][0][i] if raw["metadatas"] else {}
+            sim = round(1 - raw["distances"][0][i], 4) if raw.get("distances") else 0.0
+            if min_similarity > 0 and sim < min_similarity:
+                continue
             results.append({
                 "appid": raw["ids"][0][i],
                 "name": meta.get("name", "Unknown"),
-                "similarity_score": round(1 - raw["distances"][0][i], 4) if raw.get("distances") else 0.0,
+                "similarity_score": sim,
                 "tags": meta.get("tags", []),
                 "is_free": meta.get("is_free", False),
                 "metacritic": meta.get("metacritic", 0),

@@ -73,6 +73,7 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
             filter_tags=case.get("filter_tags"),
             free_only=case.get("free_only", False),
             min_year=case.get("min_year"),
+            min_similarity=0,  # eval: no threshold, measure raw retrieval
         )
         items = rag_result.get("results", [])
         retrieved = [item["appid"] for item in items]
