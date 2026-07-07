@@ -5,7 +5,7 @@ from ..rag.embedder import embed_query
 
 def rag_search_similar_games(
     query: str,
-    top_k: int = 5,
+    top_k: int = 10,
     filter_tags: list[str] | None = None,
     free_only: bool = False,
     min_metacritic: int | None = None,
