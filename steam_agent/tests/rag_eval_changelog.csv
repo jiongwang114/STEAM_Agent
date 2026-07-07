@@ -2,3 +2,5 @@
 baseline,2026-07-06 22:15,10,修正ground truth：补全遗漏的相关游戏，删掉不相关的（如Conan从racing移除）,0.3645
 v2_translate,2026-07-06 22:40,10,翻译prompt: 完整句子 -> 英文游戏关键词提取（genres+mechanics+titles，最多10词）,0.3579
 v3_bge,2026-07-06 23:07,10,embedder: all-MiniLM-L6-v2 -> BAAI/bge-base-en-v1.5（768维，重建知识库）,0.3512
+v4_enriched,2026-07-07 00:21,10,"build_chunk: short_description -> detailed_description, +developer, +release_date",0.2921
+v5_compact,2026-07-07 00:58,10,"文本: short_description + genres + gameplay_modes + developer。元数据: is_free, release_year, metacritic",0.2985

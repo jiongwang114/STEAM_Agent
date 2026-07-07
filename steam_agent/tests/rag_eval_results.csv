@@ -1,31 +1,31 @@
-﻿query,top_k,relevant_appids,recall_baseline,retrieved_names,recall_v2_translate,recall_v3_bge
-open world rpg,10,1245620;1091500;1174180;489830;3321460;2344520;2694490;261550;271590;3041230;892970,0.2727,Where Winds Meet;Windrose;Valheim;FINAL FANTASY XIV Online;PUBG: BATTLEGROUNDS;Path of Exile 2;Conan Exiles Enhanced;R.E.P.O.;Warframe;Schedule I,0.2727,0.2727
-类似艾尔登法环的游戏,10,1245620;2622380;3321460;2344520;2694490;3041230;1086940;1142710;489830;261550,0.2000,ELDEN RING;ELDEN RING NIGHTREIGN;Heroes of Might and Magic: Olden Era;Where Winds Meet;Valheim;Yu-Gi-Oh! Master Duel;Terraria;HELLDIVERS™ 2;Schedule I;PUBG: BATTLEGROUNDS,0.2000,0.2000
-roguelike deck builder,5,646570;2868840;2379780;3526710;250900,0.8000,Slay the Spire 2;Slay the Spire;Balatro;Everything is Crab: The Animal Evolution Roguelite;Windrose,0.8000,0.6000
-survival crafting game,10,252490;105600;892970;264710;108600;251570;322330;440900;221100;294100,0.7000,Project Zomboid;Windrose;DayZ;7 Days to Die;Valheim;Rust;Heartopia;Conan Exiles Enhanced;Everything is Crab: The Animal Evolution Roguelite;Terraria,0.7000,0.7000
-free to play fps,10,730;1172470;578080;2357570;440;1938090;2073850;230410;2507950;2767030;359550,0.3636,Brawlhalla;PUBG: BATTLEGROUNDS;HELLDIVERS™ 2;EA SPORTS FC™ 26;Apex Legends™;Yu-Gi-Oh! Master Duel;Warframe;OBS Studio;THE FINALS;Left 4 Dead 2,0.3636,0.3636
-military simulation,5,236390;1938090;2507950;359550;1144200,0.4000,Hearts of Iron IV;War Thunder;Heartopia;Delta Force;BeamNG.drive,0.4000,0.4000
-sports game,5,3405690;3472040;252950;1665460;1551360;3551340,0.6667,EA SPORTS FC™ 26;eFootball™;Football Manager 26;THE FINALS;NBA 2K26,0.6667,0.6667
-cozy farming game,5,413150;1222670;2300320;4025700;105600,0.6000,Farming Simulator 25;Stardew Valley;Don't Starve Together;Terraria;PUBG: BATTLEGROUNDS,0.6000,0.6000
-multiplayer survival,5,252490;892970;322330;108600;251570;440900,0.6667,DayZ;Project Zomboid;Don't Starve Together;Rust;7 Days to Die,0.6667,0.6667
-strategy war game,5,289070;1142710;394360;1158310;813780;3105440,0.3333,Hearts of Iron IV;Total War: WARHAMMER III;PUBG: BATTLEGROUNDS;Tom Clancy's Rainbow Six Siege;Mount & Blade II: Bannerlord,0.3333,0.3333
-horror co-op,5,739630;381210;594650;322330;1144200;3764200,0.3333,R.E.P.O.;Phasmophobia;Dead by Daylight;Gamble With Your Friends;HELLDIVERS™ 2,0.3333,0.3333
-indie game with deep mechanics,5,646570;294100;2379780;413150;105600;108600,0.1667,RimWorld;Valheim;Subnautica;PUBG: BATTLEGROUNDS;Where Winds Meet,0.1667,0.1667
-best rpg 2023,5,1086940;1245620;1091500;2344520;489830,0.2000,Total War: WARHAMMER III;Cyberpunk 2077;Crusader Kings III;THE FINALS;FINAL FANTASY XIV Online,0.2000,0.2000
-relaxing game no combat,5,1222670;2300320;4025700;3419430;227300,0.0000,PUBG: BATTLEGROUNDS;Warframe;Don't Starve Together;Battlefield™ 6;Rust,0.0000,0.0000
-competitive shooter,10,730;578080;1172470;359550;2767030;2357570;2073850;1938090;440;594650,0.6000,Hunt: Showdown 1896;PUBG: BATTLEGROUNDS;THE FINALS;Tom Clancy's Rainbow Six Siege;Arena Breakout: Infinite;Apex Legends™;Yu-Gi-Oh! Master Duel;Marvel Rivals;Dota 2;Hearts of Iron IV,0.6000,0.6000
-动作角色扮演 中文,10,1245620;1086940;1091500;3321460;2344520;489830;2694490;261550;3564740;3513350,0.5000,Geometry Dash;Delta Force;The Binding of Isaac: Rebirth;Mount & Blade II: Bannerlord;Crimson Desert;ELDEN RING;R.E.P.O.;Where Winds Meet;Diablo® IV;Valheim,0.3000,0.3000
-baldur's gate 3 similar,5,1086940;1245620;2694490;1158310;489830;1091500,0.5000,Baldur's Gate 3;Crusader Kings III;Path of Exile 2;Slay the Spire 2;Total War: WARHAMMER III,0.5000,0.5000
-恐怖游戏 多人,5,739630;381210;594650;322330;1144200;3764200,0.3333,R.E.P.O.;Dead by Daylight;Phasmophobia;HELLDIVERS™ 2;DayZ,0.3333,0.3333
-racing sim,5,244210;1551360;284160;252950;227300,0.6000,Umamusume: Pretty Derby;The Sims™ 4;Forza Horizon 5;BeamNG.drive;Euro Truck Simulator 2,0.6000,0.6000
-base building strategy,5,294100;251570;892970;108600;289070,0.0000,Bloons TD 6;Mount & Blade II: Bannerlord;PEAK;Slay the Spire;Schedule I,0.0000,0.0000
-card game roguelike steam,5,2379780;646570;2868840;3526710;250900,0.6000,Slay the Spire;Slay the Spire 2;Balatro;Heroes of Might and Magic: Olden Era;Windrose,0.6000,0.6000
-太空 探索 建造,5,264710;105600;252490;892970;322330,0.4000,Subnautica;Among Us;RimWorld;Terraria;Delta Force,0.4000,0.4000
-類似黑暗之魂的遊戲,5,1245620;2622380;2344520;3321460;3041230;2694490,0.3333,Path of Exile 2;Windrose;Dead by Daylight;Valheim;FINAL FANTASY XIV Online,0.3333,0.3333
-multiplayer battle royale,5,578080;1172470;2767030;2073850;2073620,0.2000,PUBG: BATTLEGROUNDS;Don't Starve Together;Warframe;War Thunder;FINAL FANTASY XIV Online,0.2000,0.2000
-pixel art indie,5,413150;105600;2379780;646570;250900;322170,0.1667,Wallpaper Engine;OBS Studio;Stardew Valley;R.E.P.O.;Schedule I,0.1667,0.1667
-grand strategy historical,5,394360;289070;1158310;1142710;813780,0.4000,Hearts of Iron IV;Sid Meier’s Civilization® VI;Heroes of Might and Magic: Olden Era;Grand Theft Auto V Legacy;Hunt: Showdown 1896,0.4000,0.4000
-vr social,5,438100;4000;3419430;4025700;431960,0.2000,VRChat;Phasmophobia;Don't Starve Together;Gamble With Your Friends;Grand Theft Auto V Legacy,0.2000,0.2000
-f2p mmorpg,5,39210;3513350;1203220;230410;3564740,0.2000,PUBG: BATTLEGROUNDS;Dota 2;FINAL FANTASY XIV Online;Left 4 Dead 2;Path of Exile 2,0.2000,0.2000
-英雄射击 免费,5,2357570;2767030;1172470;440;2073850,0.2000,Apex Legends™;Brawlhalla;PUBG: BATTLEGROUNDS;Tom Clancy's Rainbow Six Siege;Dota 2,0.2000,0.2000
-top metroidvania indie,5,105600;250900;322330;264710;413150,0.0000,Schedule I;Assetto Corsa;Geometry Dash;Umamusume: Pretty Derby;Slay the Spire,0.0000,0.0000
+﻿query,top_k,relevant_appids,recall_baseline,retrieved_names,recall_v2_translate,recall_v3_bge,recall_v4_enriched,recall_v5_compact
+open world rpg,10,1245620;1091500;1174180;489830;3321460;2344520;2694490;261550;271590;3041230;892970,0.2727,Where Winds Meet;Windrose;Valheim;FINAL FANTASY XIV Online;PUBG: BATTLEGROUNDS;Path of Exile 2;Conan Exiles Enhanced;R.E.P.O.;Warframe;Schedule I,0.2727,0.2727,0.0909,0.0909
+类似艾尔登法环的游戏,10,1245620;2622380;3321460;2344520;2694490;3041230;1086940;1142710;489830;261550,0.2000,ELDEN RING;ELDEN RING NIGHTREIGN;Heroes of Might and Magic: Olden Era;Where Winds Meet;Valheim;Yu-Gi-Oh! Master Duel;Terraria;HELLDIVERS™ 2;Schedule I;PUBG: BATTLEGROUNDS,0.2000,0.2000,0.3000,0.2000
+roguelike deck builder,5,646570;2868840;2379780;3526710;250900,0.8000,Slay the Spire 2;Slay the Spire;Balatro;Everything is Crab: The Animal Evolution Roguelite;Windrose,0.8000,0.6000,0.6000,0.6000
+survival crafting game,10,252490;105600;892970;264710;108600;251570;322330;440900;221100;294100,0.7000,Project Zomboid;Windrose;DayZ;7 Days to Die;Valheim;Rust;Heartopia;Conan Exiles Enhanced;Everything is Crab: The Animal Evolution Roguelite;Terraria,0.7000,0.7000,0.7000,0.6000
+free to play fps,10,730;1172470;578080;2357570;440;1938090;2073850;230410;2507950;2767030;359550,0.3636,Brawlhalla;PUBG: BATTLEGROUNDS;HELLDIVERS™ 2;EA SPORTS FC™ 26;Apex Legends™;Yu-Gi-Oh! Master Duel;Warframe;OBS Studio;THE FINALS;Left 4 Dead 2,0.3636,0.3636,0.2727,0.3636
+military simulation,5,236390;1938090;2507950;359550;1144200,0.4000,Hearts of Iron IV;War Thunder;Heartopia;Delta Force;BeamNG.drive,0.4000,0.4000,0.6000,0.4000
+sports game,5,3405690;3472040;252950;1665460;1551360;3551340,0.6667,EA SPORTS FC™ 26;eFootball™;Football Manager 26;THE FINALS;NBA 2K26,0.6667,0.6667,0.6667,0.5000
+cozy farming game,5,413150;1222670;2300320;4025700;105600,0.6000,Farming Simulator 25;Stardew Valley;Don't Starve Together;Terraria;PUBG: BATTLEGROUNDS,0.6000,0.6000,0.4000,0.6000
+multiplayer survival,5,252490;892970;322330;108600;251570;440900,0.6667,DayZ;Project Zomboid;Don't Starve Together;Rust;7 Days to Die,0.6667,0.6667,0.5000,0.3333
+strategy war game,5,289070;1142710;394360;1158310;813780;3105440,0.3333,Hearts of Iron IV;Total War: WARHAMMER III;PUBG: BATTLEGROUNDS;Tom Clancy's Rainbow Six Siege;Mount & Blade II: Bannerlord,0.3333,0.3333,0.1667,0.3333
+horror co-op,5,739630;381210;594650;322330;1144200;3764200,0.3333,R.E.P.O.;Phasmophobia;Dead by Daylight;Gamble With Your Friends;HELLDIVERS™ 2,0.3333,0.3333,0.3333,0.3333
+indie game with deep mechanics,5,646570;294100;2379780;413150;105600;108600,0.1667,RimWorld;Valheim;Subnautica;PUBG: BATTLEGROUNDS;Where Winds Meet,0.1667,0.1667,0.0000,0.1667
+best rpg 2023,5,1086940;1245620;1091500;2344520;489830,0.2000,Total War: WARHAMMER III;Cyberpunk 2077;Crusader Kings III;THE FINALS;FINAL FANTASY XIV Online,0.2000,0.2000,0.2000,0.2000
+relaxing game no combat,5,1222670;2300320;4025700;3419430;227300,0.0000,PUBG: BATTLEGROUNDS;Warframe;Don't Starve Together;Battlefield™ 6;Rust,0.0000,0.0000,0.0000,0.0000
+competitive shooter,10,730;578080;1172470;359550;2767030;2357570;2073850;1938090;440;594650,0.6000,Hunt: Showdown 1896;PUBG: BATTLEGROUNDS;THE FINALS;Tom Clancy's Rainbow Six Siege;Arena Breakout: Infinite;Apex Legends™;Yu-Gi-Oh! Master Duel;Marvel Rivals;Dota 2;Hearts of Iron IV,0.6000,0.6000,0.5000,0.5000
+动作角色扮演 中文,10,1245620;1086940;1091500;3321460;2344520;489830;2694490;261550;3564740;3513350,0.5000,Geometry Dash;Delta Force;The Binding of Isaac: Rebirth;Mount & Blade II: Bannerlord;Crimson Desert;ELDEN RING;R.E.P.O.;Where Winds Meet;Diablo® IV;Valheim,0.3000,0.3000,0.2000,0.3000
+baldur's gate 3 similar,5,1086940;1245620;2694490;1158310;489830;1091500,0.5000,Baldur's Gate 3;Crusader Kings III;Path of Exile 2;Slay the Spire 2;Total War: WARHAMMER III,0.5000,0.5000,0.1667,0.3333
+恐怖游戏 多人,5,739630;381210;594650;322330;1144200;3764200,0.3333,R.E.P.O.;Dead by Daylight;Phasmophobia;HELLDIVERS™ 2;DayZ,0.3333,0.3333,0.3333,0.3333
+racing sim,5,244210;1551360;284160;252950;227300,0.6000,Umamusume: Pretty Derby;The Sims™ 4;Forza Horizon 5;BeamNG.drive;Euro Truck Simulator 2,0.6000,0.6000,0.2000,0.2000
+base building strategy,5,294100;251570;892970;108600;289070,0.0000,Bloons TD 6;Mount & Blade II: Bannerlord;PEAK;Slay the Spire;Schedule I,0.0000,0.0000,0.2000,0.0000
+card game roguelike steam,5,2379780;646570;2868840;3526710;250900,0.6000,Slay the Spire;Slay the Spire 2;Balatro;Heroes of Might and Magic: Olden Era;Windrose,0.6000,0.6000,0.4000,0.4000
+太空 探索 建造,5,264710;105600;252490;892970;322330,0.4000,Subnautica;Among Us;RimWorld;Terraria;Delta Force,0.4000,0.4000,0.8000,0.4000
+類似黑暗之魂的遊戲,5,1245620;2622380;2344520;3321460;3041230;2694490,0.3333,Path of Exile 2;Windrose;Dead by Daylight;Valheim;FINAL FANTASY XIV Online,0.3333,0.3333,0.1667,0.0000
+multiplayer battle royale,5,578080;1172470;2767030;2073850;2073620,0.2000,PUBG: BATTLEGROUNDS;Don't Starve Together;Warframe;War Thunder;FINAL FANTASY XIV Online,0.2000,0.2000,0.0000,0.4000
+pixel art indie,5,413150;105600;2379780;646570;250900;322170,0.1667,Wallpaper Engine;OBS Studio;Stardew Valley;R.E.P.O.;Schedule I,0.1667,0.1667,0.1667,0.1667
+grand strategy historical,5,394360;289070;1158310;1142710;813780,0.4000,Hearts of Iron IV;Sid Meier’s Civilization® VI;Heroes of Might and Magic: Olden Era;Grand Theft Auto V Legacy;Hunt: Showdown 1896,0.4000,0.4000,0.4000,0.6000
+vr social,5,438100;4000;3419430;4025700;431960,0.2000,VRChat;Phasmophobia;Don't Starve Together;Gamble With Your Friends;Grand Theft Auto V Legacy,0.2000,0.2000,0.2000,0.2000
+f2p mmorpg,5,39210;3513350;1203220;230410;3564740,0.2000,PUBG: BATTLEGROUNDS;Dota 2;FINAL FANTASY XIV Online;Left 4 Dead 2;Path of Exile 2,0.2000,0.2000,0.0000,0.2000
+英雄射击 免费,5,2357570;2767030;1172470;440;2073850,0.2000,Apex Legends™;Brawlhalla;PUBG: BATTLEGROUNDS;Tom Clancy's Rainbow Six Siege;Dota 2,0.2000,0.2000,0.2000,0.2000
+top metroidvania indie,5,105600;250900;322330;264710;413150,0.0000,Schedule I;Assetto Corsa;Geometry Dash;Umamusume: Pretty Derby;Slay the Spire,0.0000,0.0000,0.0000,0.0000

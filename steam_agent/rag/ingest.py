@@ -50,26 +50,50 @@ def fetch_app_details(appid: int) -> dict | None:
         return None
 
 
+def _strip_html(text: str) -> str:
+    import re
+    return re.sub(r"<[^>]+>", " ", text).strip()
+
+
+# Categories that describe HOW you play — high signal for search intent.
+GAMEPLAY_CATEGORIES = {
+    "Single-player", "Multi-player", "Co-op", "Online Co-op",
+    "LAN Co-op", "Shared/Split Screen Co-op", "Shared/Split Screen",
+    "PvP", "Online PvP", "MMO", "Cross-Platform Multiplayer",
+}
+
+
 def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
     name = detail.get("name", f"Game {appid}")
-    tags = [g["description"] for g in detail.get("genres", [])]
-    categories = [c["description"] for c in detail.get("categories", [])]
     description = detail.get("short_description", "")
+    genres = [g["description"] for g in detail.get("genres", [])]
+    all_categories = [c["description"] for c in detail.get("categories", [])]
+    gameplay_modes = [c for c in all_categories if c in GAMEPLAY_CATEGORIES]
     metacritic = detail.get("metacritic", {}).get("score", "N/A")
+    developers = ", ".join(detail.get("developers", []))
+    release_year = detail.get("release_date", {}).get("date", "Unknown")[-4:]
+    is_free = detail.get("is_free", False)
 
-    text = (
-        f"Game: {name}\n"
-        f"Description: {description}\n"
-        f"Tags: {', '.join(tags)}\n"
-        f"Categories: {', '.join(categories)}\n"
-        f"Metacritic: {metacritic}"
-    )
+    # Build a single concentrated text paragraph for embedding.
+    # Numeric/boolean fields go to metadata only — NOT in text.
+    parts = [f"{name}. {description}"]
+    if genres:
+        parts.append(f"Genres: {', '.join(genres)}.")
+    if gameplay_modes:
+        parts.append(f"Gameplay: {', '.join(gameplay_modes)}.")
+    if developers:
+        parts.append(f"Developer: {developers}.")
+
+    text = " ".join(parts)
 
     metadata = {
         "name": name,
-        "tags": tags or ["none"],
-        "categories": categories or ["none"],
-        "metacritic": metacritic,
+        "tags": genres or ["none"],
+        "categories": all_categories or ["none"],
+        "developers": developers,
+        "is_free": is_free,
+        "release_year": int(release_year) if release_year.isdigit() else 0,
+        "metacritic": metacritic if isinstance(metacritic, int) else 0,
     }
 
     return str(appid), metadata, text
