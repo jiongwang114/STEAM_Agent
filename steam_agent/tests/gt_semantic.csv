@@ -1,21 +1,21 @@
 query,top_k,relevant_appids,notes
-"roguelike card game",5,"646570;2868840;2379780;250900;3526710",Slay the Spire/Slay the Spire 2/Balatro/Isaac/Crab
-"survival crafting open world",10,"252490;105600;892970;264710;108600;251570;322330;440900;221100;294100",Rust/Terraria/Valheim/Subnautica/ProjectZomboid/7Days/DST/ConanExiles/DayZ/RimWorld
-"cozy farming life sim",5,"413150;1222670;2300320;4025700;105600",Stardew/Sims4/FarmingSim25/Heartopia/Terraria
-"competitive multiplayer fps",10,"730;578080;1172470;359550;2767030;2357570;2073850;1938090;440;594650",CS2/PUBG/Apex/R6/MarvelRivals/Overwatch/THEFINALS/CoD/TF2/HuntShowdown
-"multiplayer survival horror",5,"739630;381210;594650;322330;1144200;3764200",Phasmophobia/DBD/HuntShowdown/DST/ReadyOrNot/RE
-"base building colony sim",5,"294100;251570;892970;108600;289070",RimWorld/7Days/Valheim/ProjectZomboid/Civ6
-"space exploration survival",5,"264710;105600;252490;892970;322330",Subnautica/Terraria/Rust/Valheim/DST
-"battle royale multiplayer",5,"578080;1172470;2767030;2073850;2073620",PUBG/Apex/MarvelRivals/THEFINALS/ArenaBreakout
-"vr social hangout",5,"438100;4000;3419430;4025700;431960",VRChat/GMod/BongoCat/Heartopia/WallpaperEngine
-"metroidvania 2d indie",5,"105600;250900;322330;264710;413150",库里无纯metroidvania/近似Terraria/Isaac/DST/Subnautica/Stardew
-"medieval strategy grand strategy",5,"394360;289070;1158310;1142710;813780",HOI4/Civ6/CK3/TotalWarWH3/AoE2
-"action rpg dark fantasy",10,"1245620;2622380;3321460;2344520;2694490;3041230;1086940;489830;261550;1091500",EldenRing/NIGHTREIGN/CrimsonDesert/Diablo4/PoE2/Windrose/BG3/Skyrim/MountBlade2/Cyberpunk
-"story rich single player rpg",5,"1086940;1091500;1245620;489830;1174180",BG3/Cyberpunk/EldenRing/Skyrim/RDR2
-"relaxing casual no combat",5,"413150;1222670;2300320;4025700;3419430",Stardew/Sims4/FarmingSim25/Heartopia/BongoCat
-"indie pixel art game",5,"413150;105600;2379780;646570;322170;250900",Stardew/Terraria/Balatro/StS/GeometryDash/Isaac
-"动作角色扮演 开放世界",10,"1245620;1086940;1091500;3321460;2344520;489830;2694490;261550;3564740;3513350",EldenRing/BG3/Cyberpunk/CrimsonDesert/Diablo4/Skyrim/PoE2/MountBlade2/WhereWindsMeet/WutheringWaves
-"恐怖合作生存",5,"739630;381210;594650;322330;1144200;3764200",Phasmophobia/DBD/HuntShowdown/DST/ReadyOrNot/RE
-"魂系动作RPG",5,"1245620;2622380;2344520;3321460;3041230;2694490",EldenRing/NIGHTREIGN/Diablo4/CrimsonDesert/Windrose/PoE2
-"卡牌策略roguelike",5,"646570;2868840;2379780;250900;3526710",StS/StS2/Balatro/Isaac/Crab
-"模拟经营管理",5,"294100;289070;2300320;413150;1222670",RimWorld/Civ6/FarmingSim25/Stardew/Sims4
+"roguelike card game",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;2642620;2356780;3353100",Slay the Spire/Balatro/One Deck Dungeon/Die in Dungeon/Lucky Hand/Abalon/Nadir/RODB/Dungeon Clawler/Passant
+"survival crafting open world",10,"108600;252490;892970;346110;251570;1129580;1029780;670260;366090;929670",Project Zomboid/Rust/Valheim/ARK/7 Days/Medieval Dynasty/Going Medieval/Solace Crafting/Colony Survival/Orion Sandbox
+"cozy farming life sim",10,"413150;1222670;2300320;1248130;3501030;4163080;2116850;2760790;4025700;447020",Stardew/Sims4/FS25/FS22/CozyGameCompany/FarmTycoon/AnotherFarmRoguelike/Rebirth/Heartopia/FS17
+"competitive multiplayer fps",10,"730;578080;2357570;2767030;1172470;1938090;2073850;359550;440;2507950",CS2/PUBG/Overwatch/MarvelRivals/Apex/CoD/THEFINALS/R6Siege/TF2/DeltaForce
+"multiplayer survival horror",10,"739630;381210;322330;108600;1774880;1096570;1985930;1681510;2268560;3241660",Phasmophobia/DBD/DST/ProjectZomboid/BlightSurvival/SongOfHorror/Backrooms1998/WW1Trenches/ZombieSurvivalGameOnline/REPO
+"base building colony sim",10,"294100;1029780;366090;1509510;979110;2798330;251570;455980;892970;1129580",RimWorld/GoingMedieval/ColonySurvival/SettlementSurvival/SpaceHaven/DungeonSettlers/7Days/Judgment/Valheim/MedievalDynasty
+"space exploration survival",10,"264710;220200;979110;346110;892970;252490;1718870;882140;670260;929670",Subnautica/KSP/SpaceHaven/ARK/Valheim/Rust/SpaceflightSimulator/Reentry/SolaceCrafting/OrionSandbox
+"battle royale multiplayer",10,"578080;1172470;1203220;2073620;2073850;2268560;221100;1605960;346110;2767030",PUBG/Apex/NARAKA/ArenaBreakout/THEFINALS/ZombieSurvivalGameOnline/DayZ/ZombieSurvivalOnline/ARK/MarvelRivals
+"vr social hangout",10,"438100;4000;3419430;3385970;2406200;2076140;447530;3866160;849740;935070",VRChat/GMod/BongoCat/BeyondSandbox/VRHentaiSim/TavernTalk/VA11Halla/CozySketcher/LoveEsquire/SakuraMMO
+"metroidvania 2d indie",10,"4684250;2871520;250900;105600;1071280;3027160;791180;1283130;238530;1147560",MetroidvaniaMaker/DeepDishDungeon/Isaac/Terraria/QPlatformer/LostGirlPlatformer/1ScreenPlatformer/MicroPlatformer/SuperPuzzlePlatformer/Skul
+"medieval strategy grand strategy",10,"1158310;3105440;1129580;1029780;261550;1142710;289070;394360;2109370;2231020",CK3/HeroesMM/MedievalDynasty/GoingMedieval/Bannerlord/TotalWarWH3/Civ6/HOI4/GreatWarWestern/ChroniclesMedieval
+"action rpg dark fantasy",10,"1245620;2344520;2694490;2622380;3321460;262060;1940340;3564740;3052610;545720",EldenRing/Diablo4/PoE2/NIGHTREIGN/CrimsonDesert/DarkestDungeon/DD2/WhereWindsMeet/RealmOfOblivion/Nother
+"story rich single player rpg",10,"1086940;1091500;1245620;489830;552620;1072420;1174180;2694490;2344520;1948980",BG3/Cyberpunk/EldenRing/Skyrim/ATOMRPG/DQBuilders2/RDR2/PoE2/Diablo4/HeroAdventure
+"relaxing casual no combat",10,"413150;1222670;3501030;3866160;447530;2076140;4025700;3581230;3666490;2653470",Stardew/Sims4/CozyGameCompany/CozySketcher/VA11Halla/TavernTalk/Heartopia/CozyGameRestoration/RaccoonCocoon/LittleProblems
+"indie pixel art game",10,"413150;105600;250900;322170;1071280;1283130;791180;3027160;636040;1796790",Stardew/Terraria/Isaac/GeometryDash/QPlatformer/MicroPlatformer/1ScreenPlatformer/LostGirlPlatformer/PixelWorlds/ChefRPG
+"动作角色扮演 开放世界",10,"1245620;3321460;1091500;3564740;3513350;2694490;2344520;261550;1203220;1948980",EldenRing/CrimsonDesert/Cyberpunk/WhereWindsMeet/WutheringWaves/PoE2/Diablo4/Bannerlord/NARAKA/HeroAdventure
+"恐怖合作生存",10,"739630;381210;322330;108600;1096570;1985930;1681510;1774880;3683450;3241660",Phasmophobia/DBD/DST/ProjectZomboid/SongOfHorror/Backrooms/WW1Trenches/BlightSurvival/OtakuSurvivalHorror/REPO
+"魂系动作RPG",10,"1245620;2622380;2694490;2344520;3052610;545720;250900;3432110;4669960;3321460",EldenRing/NIGHTREIGN/PoE2/Diablo4/RealmOfOblivion/Nother/Isaac/SoulboundRoguelike/DungeonLurker/CrimsonDesert
+"卡牌策略roguelike",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;3353100;4840020;3784030",StS/Balatro/OneDeckDungeon/DieInDungeon/LuckyHand/Abalon/Nadir/Passant/Vicelock/RACCOIN
+"模拟经营管理",10,"294100;3551340;3083800;4717430;568220;1158310;1509510;979110;750520;623700",RimWorld/FM26/UniversityTycoon/CricketTycoon/LobotomyCorp/CK3/SettlementSurvival/SpaceHaven/ArcadeTycoon/RecCenterTycoon

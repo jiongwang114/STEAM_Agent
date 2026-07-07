@@ -1,4 +1,2 @@
 ﻿label,date,top_k,variable_changed,avg_recall
-sentence,2026-07-07 17:23,10,翻译: 完整自然句子（关键词→句子）,0.6367
-sentence,2026-07-07 17:24,10,翻译: 完整自然句子,0.6367
-keywords,2026-07-07 17:25,10,翻译: 关键词风格,0.6583
+418_independent,2026-07-07 18:57,10,扩库至418款+独立人工标注ground truth(不看RAG结果),0.5200

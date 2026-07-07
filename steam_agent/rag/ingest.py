@@ -21,7 +21,7 @@ from .vector_store import _get_client, get_games_collection
 STEAM_TOP_GAMES_URL = "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/"
 STEAM_APP_LIST_URL = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR = Path(__file__).resolve().parent / "chroma_data"
 CACHE_PATH = DATA_DIR / "game_cache.json"
 
 
