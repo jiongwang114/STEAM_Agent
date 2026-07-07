@@ -1,2 +1,0 @@
-﻿label,date,top_k,variable_changed,avg_recall
-v7_filtered_eval,2026-07-07 13:29,10,12条带元数据过滤(free_only/tags/year) + 18条纯语义，评测全覆盖过滤能力,0.2986
