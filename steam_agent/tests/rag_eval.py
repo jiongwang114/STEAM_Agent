@@ -32,6 +32,17 @@ def recall_at_k(retrieved: list[str], relevant: list[str]) -> float:
     return sum(1 for r in relevant if r in retrieved) / len(relevant)
 
 
+def _filter_summary(case: dict) -> str:
+    parts = []
+    if case.get("free_only"):
+        parts.append("free_only")
+    if case.get("min_year"):
+        parts.append(f"year>={case['min_year']}")
+    if case.get("filter_tags"):
+        parts.append(f"tags={','.join(case['filter_tags'])}")
+    return ", ".join(parts)
+
+
 def load_ground_truth(path: Path) -> list[dict]:
     with open(path, newline="", encoding="utf-8-sig") as f:
         cases = []
@@ -40,6 +51,11 @@ def load_ground_truth(path: Path) -> list[dict]:
             row["relevant_appids"] = [
                 aid.strip() for aid in row["relevant_appids"].split(";") if aid.strip()
             ]
+            # Parse optional filter columns
+            row["free_only"] = row.get("free_only", "").strip() == "1"
+            row["min_year"] = int(row["min_year"]) if row.get("min_year", "").strip() else None
+            raw_tags = row.get("filter_tags", "").strip()
+            row["filter_tags"] = [t.strip() for t in raw_tags.split(",") if t.strip()] if raw_tags else None
             cases.append(row)
         return cases
 
@@ -51,7 +67,13 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
         query = case["query"]
         relevant = case["relevant_appids"]
 
-        rag_result = rag_search_similar_games(query, top_k=k)
+        rag_result = rag_search_similar_games(
+            query,
+            top_k=k,
+            filter_tags=case.get("filter_tags"),
+            free_only=case.get("free_only", False),
+            min_year=case.get("min_year"),
+        )
         items = rag_result.get("results", [])
         retrieved = [item["appid"] for item in items]
 
@@ -64,11 +86,14 @@ def run_batch(cases: list[dict], top_k_override: int | None = None) -> list[dict
             "retrieved_appids": ";".join(retrieved),
             "retrieved_names": ";".join(item["name"] for item in items),
             "recall": recall,
+            "filters_used": _filter_summary(case),
         })
 
+        filters_str = _filter_summary(case)
         status = "OK" if recall >= 0.5 else "LOW"
-        print(f"{i+1:2d}/{len(cases)} [{status}] {query[:50]:<50s} "
-              f"recall={recall:.2f}  top={items[0]['name'][:25] if items else 'N/A'}")
+        print(f"{i+1:2d}/{len(cases)} [{status}] {query[:45]:<45s} "
+              f"recall={recall:.2f}  top={items[0]['name'][:20] if items else 'N/A'}"
+              f"{'  [' + filters_str + ']' if filters_str else ''}")
 
     return results
 
