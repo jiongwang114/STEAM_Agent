@@ -79,8 +79,6 @@ def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
     parts = [f"{name}. {description}"]
     if genres:
         parts.append(f"Genres: {', '.join(genres)}.")
-    if gameplay_modes:
-        parts.append(f"Gameplay: {', '.join(gameplay_modes)}.")
     if developers:
         parts.append(f"Developer: {developers}.")
 
