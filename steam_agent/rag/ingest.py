@@ -63,7 +63,7 @@ GAMEPLAY_CATEGORIES = {
 }
 
 
-def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
+def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) -> tuple[str, dict, str]:
     name = detail.get("name", f"Game {appid}")
     description = detail.get("short_description", "")
     genres = [g["description"] for g in detail.get("genres", [])]
@@ -74,11 +74,15 @@ def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
     release_year = detail.get("release_date", {}).get("date", "Unknown")[-4:]
     is_free = detail.get("is_free", False)
 
-    # Build a single concentrated text paragraph for embedding.
-    # Numeric/boolean fields go to metadata only — NOT in text.
+    # Prefer user_tags for filtering (much finer). Fall back to genres.
+    filter_tags = (user_tags if user_tags else None) or genres or ["none"]
+
+    # Build text for embedding. Include user tags when available.
     parts = [f"{name}. {description}"]
     if genres:
         parts.append(f"Genres: {', '.join(genres)}.")
+    if user_tags:
+        parts.append(f"User Tags: {', '.join(user_tags[:15])}.")
     if developers:
         parts.append(f"Developer: {developers}.")
 
@@ -86,7 +90,7 @@ def build_chunk(appid: int, detail: dict) -> tuple[str, dict, str]:
 
     metadata = {
         "name": name,
-        "tags": genres or ["none"],
+        "tags": filter_tags,
         "categories": all_categories or ["none"],
         "developers": developers,
         "is_free": is_free,
@@ -133,7 +137,7 @@ def ingest_from_cache():
     documents_list = []
 
     for rec in records:
-        doc_id, metadata, text = build_chunk(rec["appid"], rec["detail"])
+        doc_id, metadata, text = build_chunk(rec["appid"], rec["detail"], rec.get("user_tags"))
         ids_list.append(doc_id)
         metadatas_list.append(metadata)
         documents_list.append(text)
