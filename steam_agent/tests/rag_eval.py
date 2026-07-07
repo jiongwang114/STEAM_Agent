@@ -31,42 +31,36 @@ def recall_at_k(retrieved: list[str], relevant: list[str]) -> float:
 
 
 def load_ground_truth(path: Path) -> list[dict]:
-    """Load CSV. Auto-detect filter columns (free_only, filter_tags, min_year)."""
+    """Load CSV. Parse hard-constraint columns (free_only, min_year)."""
     with open(path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
-        headers = reader.fieldnames or []
-        has_filters = any(h in headers for h in ["free_only", "filter_tags", "min_year"])
-
         cases = []
         for row in reader:
             row["top_k"] = int(row["top_k"])
             row["relevant_appids"] = [
                 aid.strip() for aid in row["relevant_appids"].split(";") if aid.strip()
             ]
-            if has_filters:
-                row["free_only"] = row.get("free_only", "").strip() == "1"
-                row["min_year"] = int(row["min_year"]) if row.get("min_year", "").strip() else None
-                raw_tags = row.get("filter_tags", "").strip()
-                row["filter_tags"] = [t.strip() for t in raw_tags.split(",") if t.strip()] if raw_tags else None
+            # Parse optional hard-constraint columns
+            row["free_only"] = row.get("free_only", "").strip() == "1"
+            year_str = row.get("min_year", "").strip()
+            row["min_year"] = int(year_str) if year_str else None
             cases.append(row)
         return cases
 
 
-def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: float = 0, filter_mode: str = "all") -> list[dict]:
+def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: float = 0, no_filters: bool = False) -> list[dict]:
     results = []
     for i, case in enumerate(cases):
         k = top_k_override or case["top_k"]
         query = case["query"]
         relevant = case["relevant_appids"]
 
-        ft = case.get("filter_tags") if filter_mode in ("all", "tags") else None
-        fo = case.get("free_only", False) if filter_mode in ("all", "free") else False
-        my = case.get("min_year") if filter_mode in ("all", "year") else None
+        fo = False if no_filters else case.get("free_only", False)
+        my = None if no_filters else case.get("min_year")
 
         rag_result = rag_search_similar_games(
             query,
             top_k=k,
-            filter_tags=ft,
             free_only=fo,
             min_year=my,
             min_similarity=min_sim,
@@ -76,13 +70,10 @@ def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: flo
         recall = recall_at_k(retrieved, relevant)
 
         filters_used = []
-        if filter_mode == "free" or (filter_mode == "all" and case.get("free_only")):
+        if fo:
             filters_used.append("free")
-        if filter_mode == "year" or (filter_mode == "all" and case.get("min_year")):
-            filters_used.append(f"y>={case['min_year']}")
-        if filter_mode == "tags" or (filter_mode == "all" and case.get("filter_tags")):
-            ft = case.get("filter_tags") or []
-            filters_used.append(f"tags={','.join(ft)}")
+        if my:
+            filters_used.append(f"y>={my}")
 
         results.append({
             "query": query,
@@ -209,8 +200,7 @@ def main():
     parser.add_argument("--label", default="", help="Version label (auto timestamp if empty)")
     parser.add_argument("--note", default="", help="What variable changed and what it changed to")
     parser.add_argument("--min-sim", type=float, default=0, help="min_similarity threshold (default 0=off)")
-    parser.add_argument("--filter-mode", choices=["all", "none", "tags", "free", "year"], default="all",
-                        help="Which filters to apply: all (default), none, tags, free, year")
+    parser.add_argument("--no-filters", action="store_true", help="Ignore all CSV hard-constraint filters")
     args = parser.parse_args()
 
     gt_path = TESTS_DIR / args.ground_truth
@@ -226,7 +216,7 @@ def main():
     if args.query_id:
         cases = [cases[args.query_id - 1]]
 
-    results = run_batch(cases, top_k_override=args.top_k, min_sim=args.min_sim, filter_mode=args.filter_mode)
+    results = run_batch(cases, top_k_override=args.top_k, min_sim=args.min_sim, no_filters=args.no_filters)
     print_summary(results)
 
     if not args.query_id:

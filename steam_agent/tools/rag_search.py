@@ -6,26 +6,26 @@ from ..rag.embedder import embed_query
 def rag_search_similar_games(
     query: str,
     top_k: int = 10,
-    filter_tags: list[str] | None = None,
     free_only: bool = False,
-    min_metacritic: int | None = None,
     min_year: int | None = None,
+    has_multiplayer: bool | None = None,
+    min_metacritic: int | None = None,
     min_similarity: float = 0.3,
 ) -> dict:
     """
     Semantic search over the game knowledge base.
     Translates Chinese queries to English, embeds, and queries Chroma.
-    Supports optional filtering and similarity threshold.
 
-    Filters (applied as exact metadata constraints, not semantic):
-    - filter_tags: only return games matching these genre tags
+    Hard filters (objective, 100% accurate metadata constraints):
     - free_only: if True, only return free-to-play games
-    - min_metacritic: only return games with metacritic >= this score
     - min_year: only return games released in or after this year
+    - has_multiplayer: if True, only return multiplayer/co-op games;
+      if False, only single-player. If None, no filter.
+    - min_metacritic: only return games with metacritic >= this score
 
     Quality control:
     - min_similarity: drop results below this cosine similarity score.
-      Default 0.3. Set to 0 to disable. Lower = more tolerant, may include noise.
+      Default 0.3. Set to 0 to disable.
 
     IMPORTANT: Call this tool at most once per user turn. If results are poor
     (similarity_score < 0.4), do NOT retry with different keywords — use
@@ -39,19 +39,16 @@ def rag_search_similar_games(
     collection = get_games_collection()
     query_embedding = embed_query([search_query])
 
-    # Build ChromaDB where clause from metadata filters.
+    # Hard constraints only — no genres or user_tags in metadata.
     conditions = []
-    if filter_tags:
-        if len(filter_tags) == 1:
-            conditions.append({"tags": {"$contains": filter_tags[0]}})
-        else:
-            conditions.append({"$or": [{"tags": {"$contains": t}} for t in filter_tags]})
     if free_only:
         conditions.append({"is_free": True})
-    if min_metacritic is not None:
-        conditions.append({"metacritic": {"$gte": min_metacritic}})
     if min_year is not None:
         conditions.append({"release_year": {"$gte": min_year}})
+    if has_multiplayer is not None:
+        conditions.append({"has_multiplayer": has_multiplayer})
+    if min_metacritic is not None:
+        conditions.append({"metacritic": {"$gte": min_metacritic}})
 
     where = None
     if len(conditions) == 1:
@@ -79,10 +76,10 @@ def rag_search_similar_games(
                 "appid": raw["ids"][0][i],
                 "name": meta.get("name", "Unknown"),
                 "similarity_score": sim,
-                "tags": meta.get("tags", []),
                 "is_free": meta.get("is_free", False),
-                "metacritic": meta.get("metacritic", 0),
                 "release_year": meta.get("release_year", 0),
+                "has_multiplayer": meta.get("has_multiplayer", False),
+                "metacritic": meta.get("metacritic", 0),
             })
 
     return {"results": results}

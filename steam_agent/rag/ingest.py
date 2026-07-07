@@ -77,7 +77,7 @@ def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) ->
     # Prefer user_tags for filtering (much finer). Fall back to genres.
     filter_tags = (user_tags if user_tags else None) or genres or ["none"]
 
-    # Build text for embedding. Include user tags when available.
+    # Text for embedding: everything semantic goes here.
     parts = [f"{name}. {description}"]
     if genres:
         parts.append(f"Genres: {', '.join(genres)}.")
@@ -85,16 +85,21 @@ def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) ->
         parts.append(f"User Tags: {', '.join(user_tags[:15])}.")
     if developers:
         parts.append(f"Developer: {developers}.")
-
     text = " ".join(parts)
+
+    # Metadata: ONLY hard constraints (no genres, no user_tags).
+    # Soft/semantic concepts ("horror", "pixel", "roguelike") belong in embedding, not filters.
+    has_multiplayer = any(
+        c in {"Multi-player", "Co-op", "Online Co-op", "PvP", "Online PvP", "MMO"}
+        for c in all_categories
+    )
 
     metadata = {
         "name": name,
-        "tags": filter_tags,
-        "categories": all_categories or ["none"],
         "developers": developers,
         "is_free": is_free,
         "release_year": int(release_year) if release_year.isdigit() else 0,
+        "has_multiplayer": has_multiplayer,
         "metacritic": metacritic if isinstance(metacritic, int) else 0,
     }
 

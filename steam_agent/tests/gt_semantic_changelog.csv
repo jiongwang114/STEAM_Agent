@@ -1,3 +1,3 @@
 ﻿label,date,top_k,variable_changed,avg_recall
-pure,2026-07-07 22:33,10,user_tag版纯语义,0.4575
-filtered,2026-07-07 22:34,10,user_tag版过滤(多标签),0.4800
+pure,2026-07-07 22:59,10,硬约束版纯语义,0.4625
+hard,2026-07-07 23:00,10,硬约束版加过滤free_only+year,0.4600
