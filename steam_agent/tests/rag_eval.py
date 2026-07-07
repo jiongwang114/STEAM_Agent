@@ -52,19 +52,23 @@ def load_ground_truth(path: Path) -> list[dict]:
         return cases
 
 
-def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: float = 0) -> list[dict]:
+def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: float = 0, filter_mode: str = "all") -> list[dict]:
     results = []
     for i, case in enumerate(cases):
         k = top_k_override or case["top_k"]
         query = case["query"]
         relevant = case["relevant_appids"]
 
+        ft = case.get("filter_tags") if filter_mode in ("all", "tags") else None
+        fo = case.get("free_only", False) if filter_mode in ("all", "free") else False
+        my = case.get("min_year") if filter_mode in ("all", "year") else None
+
         rag_result = rag_search_similar_games(
             query,
             top_k=k,
-            filter_tags=case.get("filter_tags"),
-            free_only=case.get("free_only", False),
-            min_year=case.get("min_year"),
+            filter_tags=ft,
+            free_only=fo,
+            min_year=my,
             min_similarity=min_sim,
         )
         items = rag_result.get("results", [])
@@ -72,12 +76,13 @@ def run_batch(cases: list[dict], top_k_override: int | None = None, min_sim: flo
         recall = recall_at_k(retrieved, relevant)
 
         filters_used = []
-        if case.get("free_only"):
+        if filter_mode == "free" or (filter_mode == "all" and case.get("free_only")):
             filters_used.append("free")
-        if case.get("min_year"):
+        if filter_mode == "year" or (filter_mode == "all" and case.get("min_year")):
             filters_used.append(f"y>={case['min_year']}")
-        if case.get("filter_tags"):
-            filters_used.append(f"tags={','.join(case['filter_tags'])}")
+        if filter_mode == "tags" or (filter_mode == "all" and case.get("filter_tags")):
+            ft = case.get("filter_tags") or []
+            filters_used.append(f"tags={','.join(ft)}")
 
         results.append({
             "query": query,
@@ -204,6 +209,8 @@ def main():
     parser.add_argument("--label", default="", help="Version label (auto timestamp if empty)")
     parser.add_argument("--note", default="", help="What variable changed and what it changed to")
     parser.add_argument("--min-sim", type=float, default=0, help="min_similarity threshold (default 0=off)")
+    parser.add_argument("--filter-mode", choices=["all", "none", "tags", "free", "year"], default="all",
+                        help="Which filters to apply: all (default), none, tags, free, year")
     args = parser.parse_args()
 
     gt_path = TESTS_DIR / args.ground_truth
@@ -219,7 +226,7 @@ def main():
     if args.query_id:
         cases = [cases[args.query_id - 1]]
 
-    results = run_batch(cases, top_k_override=args.top_k, min_sim=args.min_sim)
+    results = run_batch(cases, top_k_override=args.top_k, min_sim=args.min_sim, filter_mode=args.filter_mode)
     print_summary(results)
 
     if not args.query_id:

@@ -1,21 +1,41 @@
-query,top_k,relevant_appids,notes
-"roguelike card game",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;2642620;2356780;3353100",Slay the Spire/Balatro/One Deck Dungeon/Die in Dungeon/Lucky Hand/Abalon/Nadir/RODB/Dungeon Clawler/Passant
-"survival crafting open world",10,"108600;252490;892970;346110;251570;1129580;1029780;670260;366090;929670",Project Zomboid/Rust/Valheim/ARK/7 Days/Medieval Dynasty/Going Medieval/Solace Crafting/Colony Survival/Orion Sandbox
-"cozy farming life sim",10,"413150;1222670;2300320;1248130;3501030;4163080;2116850;2760790;4025700;447020",Stardew/Sims4/FS25/FS22/CozyGameCompany/FarmTycoon/AnotherFarmRoguelike/Rebirth/Heartopia/FS17
-"competitive multiplayer fps",10,"730;578080;2357570;2767030;1172470;1938090;2073850;359550;440;2507950",CS2/PUBG/Overwatch/MarvelRivals/Apex/CoD/THEFINALS/R6Siege/TF2/DeltaForce
-"multiplayer survival horror",10,"739630;381210;322330;108600;1774880;1096570;1985930;1681510;2268560;3241660",Phasmophobia/DBD/DST/ProjectZomboid/BlightSurvival/SongOfHorror/Backrooms1998/WW1Trenches/ZombieSurvivalGameOnline/REPO
-"base building colony sim",10,"294100;1029780;366090;1509510;979110;2798330;251570;455980;892970;1129580",RimWorld/GoingMedieval/ColonySurvival/SettlementSurvival/SpaceHaven/DungeonSettlers/7Days/Judgment/Valheim/MedievalDynasty
-"space exploration survival",10,"264710;220200;979110;346110;892970;252490;1718870;882140;670260;929670",Subnautica/KSP/SpaceHaven/ARK/Valheim/Rust/SpaceflightSimulator/Reentry/SolaceCrafting/OrionSandbox
-"battle royale multiplayer",10,"578080;1172470;1203220;2073620;2073850;2268560;221100;1605960;346110;2767030",PUBG/Apex/NARAKA/ArenaBreakout/THEFINALS/ZombieSurvivalGameOnline/DayZ/ZombieSurvivalOnline/ARK/MarvelRivals
-"vr social hangout",10,"438100;4000;3419430;3385970;2406200;2076140;447530;3866160;849740;935070",VRChat/GMod/BongoCat/BeyondSandbox/VRHentaiSim/TavernTalk/VA11Halla/CozySketcher/LoveEsquire/SakuraMMO
-"metroidvania 2d indie",10,"4684250;2871520;250900;105600;1071280;3027160;791180;1283130;238530;1147560",MetroidvaniaMaker/DeepDishDungeon/Isaac/Terraria/QPlatformer/LostGirlPlatformer/1ScreenPlatformer/MicroPlatformer/SuperPuzzlePlatformer/Skul
-"medieval strategy grand strategy",10,"1158310;3105440;1129580;1029780;261550;1142710;289070;394360;2109370;2231020",CK3/HeroesMM/MedievalDynasty/GoingMedieval/Bannerlord/TotalWarWH3/Civ6/HOI4/GreatWarWestern/ChroniclesMedieval
-"action rpg dark fantasy",10,"1245620;2344520;2694490;2622380;3321460;262060;1940340;3564740;3052610;545720",EldenRing/Diablo4/PoE2/NIGHTREIGN/CrimsonDesert/DarkestDungeon/DD2/WhereWindsMeet/RealmOfOblivion/Nother
-"story rich single player rpg",10,"1086940;1091500;1245620;489830;552620;1072420;1174180;2694490;2344520;1948980",BG3/Cyberpunk/EldenRing/Skyrim/ATOMRPG/DQBuilders2/RDR2/PoE2/Diablo4/HeroAdventure
-"relaxing casual no combat",10,"413150;1222670;3501030;3866160;447530;2076140;4025700;3581230;3666490;2653470",Stardew/Sims4/CozyGameCompany/CozySketcher/VA11Halla/TavernTalk/Heartopia/CozyGameRestoration/RaccoonCocoon/LittleProblems
-"indie pixel art game",10,"413150;105600;250900;322170;1071280;1283130;791180;3027160;636040;1796790",Stardew/Terraria/Isaac/GeometryDash/QPlatformer/MicroPlatformer/1ScreenPlatformer/LostGirlPlatformer/PixelWorlds/ChefRPG
-"动作角色扮演 开放世界",10,"1245620;3321460;1091500;3564740;3513350;2694490;2344520;261550;1203220;1948980",EldenRing/CrimsonDesert/Cyberpunk/WhereWindsMeet/WutheringWaves/PoE2/Diablo4/Bannerlord/NARAKA/HeroAdventure
-"恐怖合作生存",10,"739630;381210;322330;108600;1096570;1985930;1681510;1774880;3683450;3241660",Phasmophobia/DBD/DST/ProjectZomboid/SongOfHorror/Backrooms/WW1Trenches/BlightSurvival/OtakuSurvivalHorror/REPO
-"魂系动作RPG",10,"1245620;2622380;2694490;2344520;3052610;545720;250900;3432110;4669960;3321460",EldenRing/NIGHTREIGN/PoE2/Diablo4/RealmOfOblivion/Nother/Isaac/SoulboundRoguelike/DungeonLurker/CrimsonDesert
-"卡牌策略roguelike",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;3353100;4840020;3784030",StS/Balatro/OneDeckDungeon/DieInDungeon/LuckyHand/Abalon/Nadir/Passant/Vicelock/RACCOIN
-"模拟经营管理",10,"294100;3551340;3083800;4717430;568220;1158310;1509510;979110;750520;623700",RimWorld/FM26/UniversityTycoon/CricketTycoon/LobotomyCorp/CK3/SettlementSurvival/SpaceHaven/ArcadeTycoon/RecCenterTycoon
+query,top_k,relevant_appids,free_only,min_year,filter_tags,notes
+"roguelike card game",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;2642620;2356780;3353100",,,,纯语义：roguelike卡牌
+"survival crafting open world",10,"108600;252490;892970;346110;251570;1129580;1029780;670260;366090;929670",,,,纯语义：生存建造开放世界
+"cozy farming life sim",10,"413150;1222670;2300320;1248130;3501030;4163080;2116850;2760790;4025700;447020",,,,纯语义：休闲农场
+"competitive multiplayer fps",10,"730;578080;2357570;2767030;1172470;2073850;359550;440;2507950;2767030",,,,纯语义：竞技射击。CoD不是免费所以用其他替代
+"multiplayer survival horror",10,"739630;381210;322330;108600;1774880;1096570;1985930;1681510;2268560;3241660",,,,纯语义：多人恐怖生存
+"base building colony sim",10,"294100;1029780;366090;1509510;979110;2798330;251570;455980;892970;1129580",,,,纯语义：基地建造殖民模拟
+"space exploration survival",10,"264710;220200;979110;346110;892970;252490;1718870;882140;670260;929670",,,,纯语义：太空探索生存
+"battle royale multiplayer",10,"578080;1172470;1203220;2073620;2073850;2268560;221100;1605960;346110;2767030",,,,纯语义：大逃杀多人
+"vr social hangout",10,"438100;4000;3419430;3385970;2406200;2076140;447530;3866160;849740;935070",,,,纯语义：VR社交
+"metroidvania 2d indie",10,"4684250;2871520;250900;105600;1071280;3027160;791180;1283130;238530;1147560",,,,纯语义：银河城2D独立
+"medieval strategy grand strategy",10,"1158310;3105440;1129580;1029780;261550;1142710;289070;394360;2109370;2231020",,,,纯语义：中世纪策略大战略
+"action rpg dark fantasy",10,"1245620;2344520;2694490;2622380;3321460;262060;1940340;3564740;3052610;545720",,,,纯语义：动作RPG暗黑奇幻
+"story rich single player rpg",10,"1086940;1091500;1245620;489830;552620;1072420;1174180;2694490;2344520;1948980",,,,纯语义：剧情丰富单人RPG
+"relaxing casual no combat",10,"413150;1222670;3501030;3866160;447530;2076140;4025700;3581230;3666490;2653470",,,,纯语义：休闲无战斗
+"indie pixel art game",10,"413150;105600;250900;322170;1071280;1283130;791180;3027160;636040;1796790",,,,纯语义：独立像素美术
+"动作角色扮演 开放世界",10,"1245620;3321460;1091500;3564740;3513350;2694490;2344520;261550;1203220;1948980",,,,纯语义：ARPG开放世界
+"恐怖合作生存",10,"739630;381210;322330;108600;1096570;1985930;1681510;1774880;3683450;3241660",,,,纯语义：恐怖合作生存
+"魂系动作RPG",10,"1245620;2622380;2694490;2344520;3052610;545720;250900;3432110;4669960;3321460",,,,纯语义：魂系ARPG
+"卡牌策略roguelike",10,"646570;2379780;770100;2026820;3292920;1681840;1535210;3353100;4840020;3784030",,,,纯语义：卡牌策略肉鸽
+"模拟经营管理",10,"294100;3551340;3083800;4717430;568220;1158310;1509510;979110;750520;623700",,,,纯语义：模拟经营管理
+"免费射击竞技游戏",10,"730;578080;1172470;2357570;440;2073850;230410;2767030;2507950;359550",1,,,过滤free_only：免费是第一验证条件
+"2023年后最好的RPG",5,"1086940;2344520;2694490;3513350;3564740",,2023,RPG,过滤year+RPG：2023年后发布的RPG
+"赛车模拟驾驶",5,"244210;1551360;284160;252950;635260",,,Racing,过滤Racing：精准赛车标签
+"免费大型多人在线RPG",5,"3513350;1476970;230410;3564740;4119420",1,,RPG,过滤free+RPG：NARAKA不是RPG，换成IdleOn(RPG+free)
+"策略战争大战略",5,"289070;1142710;394360;1158310;813780",,,Strategy,过滤Strategy：策略战争标签
+"体育竞技游戏",5,"3405690;3472040;252950;1551360;3551340",,,Sports,过滤Sports：eFootball不存在换成Forza(Sports)
+"独立像素风游戏",5,"413150;105600;2379780;646570;322170",,,Indie,过滤Indie：独立游戏标签
+"免费动作游戏",10,"730;578080;1172470;2357570;440;230410;2767030;1203220;2073850;2507950",1,,,过滤free_only：免费动作
+"2024年之后的新游戏",5,"2622380;3513350;3564740;3224770;3321460",,2024,,过滤year>=2024：2024年之后发布
+"独立生存建造游戏",5,"252490;892970;322330;108600;264710",,,Indie,过滤Indie：生存建造都在Indie标签下
+"恐怖生存独立游戏",5,"739630;1774880;322330;108600;3683450",,,Indie,过滤Indie：DBD不是Indie换成BlightSurvival(Indie)
+"模拟经营管理策略",5,"294100;3551340;1158310;979110;1509510",,,Strategy,过滤Strategy：Lobotomy不是Strategy换成CK3
+"科幻太空独立游戏",5,"979110;220200;264710;366090;1718870",,,Indie,过滤Indie：科幻太空独立标签
+"回合制RPG策略",5,"1086940;856880;262060;2694490;3206870",,,RPG,过滤RPG：HorrorGlobes和260060不合法换成DarkestDungeon和PoE2
+"沙盒建造物理游戏",5,"4000;105600;252490;892970;346110",,,Indie,过滤Indie：BeamNG不是Indie换成ARK(Indie)
+"免费动作冒险射击",5,"730;578080;1172470;2357570;440",1,,,过滤free_only：重写为免费动作冒险，原卡牌类都不免费
+"怀旧复古RPG",5,"552620;3206870;650940;1940340;262060",,,RPG,过滤RPG：复古RPG标签
+"2023年后动作游戏",5,"2622380;3321460;3564740;3513350;2507950",,2023,,过滤year>=2023：原2022+Indie全fail，改为纯year过滤动作游戏
+"免费多人合作射击",5,"730;1172470;2357570;2073850;2507950",1,,,过滤free_only：免费多人合作射击
+"动物模拟休闲游戏",5,"1222670;413150;2300320;3501030;4025700",,,Simulation,过滤Simulation：动物/生活模拟标签
