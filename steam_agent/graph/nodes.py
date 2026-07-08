@@ -24,7 +24,10 @@ def agent_node(state: AgentState) -> dict:
     tools = get_all_tools()
     llm_with_tools = llm.bind_tools(tools)
 
-    system_prompt = build_system_prompt(state.get("user_id", ""))
+    user_id = state.get("user_id", "")
+    steam_id = state.get("steam_id", "")
+
+    system_prompt = build_system_prompt(user_id=user_id, steam_id=steam_id)
 
     messages = state["messages"]
     if not messages:
@@ -73,6 +76,7 @@ def get_all_tools():
     from ..tools.store_search import search_steam_store
     from ..tools.user_insight import save_user_insight
     from ..tools.user_memory import recall_user_memory
+    from ..tools.recall_message_detail import recall_message_detail
 
     return [
         get_user_playtime,
@@ -80,6 +84,7 @@ def get_all_tools():
         rag_search_similar_games,
         save_user_insight,
         recall_user_memory,
+        recall_message_detail,
     ]
 
 
@@ -89,6 +94,7 @@ def get_tool_map() -> dict:
     from ..tools.store_search import search_steam_store
     from ..tools.user_insight import save_user_insight
     from ..tools.user_memory import recall_user_memory
+    from ..tools.recall_message_detail import recall_message_detail
 
     return {
         "get_user_playtime": get_user_playtime,
@@ -96,6 +102,7 @@ def get_tool_map() -> dict:
         "rag_search_similar_games": rag_search_similar_games,
         "save_user_insight": save_user_insight,
         "recall_user_memory": recall_user_memory,
+        "recall_message_detail": recall_message_detail,
     }
 
 

@@ -1,13 +1,15 @@
 import json
 import logging
+from collections import defaultdict
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
 from ..graph.state import AgentState
 from ..memory.archiver import archive_conversation
+from ..memory.message_store import get_thread_list, get_thread_messages
 from ..tracing import set_trace_context
 from .schemas import ChatRequest, ChatResponse
 
@@ -15,11 +17,26 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_turn_counter: dict[str, int] = defaultdict(int)
+
 
 async def _get_graph():
     from ..graph.builder import build_graph
 
     return await build_graph()
+
+
+def _extract_token_usage(msg) -> dict | None:
+    for attr in ("usage_metadata", "response_metadata"):
+        meta = getattr(msg, attr, None)
+        if meta and isinstance(meta, dict):
+            for key in ("token_usage", "usage"):
+                usage = meta.get(key)
+                if usage and isinstance(usage, dict):
+                    return usage
+            if "prompt_tokens" in meta or "input_tokens" in meta:
+                return meta
+    return None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -41,26 +58,45 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     messages = result["messages"]
     reply = ""
-    tool_calls_made = []
+    tool_calls_made: list[str] = []
+    tool_rounds = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     for msg in messages:
         if hasattr(msg, "tool_calls") and msg.tool_calls:
+            tool_rounds += 1
             for tc in msg.tool_calls:
                 tool_calls_made.append(tc["name"])
-        elif hasattr(msg, "content") and msg.content:
+        elif hasattr(msg, "content") and msg.content and not getattr(msg, "tool_calls", None):
             reply = msg.content
+
+        usage = _extract_token_usage(msg)
+        if usage:
+            total_input_tokens += usage.get("prompt_tokens", usage.get("input_tokens", 0))
+            total_output_tokens += usage.get("completion_tokens", usage.get("output_tokens", 0))
+
+    _turn_counter[req.thread_id] += 1
+    turn = _turn_counter[req.thread_id]
 
     archive_conversation(
         user_id=req.user_id,
         thread_id=req.thread_id,
         user_message=req.message,
         assistant_reply=reply,
+        turn_number=turn,
     )
 
     return ChatResponse(
         thread_id=req.thread_id,
         reply=reply,
         tool_calls_made=tool_calls_made,
+        tool_rounds=tool_rounds,
+        token_usage={
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+            "total_tokens": total_input_tokens + total_output_tokens,
+        },
     )
 
 
@@ -100,11 +136,29 @@ async def chat_stream(req: ChatRequest):
 
         yield f'data: {json.dumps({"event": "done", "data": ""})}\n\n'
 
+        _turn_counter[req.thread_id] += 1
+        turn = _turn_counter[req.thread_id]
+
         archive_conversation(
             user_id=req.user_id,
             thread_id=req.thread_id,
             user_message=req.message,
             assistant_reply=accumulated_reply,
+            turn_number=turn,
         )
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ── 前端历史记录 API ──
+
+@router.get("/threads")
+async def list_threads(user_id: str = Query(...)):
+    threads = get_thread_list(user_id)
+    return {"threads": threads}
+
+
+@router.get("/messages")
+async def read_messages(user_id: str = Query(...), thread_id: str = Query(...)):
+    msgs = get_thread_messages(user_id, thread_id)
+    return {"messages": msgs}

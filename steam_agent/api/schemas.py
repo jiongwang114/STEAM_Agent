@@ -12,6 +12,8 @@ class ChatResponse(BaseModel):
     thread_id: str
     reply: str
     tool_calls_made: list[str] = []
+    tool_rounds: int = 0
+    token_usage: dict = {}
 
 
 class StreamEvent(BaseModel):

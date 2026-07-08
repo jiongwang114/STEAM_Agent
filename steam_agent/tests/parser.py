@@ -92,4 +92,5 @@ ALL_TOOLS = {
     "rag_search_similar_games",
     "save_user_insight",
     "recall_user_memory",
+    "recall_message_detail",
 }
