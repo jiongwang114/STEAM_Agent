@@ -1,496 +1,861 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Steam 游戏推荐助手</title>
-<style>
-/* ── Theme Variables ── */
-:root {
-  --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
-  --accent: #e94560; --text: #eaeaea; --text-muted: #a0a0b0;
-  --user-bubble: #0f3460; --assistant-bubble: #16213e;
-  --border: #2a2a4a; --tool-bg: #1a3a1a; --tool-text: #7ecb7e;
-}
-body.light {
-  --bg: #f0f2f5; --surface: #fff; --surface2: #e8eaf0;
-  --accent: #e94560; --text: #1a1a2e; --text-muted: #666;
-  --user-bubble: #d4e4ff; --assistant-bubble: #fff;
-  --border: #ddd; --tool-bg: #e0ffe0; --tool-text: #2a7a2a;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: row; }
-a { color: var(--accent); }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STEAM.AGNT // 赛博游戏推荐终端</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Orbitron & Rajdhani & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2 family=Inter:wght@300;400;500;600&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Canvas Confetti for "Ready to Play" celebration -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-/* ── Login Page ── */
-#loginPage {
-  position: fixed; inset: 0; background: var(--bg);
-  display: flex; align-items: center; justify-content: center; z-index: 999;
-}
-#loginPage.hidden { display: none; }
-.login-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 32px; width: 340px; text-align: center;
-}
-.login-card h2 { margin-bottom: 20px; font-size: 20px; }
-.login-card input {
-  width: 100%; background: var(--bg); border: 1px solid var(--border);
-  color: var(--text); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 10px; outline: none;
-}
-.login-card input:focus { border-color: var(--accent); }
-.login-card button {
-  width: 100%; background: var(--accent); color: #fff; border: none;
-  padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
-}
-.login-card button:hover { opacity: 0.9; }
-.login-card .switch { margin-top: 14px; font-size: 12px; color: var(--text-muted); }
-.login-card .switch a { cursor: pointer; text-decoration: underline; }
-.login-card .err { color: var(--accent); font-size: 12px; margin-top: 6px; min-height: 18px; }
+  <style>
+    /* 赛博朋克主题核心色彩与样式配置 */
+    :root {
+      --cyber-bg: #06060f;
+      --cyber-panel: rgba(12, 12, 28, 0.85);
+      --cyber-pink: #ff007f;
+      --cyber-cyan: #00f0ff;
+      --cyber-yellow: #fefe00;
+      --cyber-glow-pink: rgba(255, 0, 127, 0.4);
+      --cyber-glow-cyan: rgba(0, 240, 255, 0.4);
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+    }
 
-/* ── Sidebar ── */
-.sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-.sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.sidebar-header label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 3px; }
-.sidebar-header input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 6px; }
-.sidebar-header button { width: 100%; background: var(--accent); color: #fff; border: none; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-.sidebar-header button:hover { opacity: 0.9; }
-.thread-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
-.thread-item { padding: 8px 10px; cursor: pointer; border-radius: 6px; font-size: 12px; margin-bottom: 2px; transition: background 0.15s; }
-.thread-item:hover { background: var(--surface2); }
-.thread-item.active { background: var(--surface2); border: 1px solid var(--accent); }
-.thread-item .id-text { color: var(--text); font-weight: 500; }
-.thread-item .meta-text { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+    /* 浅色霓虹主题配置 */
+    body.light-theme {
+      --cyber-bg: #f3f4f6;
+      --cyber-panel: rgba(255, 255, 255, 0.9);
+      --cyber-pink: #d90473;
+      --cyber-cyan: #0ea5e9;
+      --cyber-yellow: #ca8a04;
+      --cyber-glow-pink: rgba(217, 4, 115, 0.2);
+      --cyber-glow-cyan: rgba(14, 165, 233, 0.2);
+      --text-main: #1f2937;
+      --text-muted: #4b5563;
+    }
 
-/* Sidebar bottom */
-.sidebar-bottom { padding: 6px 10px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
-.sidebar-bottom .user-tag { font-size: 11px; color: var(--text); flex: 1; }
-.sidebar-bottom .gear-btn {
-  background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px;
-}
-.sidebar-bottom .gear-btn:hover { color: var(--text); }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--cyber-bg);
+      color: var(--text-main);
+      transition: background-color 0.3s ease, color 0.3s ease;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
+    }
 
-/* ── Settings Modal ── */
-#settingsModal {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center; z-index: 998;
-}
-#settingsModal.hidden { display: none; }
-.settings-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 24px; width: 380px; max-height: 80vh; overflow-y: auto;
-}
-.settings-card h3 { margin-bottom: 16px; font-size: 16px; }
-.settings-card .field { margin-bottom: 14px; }
-.settings-card .field label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px; }
-.settings-card .field input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
-.settings-card .field input:focus { border-color: var(--accent); }
-.settings-card .field .row { display: flex; gap: 8px; }
-.settings-card .field .row button { flex: 1; background: var(--accent); color: #fff; border: none; padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-.settings-card .field .row button:hover { opacity: 0.9; }
-.settings-card .field .row button.secondary { background: var(--surface2); }
-.settings-card .field .status { font-size: 11px; margin-top: 4px; }
-.settings-card .close-btn { float: right; background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+    .cyber-font {
+      font-family: 'Orbitron', 'Rajdhani', sans-serif;
+    }
 
-/* ── Chat ── */
-.chat-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-header h1 { font-size: 16px; font-weight: 600; }
-header .title-row { display: flex; align-items: center; gap: 8px; }
-header .title-row input {
-  background: transparent; border: 1px solid transparent; color: var(--text); font-size: 12px;
-  padding: 3px 6px; border-radius: 4px; width: 140px; outline: none;
-}
-header .title-row input:hover, header .title-row input:focus { border-color: var(--border); background: var(--bg); }
-main { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
-.message { display: flex; gap: 10px; max-width: 80%; animation: fadeIn 0.25s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.message.user { align-self: flex-end; flex-direction: row-reverse; }
-.message.assistant { align-self: flex-start; }
-.message.system { align-self: center; max-width: 100%; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
-.message.user .avatar { background: var(--accent); }
-.message.assistant .avatar { background: var(--surface2); }
-.bubble { padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; word-break: break-word; white-space: pre-wrap; }
-.message.user .bubble { background: var(--user-bubble); border-bottom-right-radius: 4px; }
-.message.assistant .bubble { background: var(--assistant-bubble); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
-.tool-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--tool-bg); color: var(--tool-text); padding: 3px 8px; border-radius: 10px; font-size: 11px; margin: 3px 3px 3px 0; }
-.loading { display: flex; gap: 4px; padding: 10px 14px; }
-.loading .dot { width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
-.loading .dot:nth-child(1) { animation-delay: -0.32s; }
-.loading .dot:nth-child(2) { animation-delay: -0.16s; }
-@keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
-footer { background: var(--surface); border-top: 1px solid var(--border); padding: 10px 20px; flex-shrink: 0; }
-.input-row { display: flex; gap: 8px; }
-.input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; }
-.input-row input:focus { border-color: var(--accent); }
-.input-row input::placeholder { color: #555; }
-.input-row button { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
-.input-row button:hover { opacity: 0.9; }
-.input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
-.hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; text-align: center; }
-</style>
+    /* 更圆滑、流畅的圆角与发光特效 */
+    .border-cyber-cyan {
+      border: 1px solid var(--cyber-cyan);
+      box-shadow: 0 0 15px var(--cyber-glow-cyan);
+    }
+
+    .border-cyber-pink {
+      border: 1px solid var(--cyber-pink);
+      box-shadow: 0 0 15px var(--cyber-glow-pink);
+    }
+
+    .btn-cyber-primary {
+      background: linear-gradient(135deg, var(--cyber-pink) 0%, #b30059 100%);
+      color: #ffffff;
+      border: 1px solid var(--cyber-pink);
+      text-shadow: 0 0 5px rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 12px var(--cyber-glow-pink);
+      border-radius: 12px; /* 柔和流畅的圆角 */
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-cyber-primary:hover {
+      filter: brightness(1.15);
+      box-shadow: 0 0 25px var(--cyber-pink);
+      transform: translateY(-2px);
+    }
+
+    .btn-cyber-secondary {
+      background: rgba(0, 240, 255, 0.05);
+      color: var(--cyber-cyan);
+      border: 1px solid var(--cyber-cyan);
+      box-shadow: 0 0 10px var(--cyber-glow-cyan);
+      border-radius: 12px; /* 柔和流畅的圆角 */
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-cyber-secondary:hover {
+      background: var(--cyber-cyan);
+      color: #000000;
+      box-shadow: 0 0 22px var(--cyber-cyan);
+      transform: translateY(-2px);
+    }
+
+    /* 炫酷网格背景叠加 */
+    .cyber-grid {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(18, 16, 35, 0.25) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 16, 35, 0.25) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* 滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--cyber-cyan);
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--cyber-pink);
+    }
+
+    /* 故障艺术动效 */
+    @keyframes glitch {
+      0% { text-shadow: 2px 1px 0px var(--cyber-pink), -1px -2px 0px var(--cyber-cyan); }
+      50% { text-shadow: -2px 2px 0px var(--cyber-pink), 3px -1px 0px var(--cyber-cyan); }
+      100% { text-shadow: 1px -2px 0px var(--cyber-pink), -3px 2px 0px var(--cyber-cyan); }
+    }
+    .glitch-text:hover {
+      animation: glitch 0.3s infinite linear alternate-reverse;
+    }
+
+    /* 旋转流光动画 */
+    @keyframes spin-slow {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin-slow 12s linear infinite;
+    }
+
+    /* 封面雷达扫描器动画 */
+    @keyframes radar-pulse {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+    .radar-ring {
+      animation: radar-pulse 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+    }
+
+    /* 打字等待特效 */
+    .dot-flashing {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: var(--cyber-cyan);
+      color: var(--cyber-cyan);
+      animation: dot-flashing 1s infinite linear alternate;
+      animation-delay: .5s;
+    }
+    .dot-flashing::before, .dot-flashing::after {
+      content: '';
+      display: inline-block;
+      position: absolute;
+      top: 0;
+    }
+    .dot-flashing::before {
+      left: -16px;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: var(--cyber-cyan);
+      color: var(--cyber-cyan);
+      animation: dot-flashing 1s infinite linear alternate;
+      animation-delay: 0s;
+    }
+    .dot-flashing::after {
+      left: 16px;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: var(--cyber-cyan);
+      color: var(--cyber-cyan);
+      animation: dot-flashing 1s infinite linear alternate;
+      animation-delay: 1s;
+    }
+    @keyframes dot-flashing {
+      0% { background-color: var(--cyber-cyan); }
+      50%, 100% { background-color: rgba(0, 240, 255, 0.2); }
+    }
+
+    /* Markdown 渲染定制样式 */
+    .prose-cyber h1, .prose-cyber h2, .prose-cyber h3 {
+      font-family: 'Orbitron', sans-serif;
+      color: var(--cyber-cyan);
+      margin-top: 0.5em;
+      margin-bottom: 0.5em;
+      font-weight: bold;
+    }
+    .prose-cyber ul {
+      list-style-type: square;
+      padding-left: 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .prose-cyber li {
+      margin-bottom: 0.25rem;
+    }
+    .prose-cyber p {
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+    }
+    .prose-cyber code {
+      background: rgba(0, 240, 255, 0.1);
+      padding: 0.125rem 0.25rem;
+      border-radius: 0.25rem;
+      color: var(--cyber-pink);
+    }
+  </style>
 </head>
-<body>
+<body class="h-screen w-screen overflow-hidden flex flex-col">
 
-<!-- ── Login Page ── -->
-<div id="loginPage">
-  <div class="login-card">
-    <h2 id="loginTitle">登录</h2>
-    <input id="loginUser" type="text" placeholder="用户名" />
-    <input id="loginPass" type="password" placeholder="密码" />
-    <button onclick="doAuth()" id="loginBtn">登录</button>
-    <div class="err" id="loginErr"></div>
-    <div class="switch">
-      <span id="switchText">还没有账号？</span>
-      <a onclick="toggleAuthMode()" id="switchLink">去注册</a>
-    </div>
-  </div>
-</div>
+  <!-- ========================================== -->
+  <!-- 0. 赛博封面引导页 (Splash Screen) -->
+  <!-- ========================================== -->
+  <div id="splash-screen" class="fixed inset-0 z-50 bg-[#04040a] flex flex-col items-center justify-center transition-all duration-1000 overflow-hidden">
+    
+    <!-- 封面背景网格及粒子 -->
+    <div class="absolute inset-0 cyber-grid opacity-60"></div>
+    <div class="absolute w-[600px] h-[600px] bg-gradient-to-tr from-[#ff007f]/10 to-[#00f0ff]/10 rounded-full filter blur-[120px] pointer-events-none"></div>
 
-<!-- ── Settings Modal ── -->
-<div id="settingsModal" class="hidden">
-  <div class="settings-card">
-    <button class="close-btn" onclick="closeSettings()">x</button>
-    <h3>设置</h3>
-    <div class="field">
-      <label>用户名</label>
-      <input id="setName" type="text" readonly style="opacity:0.7" />
-    </div>
-    <div class="field">
-      <label>Steam ID</label>
-      <div class="row">
-        <input id="setSteamId" type="text" placeholder="17位数字ID" />
-        <button onclick="bindSteamId()">绑定</button>
+    <!-- 交互核心：扫描雷达 -->
+    <div class="relative mb-8 flex items-center justify-center cursor-pointer group" id="splash-interactive-core">
+      <div class="absolute w-48 h-48 rounded-full border border-pink-500/20 radar-ring"></div>
+      <div class="absolute w-64 h-64 rounded-full border border-cyan-500/10 radar-ring" style="animation-delay: 1s;"></div>
+      <div class="w-36 h-36 rounded-full bg-slate-900/90 border border-cyber-cyan shadow-[0_0_30px_var(--cyber-glow-cyan)] flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-cyber-pink group-hover:shadow-[0_0_35px_var(--cyber-glow-pink)]">
+        <i data-lucide="gamepad-2" class="w-16 h-16 text-cyan-400 group-hover:text-pink-500 transition-colors duration-500 animate-pulse"></i>
       </div>
-      <div class="status" id="setSteamStatus"></div>
-      <a href="https://store.steampowered.com/account/" target="_blank" style="font-size:10px;text-decoration:underline">
-        如何获取Steam ID？
-      </a>
+      <!-- 旋转外环刻度 -->
+      <div class="absolute w-40 h-40 border-2 border-dashed border-cyan-400/40 rounded-full animate-spin-slow"></div>
     </div>
-    <div class="field">
-      <label>主题</label>
-      <div class="row">
-        <button onclick="setTheme('dark')">深色</button>
-        <button onclick="setTheme('light')" class="secondary">浅色</button>
+
+    <!-- 文本描述与引导区 -->
+    <div class="max-w-xl text-center px-6 z-10 select-none">
+      <h1 class="text-4xl md:text-5xl font-black tracking-[0.25em] text-white cyber-font mb-2 glitch-text">
+        STEAM<span class="text-pink-500">.</span>AGNT
+      </h1>
+      <p class="text-xs text-cyan-400 tracking-[0.4em] font-bold uppercase mb-6">次世代神经游戏探索协议</p>
+      
+      <!-- 描述代理的一段话 -->
+      <div class="p-5 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-md text-sm text-slate-300 leading-relaxed mb-8 shadow-xl text-left">
+        <p class="font-semibold text-cyan-400/90 mb-2 flex items-center gap-1.5 font-mono text-xs">
+          <i data-lucide="terminal" class="w-4 h-4"></i> AGENT PROFILE // 特工档案简报：
+        </p>
+        <span class="text-slate-400">
+          STEAM.AGNT 是一款深度耦合人类游戏基因（Gaming DNA）与 Steam 实时内容库的次世代 AI 推荐终端。我们摒弃了呆板的传统标签检索，通过比对您的库存特征、愿望单指纹以及游玩时长，秒级重构您的数字娱乐品味。无论是高难度肉鸽的深渊淬炼，还是唯美科幻宇宙的浪漫考古，在此处皆可一键触达。
+        </span>
+      </div>
+
+      <!-- 引导按钮 -->
+      <button id="btn-enter-terminal" class="px-8 py-4 btn-cyber-primary text-sm font-black tracking-widest uppercase flex items-center gap-3 mx-auto shadow-[0_0_20px_var(--cyber-glow-pink)]">
+        <span>初始化神经链路 // CONNECT TO AGENT</span>
+        <i data-lucide="shield-check" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- 底部状态码 -->
+    <div class="absolute bottom-6 font-mono text-[9px] text-gray-600 tracking-wider flex gap-4">
+      <span>LATENCY: 12ms</span>
+      <span>|</span>
+      <span>SYSTEM: STABLE</span>
+      <span>|</span>
+      <span>MEM: ALLOCATED</span>
+    </div>
+  </div>
+
+  <!-- 全局自定义通知 -->
+  <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transform -translate-y-4 opacity-0 transition-all duration-300">
+    <div class="px-6 py-3 bg-[#101024] border border-cyber-cyan text-white text-sm font-semibold tracking-wider flex items-center gap-3 shadow-[0_0_15px_rgba(0,240,255,0.4)] rounded-full">
+      <span id="toast-icon">👾</span>
+      <span id="toast-text" class="cyber-font">系统就绪</span>
+    </div>
+  </div>
+
+  <!-- 主布局容器 -->
+  <div class="flex flex-1 overflow-hidden">
+    
+    <!-- ========================================== -->
+    <!-- 1. 侧边栏 (Sidebar) -->
+    <!-- ========================================== -->
+    <aside id="sidebar" class="w-80 flex-shrink-0 flex flex-col bg-[#0b0b16] border-r border-[#1a1a36] z-20 transition-all duration-300 md:translate-x-0 -translate-x-full fixed md:relative h-full">
+      
+      <!-- 侧边栏头部: 品牌 Logo & 刷新按钮 -->
+      <div class="p-4 border-b border-[#1a1a36] flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center shadow-lg">
+            <i data-lucide="gamepad-2" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-md font-black tracking-widest text-white cyber-font glitch-text cursor-pointer">STEAM.AGNT</h1>
+            <p class="text-[9px] text-gray-500 tracking-wider">CYBERPUNK ENGINE v2.5</p>
+          </div>
+        </div>
+        <!-- 侧边栏刷新按钮 (圆角优化) -->
+        <button id="btn-refresh-sessions" class="p-2 text-gray-400 hover:text-cyan-400 hover:bg-[#1a1a36] rounded-xl transition duration-200 group" title="刷新会话">
+          <i data-lucide="refresh-cw" class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"></i>
+        </button>
+      </div>
+
+      <!-- 新建会话操作区 (圆角优化) -->
+      <div class="p-4">
+        <button id="btn-new-session" class="w-full py-3 btn-cyber-primary flex items-center justify-center gap-2 rounded-xl font-bold tracking-wider text-xs uppercase cyber-font">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          新会话 // NEW RUN
+        </button>
+      </div>
+
+      <!-- 搜索过滤框 -->
+      <div class="px-4 pb-3">
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <i data-lucide="search" class="w-4 h-4 text-gray-500"></i>
+          </span>
+          <input 
+            type="text" 
+            id="search-input" 
+            placeholder="搜索运行记录..." 
+            class="w-full pl-9 pr-4 py-2 bg-[#080811] border border-[#1d1d3d] text-xs text-slate-300 placeholder-gray-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition rounded-xl"
+          />
+        </div>
+      </div>
+
+      <!-- 历史会话列表 -->
+      <div class="flex-1 overflow-y-auto px-4 py-2 space-y-2" id="sessions-container">
+        <!-- 动态生成列表 -->
+      </div>
+
+      <!-- 侧边栏底部: 齿轮 & 用户档案 & 登录模块 -->
+      <div class="p-4 border-t border-[#1a1a36] bg-[#070710] flex items-center justify-between gap-3">
+        <!-- 左下角齿轮按钮 (圆角优化) -->
+        <button id="btn-settings-trigger" class="p-2.5 text-gray-400 hover:text-cyan-400 hover:bg-[#1a1a36] rounded-xl transition duration-200" title="打开系统设置">
+          <i data-lucide="settings" class="w-5 h-5 animate-spin-slow"></i>
+        </button>
+
+        <!-- 登录 / 注册入口 & 用户卡片 -->
+        <div id="user-profile-section" class="flex-1 flex items-center justify-end">
+          <!-- 未登录状态 (圆角优化) -->
+          <button id="btn-auth-trigger" class="px-4 py-2 btn-cyber-secondary rounded-xl font-bold tracking-wider text-[11px] cyber-font uppercase flex items-center gap-1.5">
+            <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+            授权登录
+          </button>
+          
+          <!-- 已登录状态 -->
+          <div id="logged-in-profile" class="hidden flex items-center gap-2 w-full justify-between">
+            <div class="flex items-center gap-2 overflow-hidden">
+              <div class="relative flex-shrink-0">
+                <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&q=80" alt="Avatar" class="w-8 h-8 rounded-lg border border-cyan-400 object-cover" />
+                <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-[#090912] rounded-full"></span>
+              </div>
+              <div class="overflow-hidden">
+                <p id="profile-username" class="text-xs font-bold text-white tracking-wide truncate">CYBER_USER</p>
+                <p id="profile-status" class="text-[9px] text-gray-500 truncate font-semibold">Ready to game</p>
+              </div>
+            </div>
+            <button id="btn-logout-sidebar" class="p-1 text-gray-500 hover:text-red-400 transition" title="注销">
+              <i data-lucide="power" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 侧边栏手机端折叠遮罩层 -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/70 z-10 hidden md:hidden"></div>
+
+    <!-- ========================================== -->
+    <!-- 2. 主聊天内容区 (Main Content) -->
+    <!-- ========================================== -->
+    <main class="flex-1 flex flex-col overflow-hidden relative">
+      
+      <!-- 主区头部 -->
+      <header class="h-16 border-b border-[#1a1a36] bg-[#0c0c18]/90 flex items-center justify-between px-6 z-10">
+        <div class="flex items-center gap-3">
+          <!-- 移动端侧边栏切换按钮 -->
+          <button id="sidebar-toggle" class="md:hidden p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-[#1a1a36] mr-1">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+          
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-black tracking-widest text-white uppercase cyber-font" id="current-chat-title">Steam 专属神经推荐终端</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-medium bg-[#1a2d24] text-emerald-400 border border-emerald-500/30">
+                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-1 animate-pulse"></span> AGENT 在线
+              </span>
+            </div>
+            <p class="text-[10px] text-gray-500 mt-0.5">已链接 Steam AI 大模型，精准捕捉游戏基因图谱</p>
+          </div>
+        </div>
+
+        <!-- 头部 Steam ID 关联状态 -->
+        <div class="flex items-center gap-2">
+          <div id="steam-badge" class="hidden md:flex items-center gap-2 bg-[#12122b]/80 px-3 py-1.5 rounded-xl border border-gray-800 text-xs text-gray-400">
+            <i data-lucide="steam" class="w-4 h-4 text-[#107c10] fill-current" style="color: #66c0f4;"></i>
+            <span>绑定的 SteamID: <strong id="header-steam-id" class="text-cyan-400 font-mono">未绑定</strong></span>
+          </div>
+        </div>
+      </header>
+
+      <!-- 聊天消息展示区域 -->
+      <section class="flex-1 overflow-y-auto p-6 space-y-6" id="chat-messages-container">
+        <!-- 聊天信息动态插入 -->
+      </section>
+
+      <!-- 聊天控制及底板输入区域 -->
+      <footer class="p-6 bg-gradient-to-t from-[#06060f] via-[#0c0c1a] to-transparent border-t border-[#1a1a36]/50">
+        <div class="max-w-4xl mx-auto space-y-3">
+          
+          <!-- Steam ID 引导跳转与提示 -->
+          <div class="flex items-center justify-between text-xs px-1">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 bg-[#ff007f] rounded-full animate-ping"></span>
+              <span class="text-gray-400">想排除已拥有的游戏？即刻关联你的 Steam ID。</span>
+            </div>
+            <!-- 跳转至 steam 账户页方便获取 ID -->
+            <a 
+              href="https://store.steampowered.com/account/" 
+              target="_blank" 
+              class="text-cyan-400 hover:text-cyan-300 font-bold transition flex items-center gap-1 hover:underline"
+            >
+              如何获取 Steam ID? 
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+
+          <!-- 发送输入栏 (圆角优化) -->
+          <form id="chat-form" class="relative flex items-center">
+            <div class="absolute left-4 text-gray-500">
+              <i data-lucide="terminal" class="w-5 h-5"></i>
+            </div>
+            <input 
+              type="text" 
+              id="message-input" 
+              placeholder="键入您的偏好：如“节奏感强、太空科幻、带有经营模拟要素的肉鸽”"
+              class="w-full py-4 pl-12 pr-28 bg-[#0b0b14] border border-[#1f1f42] text-sm text-white placeholder-gray-600 rounded-2xl focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition shadow-[inset_0_1px_4px_rgba(0,0,0,0.8)]"
+              autocomplete="off"
+            />
+            <!-- 发送按钮 (圆角优化) -->
+            <button 
+              type="submit" 
+              class="absolute right-2 px-5 py-2.5 btn-cyber-primary rounded-xl font-bold tracking-widest text-xs uppercase cyber-font flex items-center gap-1.5"
+            >
+              <span>发送</span>
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            </button>
+          </form>
+
+          <p class="text-[10px] text-center text-gray-500">
+            * 本智能 Agent 包含创意工坊数据整合，推荐结果可直接点燃试玩。
+          </p>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 3. 设置面板弹窗 (Settings Panel Modal) -->
+  <!-- ========================================== -->
+  <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="modal-settings-overlay"></div>
+    <div class="relative w-full max-w-md p-6 bg-[#0f0f20] border-cyber-cyan z-10 rounded-2xl shadow-2xl transition duration-300 transform scale-95 opacity-0" id="settings-content">
+      
+      <!-- 弹窗标题 -->
+      <div class="flex items-center justify-between border-b border-[#202048] pb-4 mb-4">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-cyan-400 animate-pulse"></i>
+          <h3 class="text-md font-bold tracking-widest text-white uppercase cyber-font">终端配置核心 // CONFIGS</h3>
+        </div>
+        <!-- 关闭按钮 -->
+        <button class="text-gray-400 hover:text-red-400 transition" id="btn-close-settings">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Steam 绑定区块 (圆角优化) -->
+        <div class="space-y-2">
+          <label class="text-xs font-bold tracking-wider text-slate-400 block uppercase cyber-font">关联 Steam ID 数据库</label>
+          <div class="flex gap-2">
+            <input 
+              type="text" 
+              id="steam-id-input" 
+              placeholder="17位 Steam 社区 ID (如 7656119803..."
+              class="flex-1 px-3 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white placeholder-gray-600 rounded-xl focus:outline-none focus:border-cyan-400 font-mono"
+            />
+            <!-- 绑定 Steam ID 按钮 -->
+            <button id="btn-bind-steam" class="px-4 py-2 btn-cyber-primary rounded-xl text-xs font-bold cyber-font">
+              确认绑定
+            </button>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-gray-500">已绑定：<span id="settings-steam-status" class="text-cyan-400 font-mono">无</span></span>
+            <button id="btn-unbind-steam" class="hidden text-[10px] text-red-400 hover:underline">解除绑定</button>
+          </div>
+        </div>
+
+        <!-- 主题切换区块 (圆角优化) -->
+        <div class="flex items-center justify-between p-3 bg-[#080812] rounded-xl border border-[#1f1f46]">
+          <div>
+            <h4 class="text-xs font-bold tracking-wider text-slate-300 uppercase cyber-font">霓虹主题切换</h4>
+            <p class="text-[10px] text-gray-500">切换深色赛博与浅色赛博风</p>
+          </div>
+          <!-- 主题切换按钮 -->
+          <button id="btn-theme-toggle" class="flex items-center gap-2 px-3 py-1.5 bg-[#1b1b3a] border border-cyan-400/50 rounded-xl text-xs text-cyan-400 hover:bg-cyan-500/10 transition font-bold cyber-font">
+            <i data-lucide="moon" id="theme-icon" class="w-4 h-4"></i>
+            <span id="theme-text">深色赛博</span>
+          </button>
+        </div>
+
+        <!-- 退出登录与关闭区块 (圆角优化) -->
+        <div class="pt-4 border-t border-[#202048] flex gap-2 justify-end">
+          <!-- 退出登录按钮 -->
+          <button id="btn-logout-settings" class="px-4 py-2 bg-[#2d0f1b] border border-red-500/40 text-red-400 hover:bg-red-500/10 hover:border-red-500 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cyber-font uppercase">
+            <i data-lucide="power" class="w-3.5 h-3.5"></i>
+            注销用户
+          </button>
+          <!-- 关闭按钮 -->
+          <button id="btn-close-settings-footer" class="px-4 py-2 bg-[#1b1b36] hover:bg-[#252549] text-gray-400 rounded-xl text-xs transition font-semibold">
+            关闭
+          </button>
+        </div>
       </div>
     </div>
-    <div class="field">
-      <button onclick="doLogout()" class="secondary" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:8px;border-radius:6px;font-size:12px;cursor:pointer">退出登录</button>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 4. 登录 / 注册弹窗 (Auth Modal) -->
+  <!-- ========================================== -->
+  <div id="modal-auth" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+    <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" id="modal-auth-overlay"></div>
+    <div class="relative w-full max-w-sm p-6 bg-[#0f0f20] border-cyber-pink z-10 rounded-2xl shadow-2xl transition duration-300 transform scale-95 opacity-0" id="auth-content">
+      
+      <!-- 弹窗标签切换 -->
+      <div class="flex border-b border-[#202048] mb-6">
+        <button id="tab-login" class="flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font">
+          终端登入
+        </button>
+        <button id="tab-register" class="flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font">
+          注册协议
+        </button>
+      </div>
+
+      <!-- 登入表单 -->
+      <form id="form-auth" class="space-y-4">
+        <div>
+          <label class="text-[10px] font-bold tracking-wider text-slate-400 block mb-1 uppercase">特工代号 (Username)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+              <i data-lucide="user" class="w-4 h-4"></i>
+            </span>
+            <input 
+              type="text" 
+              id="auth-username"
+              required
+              class="w-full pl-9 pr-4 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white rounded-xl focus:outline-none focus:border-pink-500 font-mono"
+              placeholder="请输入代号..."
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[10px] font-bold tracking-wider text-slate-400 block mb-1 uppercase">密钥证书 (Password)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+            </span>
+            <input 
+              type="password" 
+              id="auth-password"
+              required
+              class="w-full pl-9 pr-4 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white rounded-xl focus:outline-none focus:border-pink-500 font-mono"
+              placeholder="请输入密码..."
+            />
+          </div>
+        </div>
+
+        <button type="submit" id="btn-auth-submit" class="w-full py-3 btn-cyber-primary rounded-xl font-bold tracking-widest text-xs uppercase cyber-font">
+          建立连接 // CONNECT
+        </button>
+
+        <p class="text-[9px] text-center text-gray-500 mt-2">
+          * 访问本终端需要遵守《赛博安全及密码法案 v12.4》。
+        </p>
+      </form>
+
+      <!-- 绝对定位的关闭按钮 -->
+      <button class="absolute top-4 right-4 text-gray-400 hover:text-white transition" id="btn-close-auth">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
     </div>
   </div>
-</div>
 
-<!-- ── Main Layout ── -->
-<aside class="sidebar">
-  <div class="sidebar-header">
-    <label>搜索会话</label>
-    <input id="searchThreads" type="text" placeholder="搜索..." oninput="filterThreads()" />
-  </div>
-  <div class="thread-list" id="threadList">
-    <div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">点击"刷新列表"加载</div>
-  </div>
-  <div class="sidebar-bottom">
-    <span class="user-tag" id="userTag">未登录</span>
-    <button class="gear-btn" onclick="openSettings()" title="设置">&#9881;</button>
-    <button onclick="refreshThreads()" style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:4px" title="刷新列表">&#8635;</button>
-  </div>
-</aside>
 
-<div class="chat-container">
-<header>
-  <h1>Steam 游戏推荐助手</h1>
-  <div class="title-row">
-    <input id="titleInput" type="text" placeholder="会话标题" onchange="saveTitle()" onkeydown="if(event.key==='Enter')this.blur()" />
-    <button onclick="newThread()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">新会话</button>
-  </div>
-</header>
-<main id="chat"></main>
-<footer>
-  <div class="input-row">
-    <input id="input" type="text" placeholder="输入消息..." autofocus onkeydown="if(event.key==='Enter')send()" />
-    <button id="sendBtn" onclick="send()">发送</button>
-  </div>
-  <div class="hint">左侧查看历史会话 | 左下角齿轮打开设置</div>
-</footer>
-</div>
+  <!-- JavaScript Core -->
+  <script>
 
-<script>
-// ── State ──
-const chat = document.getElementById('chat');
-const input = document.getElementById('input');
-const sendBtn = document.getElementById('sendBtn');
-const threadList = document.getElementById('threadList');
-const titleInput = document.getElementById('titleInput');
+    /* ── Real Backend State ── */
+    var state = { user:null, steamId:'', activeSessionId:null, searchQuery:'', isLightTheme:false, sessions:[] };
+    var threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+    var isStreaming = false, authMode = 'login';
+    var API = '';
 
-let threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-let isStreaming = false;
-let currentUser = '';
-let currentSteamId = '';
-let currentTheme = 'dark';
-let allThreads = [];
-
-// ── Auth ──
-let authMode = 'login';
-function toggleAuthMode() {
-  authMode = authMode === 'login' ? 'register' : 'login';
-  document.getElementById('loginTitle').textContent = authMode === 'login' ? '登录' : '注册';
-  document.getElementById('loginBtn').textContent = authMode === 'login' ? '登录' : '注册';
-  document.getElementById('switchText').textContent = authMode === 'login' ? '还没有账号？' : '已有账号？';
-  document.getElementById('switchLink').textContent = authMode === 'login' ? '去注册' : '去登录';
-  document.getElementById('loginErr').textContent = '';
-}
-async function doAuth() {
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value.trim();
-  const errEl = document.getElementById('loginErr');
-  if (!u || !p) { errEl.textContent = '请填写用户名和密码'; return; }
-  const ep = authMode === 'login' ? '/auth/login' : '/auth/register';
-  try {
-    const r = await fetch(ep + '?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), { method: 'POST' });
-    const d = await r.json();
-    if (d.status === 'ok') {
-      currentUser = d.username || u;
-      localStorage.setItem('steam_user', currentUser);
-      document.getElementById('loginPage').classList.add('hidden');
-      document.getElementById('userTag').textContent = currentUser;
-      document.getElementById('setName').value = currentUser;
-      initApp();
-    } else {
-      errEl.textContent = d.message;
+    /* ── Toast ── */
+    function showToast(msg, type) {
+      type = type || 'info';
+      var icons = { success:'OK', error:'ERR', info:'i', steam:'S' };
+      DOM.toastIcon.innerText = icons[type] || '?';
+      DOM.toastText.innerText = msg;
+      var box = DOM.toast.firstElementChild;
+      if (type === 'error') { box.style.boxShadow = '0 0 15px rgba(239,68,68,0.5)'; box.style.borderColor = '#ef4444'; }
+      else if (type === 'success') { box.style.boxShadow = '0 0 15px rgba(16,185,129,0.5)'; box.style.borderColor = '#10b981'; }
+      else { box.style.boxShadow = '0 0 15px var(--cyber-glow-cyan)'; box.style.borderColor = 'var(--cyber-cyan)'; }
+      DOM.toast.classList.remove('opacity-0','-translate-y-4');
+      DOM.toast.classList.add('opacity-100','translate-y-0');
+      setTimeout(function(){ DOM.toast.classList.remove('opacity-100','translate-y-0'); DOM.toast.classList.add('opacity-0','-translate-y-4'); }, 3000);
     }
-  } catch (e) { errEl.textContent = '网络错误'; }
-}
-function doLogout() {
-  currentUser = ''; currentSteamId = '';
-  localStorage.removeItem('steam_user');
-  document.getElementById('loginPage').classList.remove('hidden');
-  document.getElementById('settingsModal').classList.add('hidden');
-  chat.innerHTML = ''; threadList.innerHTML = '';
-  addMessage('system', '已退出登录');
-}
 
-// ── Init ──
-async function initApp() {
-  // Load user info
-  try {
-    const r = await fetch('/auth/user-info?username=' + encodeURIComponent(currentUser));
-    const d = await r.json();
-    if (d.status === 'ok' && d.user) {
-      currentSteamId = d.user.bound_steam_id || '';
-      currentTheme = d.user.theme || 'dark';
-      document.getElementById('setSteamId').value = currentSteamId;
-      if (currentSteamId) {
-        document.getElementById('setSteamStatus').textContent = '已绑定';
-        document.getElementById('setSteamStatus').style.color = 'var(--tool-text)';
-      }
-      setTheme(currentTheme);
+    /* ── Modal ── */
+    function openModal(mid, cid) {
+      document.getElementById(mid).classList.remove('hidden');
+      setTimeout(function(){ var c=document.getElementById(cid); c.classList.remove('scale-95','opacity-0'); c.classList.add('scale-100','opacity-100'); }, 50);
     }
-  } catch (_) {}
-  refreshThreads();
-}
-
-async function bindSteamId() {
-  const sid = document.getElementById('setSteamId').value.trim();
-  if (!sid) return;
-  document.getElementById('setSteamStatus').textContent = '绑定中...';
-  try {
-    const r = await fetch('/bind-steam?user_id=' + currentUser + '&steam_id=' + sid, { method: 'POST' });
-    const d = await r.json();
-    if (d.status === 'ok') {
-      currentSteamId = sid;
-      document.getElementById('setSteamStatus').textContent = '已绑定';
-      document.getElementById('setSteamStatus').style.color = 'var(--tool-text)';
-    } else {
-      document.getElementById('setSteamStatus').textContent = d.message || '绑定失败';
-      document.getElementById('setSteamStatus').style.color = 'var(--accent)';
+    function closeModal(mid, cid) {
+      var c=document.getElementById(cid); c.classList.remove('scale-100','opacity-100'); c.classList.add('scale-95','opacity-0');
+      setTimeout(function(){ document.getElementById(mid).classList.add('hidden'); }, 250);
     }
-  } catch (e) {
-    document.getElementById('setSteamStatus').textContent = '网络错误';
-  }
-}
 
-function setTheme(t) {
-  currentTheme = t;
-  document.body.className = t === 'light' ? 'light' : '';
-  fetch('/auth/theme?username=' + currentUser + '&theme=' + t, { method: 'POST' }).catch(()=>{});
-}
-
-// ── Settings ──
-function openSettings() {
-  document.getElementById('setName').value = currentUser;
-  document.getElementById('setSteamId').value = currentSteamId;
-  document.getElementById('setSteamStatus').textContent = currentSteamId ? '已绑定' : '';
-  document.getElementById('settingsModal').classList.remove('hidden');
-}
-function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
-document.getElementById('settingsModal').addEventListener('click', function(e) {
-  if (e.target === this) closeSettings();
-});
-
-// ── Threads ──
-async function refreshThreads() {
-  threadList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">加载中...</div>';
-  try {
-    const r = await fetch('/threads?user_id=' + encodeURIComponent(currentUser));
-    const d = await r.json();
-    allThreads = d.threads || [];
-    renderThreads(allThreads);
-  } catch (e) { threadList.innerHTML = '<div style="color:var(--accent);font-size:12px;padding:8px">加载失败</div>'; }
-}
-function filterThreads() {
-  const q = (document.getElementById('searchThreads').value || '').toLowerCase();
-  renderThreads(q ? allThreads.filter(t => (t.title||'').toLowerCase().includes(q) || t.thread_id.toLowerCase().includes(q)) : allThreads);
-}
-function renderThreads(threads) {
-  threadList.innerHTML = '';
-  if (!threads.length) { threadList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">暂无历史会话</div>'; return; }
-  threads.forEach(t => {
-    const div = document.createElement('div');
-    div.className = 'thread-item' + (t.thread_id === threadId ? ' active' : '');
-    div.innerHTML = '<div class="id-text">' + (t.title || '新会话') + '</div>'
-      + '<div class="meta-text">' + (t.msg_count||0) + ' 条 | ' + (t.last_active||'').slice(0,16).replace('T',' ') + '</div>';
-    div.onclick = () => loadThread(t.thread_id);
-    threadList.appendChild(div);
-  });
-}
-async function loadThread(tid) {
-  threadId = tid;
-  titleInput.value = '';
-  chat.innerHTML = ''; addMessage('system', '加载中...');
-  try {
-    const r = await fetch('/messages?user_id=' + currentUser + '&thread_id=' + tid);
-    const d = await r.json();
-    chat.innerHTML = '';
-    if (d.messages && d.messages.length) {
-      d.messages.forEach(m => addMessage(m.role === 'user' ? 'user' : 'assistant', m.content));
-    } else { addMessage('system', '该会话暂无消息。'); }
-    // Load title
-    try {
-      const tr = await fetch('/threads?user_id=' + currentUser);
-      const td = await tr.json();
-      const found = (td.threads||[]).find(t => t.thread_id === tid);
-      titleInput.value = found?.title || '';
-    } catch(_){}
-  } catch (e) { chat.innerHTML = ''; addMessage('system', '加载失败'); }
-  renderThreads(allThreads);
-  chat.scrollTop = chat.scrollHeight;
-}
-function newThread() {
-  threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-  titleInput.value = '';
-  chat.innerHTML = '';
-  addMessage('system', '新会话已开始');
-  renderThreads(allThreads);
-}
-async function saveTitle() {
-  const title = titleInput.value.trim();
-  if (!title || !currentUser) return;
-  try {
-    await fetch('/thread-title?user_id=' + currentUser + '&thread_id=' + threadId + '&title=' + encodeURIComponent(title), { method: 'POST' });
-    // Update in local list
-    const idx = allThreads.findIndex(t => t.thread_id === threadId);
-    if (idx >= 0) allThreads[idx].title = title;
-    renderThreads(allThreads);
-  } catch(_){}
-}
-
-// ── Chat ──
-function renderMarkdown(text) {
-  if (!text) return '';
-  let html = text;
-  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  html = html.replace(/\[!\[([^\]]*)\]\(([^)]+)\)\]\(([^)]+)\)/g,
-    '<a href="$3" target="_blank"><img src="$2" alt="$1" style="max-width:100%;max-height:200px;border-radius:8px;margin:6px 0;display:block" loading="lazy" /></a>');
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<img src="$2" alt="$1" style="max-width:100%;border-radius:8px;margin:6px 0;display:block" loading="lazy" />');
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" style="color:var(--accent);text-decoration:underline">$1</a>');
-  html = html.replace(/^#### (.+)$/gm, '<h4 style="margin:8px 0 4px;font-size:14px">$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3 style="margin:10px 0 4px;font-size:15px">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 style="margin:12px 0 6px;font-size:16px">$1</h2>');
-  html = html.replace(/^---+\s*$/gm, '<hr style="border-color:var(--border);margin:8px 0">');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  html = html.replace(/^(\d+)\.{1,2}\s+(.+)$/gm, '<div style="margin:2px 0 2px 8px"><b>$1.</b> $2</div>');
-  html = html.replace(/^[-*]\s+(.+)$/gm, '<div style="margin:2px 0 2px 12px">- $1</div>');
-  html = html.replace(/\n/g, '<br>');
-  return html;
-}
-function addMessage(role, text, toolNames) {
-  const div = document.createElement('div');
-  div.className = 'message ' + role;
-  if (role === 'system') {
-    div.innerHTML = '<div class="bubble" style="color:var(--text-muted);font-size:12px;text-align:center">' + text + '</div>';
-  } else {
-    const rendered = role === 'assistant' ? renderMarkdown(text) : text;
-    div.innerHTML = '<div class="avatar">' + (role === 'user' ? 'U' : 'A') + '</div><div class="bubble">' + rendered + '</div>';
-    if (toolNames && toolNames.length) {
-      div.querySelector('.bubble').insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + toolNames.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
-    }
-  }
-  chat.appendChild(div); chat.scrollTop = chat.scrollHeight; return div;
-}
-function addStreamingMessage() {
-  const div = document.createElement('div');
-  div.className = 'message assistant';
-  div.innerHTML = '<div class="avatar">A</div><div class="bubble"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>';
-  div.id = 'streaming-msg'; chat.appendChild(div); return div;
-}
-async function send() {
-  const msg = input.value.trim();
-  if (!msg || isStreaming || !currentUser) return;
-  isStreaming = true; input.value = ''; input.disabled = true; sendBtn.disabled = true;
-  addMessage('user', msg);
-  const streamDiv = addStreamingMessage();
-  const bubble = streamDiv.querySelector('.bubble');
-  let fullReply = ''; const tools = [];
-  try {
-    const resp = await fetch('/chat/stream', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thread_id: threadId, user_id: currentUser, message: msg, steam_id: currentSteamId || null })
+    /* ── Splash Screen ── */
+    DOM.splashInteractiveCore.addEventListener('click', function(){ confetti({ particleCount:50, spread:60, colors:['#00f0ff','#ff007f'] }); });
+    DOM.btnEnterTerminal.addEventListener('click', function(){
+      DOM.splashScreen.classList.add('opacity-0','pointer-events-none','scale-110');
+      setTimeout(function(){ DOM.splashScreen.classList.add('hidden'); }, 1000);
+      confetti({ particleCount:150, spread:80, origin:{y:0.6}, colors:['#ff007f','#00f0ff','#fefe00'] });
+      showToast('链路建立成功！点左下角登录开始','success');
     });
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder(); let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n'); buffer = lines.pop() || '';
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t || !t.startsWith('data: ')) continue;
-        try {
-          const evt = JSON.parse(t.slice(6));
-          if (evt.event === 'token') { fullReply += evt.data; bubble.innerHTML = renderMarkdown(fullReply); chat.scrollTop = chat.scrollHeight; }
-          else if (evt.event === 'tool_call') tools.push(evt.data);
-        } catch (_) {}
-      }
-    }
-    if (fullReply) bubble.innerHTML = renderMarkdown(fullReply);
-    else bubble.textContent = '(无回复)';
-    if (tools.length) bubble.insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + tools.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
-  } catch (err) {
-    bubble.innerHTML = '<span style="color:var(--accent)">请求失败: ' + err.message + '</span>';
-  } finally {
-    streamDiv.removeAttribute('id'); isStreaming = false;
-    input.disabled = false; sendBtn.disabled = false; input.focus();
-    chat.scrollTop = chat.scrollHeight;
-    // Refresh threads after reply (title might have been auto-generated)
-    setTimeout(refreshThreads, 1500);
-  }
-}
+    window.startGameCelebration = function(n){ showToast('打开 '+n+' ...','steam'); confetti({ particleCount:150, spread:80, origin:{y:0.6}, colors:['#ff007f','#00f0ff','#fefe00'] }); };
 
-// ── Startup ──
-const saved = localStorage.getItem('steam_user');
-if (saved) {
-  currentUser = saved;
-  document.getElementById('loginPage').classList.add('hidden');
-  document.getElementById('userTag').textContent = currentUser;
-  document.getElementById('setName').value = currentUser;
-  initApp();
-} else {
-  document.getElementById('userTag').textContent = '未登录';
-}
-addMessage('system', '欢迎使用 Steam 游戏推荐助手');
+    /* ── Auth Tabs ── */
+    function switchAuthTab(t) {
+      authMode = t;
+      DOM.tabLogin.className = t==='login'
+        ? 'flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font'
+        : 'flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font';
+      DOM.tabRegister.className = t==='register'
+        ? 'flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font'
+        : 'flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font';
+      DOM.btnAuthSubmit.innerText = t==='login' ? '登录 // CONNECT' : '注册 // SIGN UP';
+    }
+    DOM.tabLogin.addEventListener('click', function(){ switchAuthTab('login'); });
+    DOM.tabRegister.addEventListener('click', function(){ switchAuthTab('register'); });
+
+    /* ── Auth Submit ── */
+    DOM.formAuth.addEventListener('submit', async function(e){
+      e.preventDefault();
+      var u = DOM.authUsername.value.trim(), p = DOM.authPassword.value.trim();
+      if (!u || !p) { showToast('请填写账户名和密码','error'); return; }
+      var ep = authMode === 'login' ? '/auth/login' : '/auth/register';
+      try {
+        var r = await fetch(API + ep + '?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), {method:'POST'});
+        var d = await r.json();
+        if (d.status === 'ok') {
+          state.user = { username: d.username || u };
+          localStorage.setItem('steam_user', state.user.username);
+          DOM.profileUsername.innerText = (d.username||u).toUpperCase();
+          DOM.profileStatus.innerText = '已激活';
+          DOM.btnAuthTrigger.classList.add('hidden');
+          DOM.loggedInProfile.classList.remove('hidden');
+          closeModal('modal-auth','auth-content');
+          showToast('欢迎回来','success');
+          confetti({ particleCount:80, spread:60, colors:['#00f0ff','#ff007f'] });
+          initApp();
+        } else { showToast(d.message || '失败','error'); }
+      } catch(ex) { showToast('网络错误: ' + ex.message, 'error'); }
+    });
+
+    /* ── Init ── */
+    async function initApp() {
+      if (!state.user) return;
+      try {
+        var r = await fetch(API + '/auth/user-info?username=' + encodeURIComponent(state.user.username));
+        var d = await r.json();
+        if (d.status === 'ok' && d.user) {
+          state.steamId = d.user.bound_steam_id || '';
+          state.isLightTheme = d.user.theme === 'light';
+          if (state.steamId) updateSteamUI(state.steamId);
+          if (state.isLightTheme) { document.body.classList.add('light-theme'); DOM.themeIcon.setAttribute('data-lucide','sun'); DOM.themeText.innerText='浅色'; }
+        }
+      } catch(_) {}
+      refreshThreads();
+    }
+    function updateSteamUI(sid) { DOM.settingsSteamStatus.innerText=sid; DOM.btnUnbindSteam.classList.remove('hidden'); DOM.headerSteamId.innerText=sid; DOM.steamBadge.classList.remove('hidden'); }
+
+    /* ── Logout ── */
+    function logout() {
+      state.user=null; state.steamId=''; localStorage.removeItem('steam_user');
+      DOM.btnAuthTrigger.classList.remove('hidden'); DOM.loggedInProfile.classList.add('hidden');
+      DOM.steamBadge.classList.add('hidden'); DOM.headerSteamId.innerText='未绑定';
+      DOM.settingsSteamStatus.innerText='无'; DOM.btnUnbindSteam.classList.add('hidden');
+      closeModal('modal-settings','settings-content'); closeModal('modal-auth','auth-content');
+      DOM.chatMessagesContainer.innerHTML=''; DOM.sessionsContainer.innerHTML=''; showToast('已退出','info');
+    }
+
+    /* ── Panel Events ── */
+    DOM.btnSettingsTrigger.addEventListener('click', function(){ openModal('modal-settings','settings-content'); });
+    DOM.btnCloseSettings.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
+    DOM.btnCloseSettingsFooter.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
+    DOM.modalSettingsOverlay.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
+    DOM.btnAuthTrigger.addEventListener('click', function(){ switchAuthTab('login'); openModal('modal-auth','auth-content'); });
+    DOM.btnCloseAuth.addEventListener('click', function(){ closeModal('modal-auth','auth-content'); });
+    DOM.modalAuthOverlay.addEventListener('click', function(){ closeModal('modal-auth','auth-content'); });
+
+    /* ── Theme ── */
+    DOM.btnThemeToggle.addEventListener('click', function(){
+      state.isLightTheme=!state.isLightTheme;
+      if (state.isLightTheme) { document.body.classList.add('light-theme'); DOM.themeIcon.setAttribute('data-lucide','sun'); DOM.themeText.innerText='浅色'; }
+      else { document.body.classList.remove('light-theme'); DOM.themeIcon.setAttribute('data-lucide','moon'); DOM.themeText.innerText='深色'; }
+      if (state.user) fetch(API+'/auth/theme?username='+state.user.username+'&theme='+(state.isLightTheme?'light':'dark'),{method:'POST'}).catch(function(){});
+    });
+
+    /* ── Steam ID ── */
+    DOM.btnBindSteam.addEventListener('click', async function(){
+      var v = DOM.steamIdInput.value.trim();
+      if (!v) { showToast('请输入 Steam ID','error'); return; }
+      if (!/^\d{17}$/.test(v)) { showToast('格式不正确（17位数字）','error'); return; }
+      if (!state.user) { showToast('请先登录','error'); return; }
+      try {
+        var r = await fetch(API + '/bind-steam?user_id=' + state.user.username + '&steam_id=' + v, {method:'POST'});
+        var d = await r.json();
+        if (d.status === 'ok') { state.steamId=v; updateSteamUI(v); DOM.steamIdInput.value=''; closeModal('modal-settings','settings-content'); showToast('Steam ID 绑定成功','success'); }
+        else { showToast(d.message || '绑定失败','error'); }
+      } catch(ex) { showToast('网络错误','error'); }
+    });
+    DOM.btnUnbindSteam.addEventListener('click', function(){ state.steamId=''; DOM.settingsSteamStatus.innerText='无'; DOM.btnUnbindSteam.classList.add('hidden'); DOM.steamBadge.classList.add('hidden'); DOM.headerSteamId.innerText='未绑定'; showToast('已解绑','info'); });
+    DOM.btnLogoutSidebar.addEventListener('click', logout);
+    DOM.btnLogoutSettings.addEventListener('click', logout);
+
+    /* ── Threads ── */
+    async function refreshThreads() {
+      if (!state.user) return;
+      try { var r=await fetch(API+'/threads?user_id='+encodeURIComponent(state.user.username)); var d=await r.json(); state.sessions=d.threads||[]; } catch(e){ state.sessions=[]; }
+      renderSessions();
+    }
+    function renderSessions() {
+      DOM.sessionsContainer.innerHTML='';
+      var q=(DOM.searchInput.value||'').toLowerCase();
+      var filtered=state.sessions.filter(function(s){return (s.title||'新会话').toLowerCase().indexOf(q)>=0;});
+      if (!filtered.length) { DOM.sessionsContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500 uppercase tracking-widest">暂无会话</div>'; return; }
+      filtered.forEach(function(s){
+        var active=s.thread_id===state.activeSessionId;
+        var cls=active?'border-l-4 border-cyber-pink bg-pink-500/10 text-white font-semibold':'text-gray-400 hover:text-white hover:bg-white/5';
+        var div=document.createElement('div');
+        div.className='p-3 rounded-xl cursor-pointer transition flex flex-col gap-1 border border-[#1a1a36]/40 '+cls;
+        var timeStr = (s.last_active||'').slice(0,16).replace('T',' ');
+        div.innerHTML='<div class="flex items-center justify-between"><span class="text-xs truncate font-medium flex-1">'+(s.title||'新会话')+'</span></div><span class="text-[9px] text-gray-500 font-mono self-end">'+(s.msg_count||0)+' 条 | '+timeStr+'</span>';
+        div.addEventListener('click',function(){ loadThread(s.thread_id); });
+        DOM.sessionsContainer.appendChild(div);
+      });
+    }
+    async function loadThread(tid) {
+      state.activeSessionId=tid; DOM.currentChatTitle.innerText='加载中...'; renderSessions(); DOM.chatMessagesContainer.innerHTML='';
+      try {
+        var r=await fetch(API+'/messages?user_id='+state.user.username+'&thread_id='+tid);
+        var d=await r.json();
+        if (d.messages&&d.messages.length) d.messages.forEach(function(m){ renderMessage(m.role==='user'?'user':'agent',m.content); });
+        var found=state.sessions.find(function(t){return t.thread_id===tid;});
+        DOM.currentChatTitle.innerText=(found&&found.title)?found.title:'新会话';
+      }catch(e){ DOM.chatMessagesContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500">加载失败</div>'; }
+      DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight;
+    }
+
+    /* ── Chat ── */
+    function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+    function renderMessage(sender,text) {
+      var isAgent=sender==='agent';
+      var wrapper=document.createElement('div');
+      wrapper.className='flex '+(isAgent?'justify-start':'justify-end')+' items-start gap-3 w-full';
+      var avatar=isAgent
+        ? '<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan shadow-[0_0_8px_var(--cyber-glow-cyan)] flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div>'
+        : '<div class="w-9 h-9 rounded-xl bg-[#12122b] flex items-center justify-center border border-cyber-pink shadow-[0_0_8px_var(--cyber-glow-pink)] flex-shrink-0"><i data-lucide="user" class="w-5 h-5 text-white"></i></div>';
+      var bubbleStyle=isAgent?'bg-[#101024]/90 border border-slate-800 text-slate-100 prose-cyber rounded-2xl rounded-tl-sm':'bg-[#ff007f]/10 border border-[#ff007f]/30 text-white rounded-2xl rounded-tr-sm';
+      var rendered=isAgent?marked.parse(text):esc(text);
+      wrapper.innerHTML=(isAgent?avatar:'')+'<div class="max-w-[80%] md:max-w-[70%] p-4 '+bubbleStyle+' shadow-lg relative"><span class="absolute top-1 right-2 text-[8px] text-gray-600 font-mono uppercase tracking-wider">'+(isAgent?'AGENT':'USER')+'</span><div class="text-sm leading-relaxed whitespace-pre-line">'+rendered+'</div></div>'+(isAgent?'':avatar);
+      DOM.chatMessagesContainer.appendChild(wrapper);
+    }
+
+    DOM.chatForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      var text=DOM.messageInput.value.trim();
+      if (!text||isStreaming) return;
+      if (!state.user) { showToast('请先登录','error'); return; }
+      if (!state.activeSessionId) state.activeSessionId=threadId;
+      isStreaming=true; DOM.messageInput.value=''; renderMessage('user',text);
+
+      var typingId='typing-'+Date.now();
+      var tw=document.createElement('div');
+      tw.className='flex justify-start items-center gap-3 w-full'; tw.id=typingId;
+      tw.innerHTML='<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="p-4 bg-[#101024]/90 border border-slate-800 rounded-2xl flex items-center justify-center min-w-[80px] h-12"><div class="dot-flashing"></div></div>';
+      DOM.chatMessagesContainer.appendChild(tw); DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight;
+
+      var fullReply=''; var tools=[];
+      try {
+        var resp=await fetch(API+'/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({thread_id:state.activeSessionId,user_id:state.user.username,message:text,steam_id:state.steamId||null})});
+        var reader=resp.body.getReader(); var decoder=new TextDecoder(); var buffer='';
+        while(true){
+          var r2=await reader.read();
+          if (r2.done) break;
+          buffer+=decoder.decode(r2.value,{stream:true});
+          var lines=buffer.split('\n'); buffer=lines.pop()||'';
+          for (var i=0;i<lines.length;i++){
+            var t=lines[i].trim();
+            if (!t||!t.startsWith('data: ')) continue;
+            try{ var evt=JSON.parse(t.slice(6)); if(evt.event==='token') fullReply+=evt.data; else if(evt.event==='tool_call') tools.push(evt.data); } catch(_){}
+          }
+        }
+        var node=document.getElementById(typingId);
+        if (node){
+          var toolsHtml=tools.length?'<div style="margin-top:8px;font-size:10px;color:#a0a0b0">'+tools.map(esc).join(' . ')+'</div>':'';
+          node.outerHTML='<div class="flex justify-start items-start gap-3 w-full"><div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="max-w-[80%] md:max-w-[70%] p-4 bg-[#101024]/90 border border-slate-800 text-slate-100 prose-cyber rounded-2xl rounded-tl-sm shadow-lg relative"><span class="absolute top-1 right-2 text-[8px] text-gray-600 font-mono uppercase tracking-wider">AGENT</span><div class="text-sm leading-relaxed whitespace-pre-line">'+marked.parse(fullReply||'(无回复)')+'</div>'+toolsHtml+'</div></div>';
+        }
+        setTimeout(function(){ refreshThreads(); },2000);
+      } catch(err) {
+        var node2=document.getElementById(typingId);
+        if (node2) node2.outerHTML='<div class="flex justify-start items-start gap-3 w-full"><div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="p-4 bg-[#101024]/90 border border-red-500/40 text-red-400 rounded-2xl text-sm">请求失败: '+esc(err.message)+'</div></div>';
+      } finally { isStreaming=false; DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight; }
+    });
+
+    /* ── New Session ── */
+    DOM.btnNewSession.addEventListener('click',function(){ threadId=crypto.randomUUID?crypto.randomUUID():Date.now().toString(36); state.activeSessionId=threadId; DOM.currentChatTitle.innerText='新会话'; DOM.chatMessagesContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500">新会话已开始</div>'; renderSessions(); });
+
+    /* ── Refresh ── */
+    DOM.btnRefreshSessions.addEventListener('click',function(){ DOM.btnRefreshSessions.firstElementChild.classList.add('rotate-180'); refreshThreads().then(function(){ setTimeout(function(){ DOM.btnRefreshSessions.firstElementChild.classList.remove('rotate-180'); },500); }); });
+
+    /* ── Search ── */
+    DOM.searchInput.addEventListener('input',function(e){ state.searchQuery=e.target.value; renderSessions(); });
+
+    /* ── Mobile ── */
+    DOM.sidebarToggle.addEventListener('click',function(){ DOM.sidebar.classList.remove('-translate-x-full'); DOM.sidebarOverlay.classList.remove('hidden'); });
+    DOM.sidebarOverlay.addEventListener('click',function(){ DOM.sidebar.classList.add('-translate-x-full'); DOM.sidebarOverlay.classList.add('hidden'); });
+
+    /* ── Boot ── */
+    window.onload=function(){ lucide.createIcons(); var s=localStorage.getItem('steam_user'); if(s){ state.user={username:s}; DOM.profileUsername.innerText=s.toUpperCase(); DOM.profileStatus.innerText='已激活'; DOM.btnAuthTrigger.classList.add('hidden'); DOM.loggedInProfile.classList.remove('hidden'); initApp(); } };
+
 </script>
 </body>
 </html>
