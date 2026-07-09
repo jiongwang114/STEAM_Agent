@@ -16,6 +16,7 @@ COPY steam_agent/ ./steam_agent/
 
 RUN mkdir -p /app/steam_agent/rag/chroma_data /app/data /root/.cache/torch
 ENV SENTENCE_TRANSFORMERS_HOME=/root/.cache/torch/sentence_transformers
+ENV HF_ENDPOINT=https://hf-mirror.com
 
 EXPOSE 8000
 
