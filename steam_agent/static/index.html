@@ -167,13 +167,45 @@ function newThread() {
   document.querySelectorAll('.thread-item').forEach(el => el.classList.remove('active'));
 }
 
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = text;
+  // escape HTML first
+  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // images wrapped in clickable link to store
+  html = html.replace(/!\[([^\]]*)\]\((\/\/[^)]+|https?:\/\/[^)]+)\)/g,
+    '<a href="$2" target="_blank"><img src="$2" alt="$1" style="max-width:100%;max-height:200px;border-radius:8px;margin:6px 0;display:block" loading="lazy" /></a>');
+  // plain markdown images (no http) — just render
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
+    '<img src="$2" alt="$1" style="max-width:100%;border-radius:8px;margin:6px 0" loading="lazy" />');
+  // clickable links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" style="color:var(--accent);text-decoration:underline">$1</a>');
+  // headings
+  html = html.replace(/^#### (.+)$/gm, '<h4 style="margin:8px 0 4px;font-size:14px">$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3 style="margin:10px 0 4px;font-size:15px">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 style="margin:12px 0 6px;font-size:16px">$1</h2>');
+  // horizontal rule
+  html = html.replace(/^---+\s*$/gm, '<hr style="border-color:var(--border);margin:8px 0">');
+  // bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // numbered list items
+  html = html.replace(/^(\d+)\.{1,2}\s+(.+)$/gm, '<div style="margin:2px 0 2px 8px"><b>$1.</b> $2</div>');
+  // bullet list items
+  html = html.replace(/^[-*]\s+(.+)$/gm, '<div style="margin:2px 0 2px 12px">- $1</div>');
+  // emoji fix: wrap emoji spans cleanly
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 function addMessage(role, text, toolNames) {
   const div = document.createElement('div');
   div.className = 'message ' + role;
   if (role === 'system') {
     div.innerHTML = '<div class="bubble" style="color:var(--text-muted);font-size:12px;text-align:center">' + text + '</div>';
   } else {
-    div.innerHTML = '<div class="avatar">' + (role === 'user' ? 'U' : 'A') + '</div><div class="bubble">' + text + '</div>';
+    const rendered = role === 'assistant' ? renderMarkdown(text) : text;
+    div.innerHTML = '<div class="avatar">' + (role === 'user' ? 'U' : 'A') + '</div><div class="bubble">' + rendered + '</div>';
     if (toolNames && toolNames.length > 0) {
       div.querySelector('.bubble').insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + toolNames.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
     }
@@ -222,18 +254,18 @@ async function send() {
         if (!t || !t.startsWith('data: ')) continue;
         try {
           const evt = JSON.parse(t.slice(6));
-          if (evt.event === 'token') { fullReply += evt.data; bubble.textContent = fullReply; chat.scrollTop = chat.scrollHeight; }
+          if (evt.event === 'token') { fullReply += evt.data; bubble.innerHTML = renderMarkdown(fullReply); chat.scrollTop = chat.scrollHeight; }
           else if (evt.event === 'tool_call') tools.push(evt.data);
         } catch (_) {}
       }
     }
-    bubble.textContent = fullReply || '(无回复)';
+    if (fullReply) { bubble.innerHTML = renderMarkdown(fullReply); }
+    else { bubble.textContent = '(无回复)'; }
     if (tools.length) bubble.insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + tools.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
-    streamDiv.removeAttribute('id');
   } catch (err) {
     bubble.innerHTML = '<span style="color:var(--accent)">请求失败: ' + err.message + '</span>';
-    streamDiv.removeAttribute('id');
   } finally {
+    streamDiv.removeAttribute('id');
     isStreaming = false;
     input.disabled = false; sendBtn.disabled = false;
     input.focus(); chat.scrollTop = chat.scrollHeight;

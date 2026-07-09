@@ -39,14 +39,16 @@ def search_steam_store(query: str, max_results: int = 10) -> dict:
         if detail is None:
             continue
         item = items[i] if i < len(items) else {}
+        appid = item.get("id", detail.get("steam_appid"))
         results.append({
-            "appid": item.get("id", detail.get("steam_appid")),
+            "appid": appid,
             "name": detail.get("name", item.get("name", "Unknown")),
             "price": _extract_price(detail),
             "metacritic": detail.get("metacritic", {}).get("score"),
             "tags": [g["description"] for g in detail.get("genres", [])],
             "header_image": detail.get("header_image", ""),
             "short_description": detail.get("short_description", ""),
+            "store_url": f"https://store.steampowered.com/app/{appid}/" if appid else "",
         })
 
     return {"results": results}
@@ -56,7 +58,7 @@ def _search_store(query: str) -> dict:
     import urllib.request
     import json
 
-    url = f"{STEAM_STORE_URL}/storesearch/?term={urllib.request.quote(query)}&cc=us&l=english"
+    url = f"{STEAM_STORE_URL}/storesearch/?term={urllib.request.quote(query)}&cc=cn&l=schinese"
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=10.0) as resp:
         return json.loads(resp.read())
@@ -66,7 +68,7 @@ def _fetch_app_detail_sync(appid: int) -> dict | None:
     import json
     import urllib.request
 
-    url = f"{STEAM_STORE_URL}/appdetails?appids={appid}&cc=us"
+    url = f"{STEAM_STORE_URL}/appdetails?appids={appid}&cc=cn"
     req = urllib.request.Request(url, headers=HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=10.0) as resp:
@@ -87,8 +89,10 @@ def _fetch_app_details_sync(appids: list[int]) -> list[dict | None]:
 def _extract_price(detail: dict) -> dict:
     price_overview = detail.get("price_overview")
     if not price_overview:
-        return {"currency": "N/A", "final": 0}
+        return {"currency": "N/A", "final": 0, "initial": 0, "discount_percent": 0}
     return {
         "currency": price_overview.get("currency", "N/A"),
         "final": price_overview.get("final", 0),
+        "initial": price_overview.get("initial", price_overview.get("final", 0)),
+        "discount_percent": price_overview.get("discount_percent", 0),
     }

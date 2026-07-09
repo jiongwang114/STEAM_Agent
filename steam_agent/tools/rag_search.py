@@ -1,6 +1,27 @@
+from pathlib import Path
 from ..rag.translate import translate_to_english
 from ..rag.vector_store import get_games_collection
 from ..rag.embedder import embed_query
+
+CACHE_PATH = Path(__file__).resolve().parent.parent / "rag" / "chroma_data" / "game_cache.json"
+_cache_images: dict[str, str] | None = None
+
+
+def _load_cache_images() -> dict[str, str]:
+    """Load header_image map from game_cache.json, lazy."""
+    global _cache_images
+    if _cache_images is None:
+        import json
+        _cache_images = {}
+        if CACHE_PATH.exists():
+            with open(CACHE_PATH, encoding="utf-8") as f:
+                games = json.load(f)
+                for g in games:
+                    appid = str(g.get("appid", ""))
+                    img = g.get("detail", {}).get("header_image", "")
+                    if appid and img:
+                        _cache_images[appid] = img
+    return _cache_images
 
 
 def rag_search_similar_games(
@@ -72,14 +93,18 @@ def rag_search_similar_games(
             sim = round(1 - raw["distances"][0][i], 4) if raw.get("distances") else 0.0
             if min_similarity > 0 and sim < min_similarity:
                 continue
+            desc = raw["documents"][0][i].strip() if raw.get("documents") else ""
             results.append({
                 "appid": raw["ids"][0][i],
                 "name": meta.get("name", "Unknown"),
                 "similarity_score": sim,
+                "description": desc,
                 "is_free": meta.get("is_free", False),
                 "release_year": meta.get("release_year", 0),
                 "has_multiplayer": meta.get("has_multiplayer", False),
                 "metacritic": meta.get("metacritic", 0),
+                "header_image": _load_cache_images().get(raw["ids"][0][i], ""),
+                "store_url": f"https://store.steampowered.com/app/{raw['ids'][0][i]}/",
             })
 
     return {"results": results}

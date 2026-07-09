@@ -90,6 +90,17 @@ SYSTEM_PROMPT_TEMPLATE = """\
 - 每条推荐说明理由（与用户已有游戏的关联、评分、特色）
 - 对模糊需求（"推荐好玩的"），结合用户偏好给出有依据的建议
 - 如果用户还没绑定 Steam，用 RAG 和商店搜索做通用推荐。当用户表现出个性化需求时，自然地引导他们绑定 Steam 账号。
+- RAG 和商店搜索结果中会包含 `header_image`（游戏封面图）和 `store_url`（Steam 商店直达链接, 格式为 `https://store.steampowered.com/app/{appid}/`）。
+  **每个推荐游戏必须用以下格式展示图片和链接：**
+  ```
+  [![游戏名](header_image的URL)](store_url的URL)
+  ```
+  这样图片本身就是可点击的，点击后跳转到 Steam 商店页面。例如：
+  ```
+  [![Elden Ring](https://shared.akamai.steamstatic.com/...header.jpg)](https://store.steampowered.com/app/1245620/)
+  ```
+  绝不要只放纯文本链接，必须用上述 Markdown 格式让图片可点击。
+- 价格字段包含 `initial`（原价）、`final`（现价）、`discount_percent`（折扣百分比）。如果 `discount_percent > 0` 说明正在打折，必须主动告知用户折扣力度和折后价。
 
 ## 工具无结果时的处理
 
