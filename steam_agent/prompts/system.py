@@ -90,7 +90,7 @@ SYSTEM_PROMPT_TEMPLATE = """\
 - 每条推荐说明理由（与用户已有游戏的关联、评分、特色）
 - 对模糊需求（"推荐好玩的"），结合用户偏好给出有依据的建议
 - 如果用户还没绑定 Steam，用 RAG 和商店搜索做通用推荐。当用户表现出个性化需求时，自然地引导他们绑定 Steam 账号。
-- RAG 和商店搜索结果中会包含 `header_image`（游戏封面图）和 `store_url`（Steam 商店直达链接, 格式为 `https://store.steampowered.com/app/{appid}/`）。
+- RAG 和商店搜索结果中会包含 `header_image`（游戏封面图）和 `store_url`（Steam 商店直达链接, 格式为 `https://store.steampowered.com/app/{{appid}}/`）。
   **每个推荐游戏必须用以下格式展示图片和链接：**
   ```
   [![游戏名](header_image的URL)](store_url的URL)
