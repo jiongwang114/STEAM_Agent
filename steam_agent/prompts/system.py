@@ -16,6 +16,7 @@ SYSTEM_PROMPT_TEMPLATE = """\
 
 {steam_id_context}
 {user_id_context}
+{game_profile_context}
 
 ## 推理规则
 
@@ -155,14 +156,23 @@ SYSTEM_PROMPT_TEMPLATE = """\
 
 
 def build_system_prompt(user_id: str, steam_id: str | None = None) -> SystemMessage:
-    """构建 System Prompt，注入用户画像和 steam_id 上下文。"""
+    """构建 System Prompt，注入用户画像、steam_id、游戏档案。"""
+    from ..memory.game_profile import get_game_profile
+
     insights_text = _format_insights(user_id)
     steam_id_text = _format_steam_id(steam_id)
     user_id_text = _format_user_id(user_id or "unknown")
+
+    profile_text = ""
+    if steam_id:
+        profile_text = get_game_profile(steam_id)
+    profile_context = f"\n## 用户游戏档案（每 6 小时自动刷新）\n\n{profile_text}" if profile_text else ""
+
     content = SYSTEM_PROMPT_TEMPLATE.format(
         user_insights=insights_text,
         steam_id_context=steam_id_text,
         user_id_context=user_id_text,
+        game_profile_context=profile_context,
     )
     return SystemMessage(content=content)
 

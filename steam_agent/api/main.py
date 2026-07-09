@@ -25,6 +25,8 @@ async def lifespan(app: FastAPI):
     get_embedder()
     logging.info("Initializing SQLite database...")
     init_db()
+    from ..memory.game_profile import init_game_profile_table
+    init_game_profile_table()
     logging.info("Steam Agent API ready.")
     yield
 
