@@ -69,6 +69,16 @@ footer { background: var(--surface); border-top: 1px solid var(--border); paddin
     <input id="userIdInput" type="text" value="web_user" placeholder="eval_user" />
     <button onclick="refreshThreads()">刷新列表</button>
   </div>
+  <div class="sidebar-header" style="border-top:1px solid var(--border)">
+    <label>Steam ID</label>
+    <input id="steamIdInput" type="text" placeholder="17位数字ID，如 7656119..." />
+    <button onclick="bindSteam()" style="margin-bottom:4px">绑定 Steam ID</button>
+    <a href="https://store.steampowered.com/account/" target="_blank"
+       style="font-size:10px;color:var(--accent);text-decoration:underline;display:block;text-align:center">
+      如何获取Steam ID？点此打开Steam账户页
+    </a>
+    <div id="steamStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;text-align:center"></div>
+  </div>
   <div class="thread-list" id="threadList">
     <div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">点击"刷新列表"加载历史会话</div>
   </div>
@@ -109,6 +119,41 @@ let isStreaming = false;
 function getUserId() {
   const inp = document.getElementById('userIdInput');
   return inp ? inp.value.trim() || 'web_user' : 'web_user';
+}
+
+let currentSteamId = '';
+
+async function loadSteamId() {
+  const uid = getUserId();
+  try {
+    const resp = await fetch('/steam-id?user_id=' + encodeURIComponent(uid));
+    const data = await resp.json();
+    if (data.steam_id) {
+      currentSteamId = data.steam_id;
+      document.getElementById('steamIdInput').value = data.steam_id;
+      document.getElementById('steamStatus').textContent = '已绑定: ' + data.steam_id.slice(0, 10) + '...';
+      document.getElementById('steamStatus').style.color = 'var(--tool-text)';
+    }
+  } catch (_) {}
+}
+
+async function bindSteam() {
+  const uid = getUserId();
+  const sid = document.getElementById('steamIdInput').value.trim();
+  if (!sid) { alert('请先输入 Steam ID'); return; }
+  document.getElementById('steamStatus').textContent = '绑定中...';
+  try {
+    const resp = await fetch('/bind-steam?user_id=' + encodeURIComponent(uid) + '&steam_id=' + encodeURIComponent(sid), { method: 'POST' });
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      currentSteamId = data.steam_id;
+      document.getElementById('steamStatus').textContent = '已绑定: ' + data.steam_id.slice(0, 10) + '...';
+      document.getElementById('steamStatus').style.color = 'var(--tool-text)';
+    }
+  } catch (err) {
+    document.getElementById('steamStatus').textContent = '绑定失败: ' + err.message;
+    document.getElementById('steamStatus').style.color = 'var(--accent)';
+  }
 }
 
 async function refreshThreads() {
@@ -238,7 +283,7 @@ async function send() {
   try {
     const resp = await fetch('/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thread_id: threadId, user_id: getUserId(), message: msg, steam_id: null })
+      body: JSON.stringify({ thread_id: threadId, user_id: getUserId(), message: msg, steam_id: currentSteamId || null })
     });
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
@@ -274,6 +319,7 @@ async function send() {
 
 addMessage('system', '欢迎使用 Steam 游戏推荐助手');
 refreshThreads();
+loadSteamId();
 </script>
 </body>
 </html>

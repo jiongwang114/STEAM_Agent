@@ -162,3 +162,39 @@ async def list_threads(user_id: str = Query(...)):
 async def read_messages(user_id: str = Query(...), thread_id: str = Query(...)):
     msgs = get_thread_messages(user_id, thread_id)
     return {"messages": msgs}
+
+
+# ── Steam ID 绑定 API ──
+
+@router.post("/bind-steam")
+async def bind_steam(user_id: str = Query(...), steam_id: str = Query(...)):
+    """将 Steam ID 持久化到 user_insights 表，作为个人事实保存。"""
+    from ..memory.insight_store import add_insight, remove_insight, get_insights
+    from ..memory.game_profile import get_game_profile
+
+    # 移除旧的 steam_id 记录
+    existing = get_insights(user_id)
+    for item in existing:
+        if "Steam ID" in item["insight"]:
+            remove_insight(user_id, item["insight"])
+
+    # 写入新的
+    insight_text = f"用户Steam ID: {steam_id}"
+    add_insight(user_id, insight_text, "fact")
+
+    # 预热画像缓存
+    profile = get_game_profile(steam_id)
+
+    return {"status": "ok", "steam_id": steam_id, "profile_preview": profile[:200] if profile else ""}
+
+
+@router.get("/steam-id")
+async def get_steam_id(user_id: str = Query(...)):
+    """查询已绑定的 Steam ID。"""
+    from ..memory.insight_store import get_insights
+
+    existing = get_insights(user_id)
+    for item in existing:
+        if "Steam ID" in item["insight"]:
+            return {"steam_id": item["insight"].replace("用户Steam ID: ", "").strip()}
+    return {"steam_id": ""}
