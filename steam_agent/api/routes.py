@@ -87,6 +87,9 @@ async def chat(req: ChatRequest) -> ChatResponse:
         turn_number=turn,
     )
 
+    if turn == 1 and reply:
+        _maybe_generate_title(req.user_id, req.thread_id, req.message)
+
     return ChatResponse(
         thread_id=req.thread_id,
         reply=reply,
@@ -147,6 +150,10 @@ async def chat_stream(req: ChatRequest):
             turn_number=turn,
         )
 
+        # Auto-generate title after first turn
+        if turn == 1 and accumulated_reply:
+            _maybe_generate_title(req.user_id, req.thread_id, req.message)
+
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
@@ -154,8 +161,22 @@ async def chat_stream(req: ChatRequest):
 
 @router.get("/threads")
 async def list_threads(user_id: str = Query(...)):
-    threads = get_thread_list(user_id)
-    return {"threads": threads}
+    from ..memory.thread_title import get_thread_list_with_titles
+
+    threads = get_thread_list_with_titles(user_id)
+    if threads:
+        return {"threads": threads}
+    # fallback to old message-only list
+    raw = get_thread_list(user_id)
+    return {"threads": raw}
+
+
+@router.post("/thread-title")
+async def set_title(user_id: str = Query(...), thread_id: str = Query(...), title: str = Query(...)):
+    from ..memory.thread_title import set_thread_title
+
+    set_thread_title(user_id, thread_id, title)
+    return {"status": "ok"}
 
 
 @router.get("/messages")
@@ -168,21 +189,24 @@ async def read_messages(user_id: str = Query(...), thread_id: str = Query(...)):
 
 @router.post("/bind-steam")
 async def bind_steam(user_id: str = Query(...), steam_id: str = Query(...)):
-    """将 Steam ID 持久化到 user_insights 表，作为个人事实保存。"""
+    """绑定 Steam ID：auth 表 + user_insights 表 + 预热画像。"""
+    from ..memory.auth import bind_steam_id, get_user_info
     from ..memory.insight_store import add_insight, remove_insight, get_insights
     from ..memory.game_profile import get_game_profile
 
-    # 移除旧的 steam_id 记录
+    # Bind in auth table (one steam_id per user, check uniqueness)
+    ok, msg = bind_steam_id(user_id, steam_id)
+    if not ok:
+        return {"status": "error", "message": msg}
+
+    # Persist as insight
     existing = get_insights(user_id)
     for item in existing:
         if "Steam ID" in item["insight"]:
             remove_insight(user_id, item["insight"])
+    add_insight(user_id, f"用户Steam ID: {steam_id}", "fact")
 
-    # 写入新的
-    insight_text = f"用户Steam ID: {steam_id}"
-    add_insight(user_id, insight_text, "fact")
-
-    # 预热画像缓存
+    # Warm profile cache
     profile = get_game_profile(steam_id)
 
     return {"status": "ok", "steam_id": steam_id, "profile_preview": profile[:200] if profile else ""}
@@ -198,3 +222,48 @@ async def get_steam_id(user_id: str = Query(...)):
         if "Steam ID" in item["insight"]:
             return {"steam_id": item["insight"].replace("用户Steam ID: ", "").strip()}
     return {"steam_id": ""}
+
+
+# ── 用户认证 API ──
+
+@router.post("/auth/register")
+async def auth_register(username: str = Query(...), password: str = Query(...)):
+    from ..memory.auth import register
+
+    ok, msg = register(username, password)
+    return {"status": "ok" if ok else "error", "message": msg, "username": username if ok else ""}
+
+
+@router.post("/auth/login")
+async def auth_login(username: str = Query(...), password: str = Query(...)):
+    from ..memory.auth import login
+
+    ok, msg = login(username, password)
+    return {"status": "ok" if ok else "error", "message": msg, "username": username if ok else ""}
+
+
+@router.get("/auth/user-info")
+async def auth_user_info(username: str = Query(...)):
+    from ..memory.auth import get_user_info
+
+    info = get_user_info(username)
+    if info:
+        return {"status": "ok", "user": info}
+    return {"status": "error", "message": "用户不存在"}
+
+
+@router.post("/auth/theme")
+async def auth_set_theme(username: str = Query(...), theme: str = Query(...)):
+    from ..memory.auth import update_theme
+
+    update_theme(username, theme)
+    return {"status": "ok"}
+
+
+def _maybe_generate_title(user_id: str, thread_id: str, message: str):
+    """Auto-generate a short title for a new thread based on the first user message."""
+    try:
+        from ..memory.thread_title import auto_generate_title
+        auto_generate_title(user_id, thread_id, message)
+    except Exception:
+        pass

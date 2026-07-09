@@ -5,16 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Steam 游戏推荐助手</title>
 <style>
+/* ── Theme Variables ── */
 :root {
   --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
   --accent: #e94560; --text: #eaeaea; --text-muted: #a0a0b0;
   --user-bubble: #0f3460; --assistant-bubble: #16213e;
   --border: #2a2a4a; --tool-bg: #1a3a1a; --tool-text: #7ecb7e;
 }
+body.light {
+  --bg: #f0f2f5; --surface: #fff; --surface2: #e8eaf0;
+  --accent: #e94560; --text: #1a1a2e; --text-muted: #666;
+  --user-bubble: #d4e4ff; --assistant-bubble: #fff;
+  --border: #ddd; --tool-bg: #e0ffe0; --tool-text: #2a7a2a;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: row; }
+a { color: var(--accent); }
 
-/* Sidebar */
+/* ── Login Page ── */
+#loginPage {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; z-index: 999;
+}
+#loginPage.hidden { display: none; }
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 32px; width: 340px; text-align: center;
+}
+.login-card h2 { margin-bottom: 20px; font-size: 20px; }
+.login-card input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 14px; border-radius: 6px; font-size: 14px; margin-bottom: 10px; outline: none;
+}
+.login-card input:focus { border-color: var(--accent); }
+.login-card button {
+  width: 100%; background: var(--accent); color: #fff; border: none;
+  padding: 10px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px;
+}
+.login-card button:hover { opacity: 0.9; }
+.login-card .switch { margin-top: 14px; font-size: 12px; color: var(--text-muted); }
+.login-card .switch a { cursor: pointer; text-decoration: underline; }
+.login-card .err { color: var(--accent); font-size: 12px; margin-top: 6px; min-height: 18px; }
+
+/* ── Sidebar ── */
 .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
 .sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border); }
 .sidebar-header label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 3px; }
@@ -25,13 +58,49 @@ body { font-family: sans-serif; background: var(--bg); color: var(--text); heigh
 .thread-item { padding: 8px 10px; cursor: pointer; border-radius: 6px; font-size: 12px; margin-bottom: 2px; transition: background 0.15s; }
 .thread-item:hover { background: var(--surface2); }
 .thread-item.active { background: var(--surface2); border: 1px solid var(--accent); }
-.thread-item .id-text { color: var(--text); font-weight: 500; font-family: monospace; }
+.thread-item .id-text { color: var(--text); font-weight: 500; }
 .thread-item .meta-text { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
 
-/* Chat */
+/* Sidebar bottom */
+.sidebar-bottom { padding: 6px 10px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.sidebar-bottom .user-tag { font-size: 11px; color: var(--text); flex: 1; }
+.sidebar-bottom .gear-btn {
+  background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px;
+}
+.sidebar-bottom .gear-btn:hover { color: var(--text); }
+
+/* ── Settings Modal ── */
+#settingsModal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 998;
+}
+#settingsModal.hidden { display: none; }
+.settings-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 24px; width: 380px; max-height: 80vh; overflow-y: auto;
+}
+.settings-card h3 { margin-bottom: 16px; font-size: 16px; }
+.settings-card .field { margin-bottom: 14px; }
+.settings-card .field label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px; }
+.settings-card .field input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+.settings-card .field input:focus { border-color: var(--accent); }
+.settings-card .field .row { display: flex; gap: 8px; }
+.settings-card .field .row button { flex: 1; background: var(--accent); color: #fff; border: none; padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.settings-card .field .row button:hover { opacity: 0.9; }
+.settings-card .field .row button.secondary { background: var(--surface2); }
+.settings-card .field .status { font-size: 11px; margin-top: 4px; }
+.settings-card .close-btn { float: right; background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+
+/* ── Chat ── */
 .chat-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 header h1 { font-size: 16px; font-weight: 600; }
+header .title-row { display: flex; align-items: center; gap: 8px; }
+header .title-row input {
+  background: transparent; border: 1px solid transparent; color: var(--text); font-size: 12px;
+  padding: 3px 6px; border-radius: 4px; width: 140px; outline: none;
+}
+header .title-row input:hover, header .title-row input:focus { border-color: var(--border); background: var(--bg); }
 main { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
 .message { display: flex; gap: 10px; max-width: 80%; animation: fadeIn 0.25s ease; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -63,186 +132,289 @@ footer { background: var(--surface); border-top: 1px solid var(--border); paddin
 </head>
 <body>
 
+<!-- ── Login Page ── -->
+<div id="loginPage">
+  <div class="login-card">
+    <h2 id="loginTitle">登录</h2>
+    <input id="loginUser" type="text" placeholder="用户名" />
+    <input id="loginPass" type="password" placeholder="密码" />
+    <button onclick="doAuth()" id="loginBtn">登录</button>
+    <div class="err" id="loginErr"></div>
+    <div class="switch">
+      <span id="switchText">还没有账号？</span>
+      <a onclick="toggleAuthMode()" id="switchLink">去注册</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings Modal ── -->
+<div id="settingsModal" class="hidden">
+  <div class="settings-card">
+    <button class="close-btn" onclick="closeSettings()">x</button>
+    <h3>设置</h3>
+    <div class="field">
+      <label>用户名</label>
+      <input id="setName" type="text" readonly style="opacity:0.7" />
+    </div>
+    <div class="field">
+      <label>Steam ID</label>
+      <div class="row">
+        <input id="setSteamId" type="text" placeholder="17位数字ID" />
+        <button onclick="bindSteamId()">绑定</button>
+      </div>
+      <div class="status" id="setSteamStatus"></div>
+      <a href="https://store.steampowered.com/account/" target="_blank" style="font-size:10px;text-decoration:underline">
+        如何获取Steam ID？
+      </a>
+    </div>
+    <div class="field">
+      <label>主题</label>
+      <div class="row">
+        <button onclick="setTheme('dark')">深色</button>
+        <button onclick="setTheme('light')" class="secondary">浅色</button>
+      </div>
+    </div>
+    <div class="field">
+      <button onclick="doLogout()" class="secondary" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:8px;border-radius:6px;font-size:12px;cursor:pointer">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main Layout ── -->
 <aside class="sidebar">
   <div class="sidebar-header">
-    <label>用户 ID</label>
-    <input id="userIdInput" type="text" value="web_user" placeholder="eval_user" />
-    <button onclick="refreshThreads()">刷新列表</button>
-  </div>
-  <div class="sidebar-header" style="border-top:1px solid var(--border)">
-    <label>Steam ID</label>
-    <input id="steamIdInput" type="text" placeholder="17位数字ID，如 7656119..." />
-    <button onclick="bindSteam()" style="margin-bottom:4px">绑定 Steam ID</button>
-    <a href="https://store.steampowered.com/account/" target="_blank"
-       style="font-size:10px;color:var(--accent);text-decoration:underline;display:block;text-align:center">
-      如何获取Steam ID？点此打开Steam账户页
-    </a>
-    <div id="steamStatus" style="font-size:10px;color:var(--text-muted);margin-top:3px;text-align:center"></div>
+    <label>搜索会话</label>
+    <input id="searchThreads" type="text" placeholder="搜索..." oninput="filterThreads()" />
   </div>
   <div class="thread-list" id="threadList">
-    <div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">点击"刷新列表"加载历史会话</div>
+    <div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">点击"刷新列表"加载</div>
+  </div>
+  <div class="sidebar-bottom">
+    <span class="user-tag" id="userTag">未登录</span>
+    <button class="gear-btn" onclick="openSettings()" title="设置">&#9881;</button>
+    <button onclick="refreshThreads()" style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:4px" title="刷新列表">&#8635;</button>
   </div>
 </aside>
 
 <div class="chat-container">
 <header>
   <h1>Steam 游戏推荐助手</h1>
-  <div>
-    <span style="font-size:12px;color:var(--text-muted)">会话: </span>
-    <strong id="threadLabel" style="font-size:12px">—</strong>
-    <button onclick="newThread()" style="margin-left:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">新会话</button>
+  <div class="title-row">
+    <input id="titleInput" type="text" placeholder="会话标题" onchange="saveTitle()" onkeydown="if(event.key==='Enter')this.blur()" />
+    <button onclick="newThread()" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">新会话</button>
   </div>
 </header>
-
 <main id="chat"></main>
-
 <footer>
   <div class="input-row">
     <input id="input" type="text" placeholder="输入消息..." autofocus onkeydown="if(event.key==='Enter')send()" />
     <button id="sendBtn" onclick="send()">发送</button>
   </div>
-  <div class="hint">左侧可查看和切换历史会话 | Agent 自动调用工具</div>
+  <div class="hint">左侧查看历史会话 | 左下角齿轮打开设置</div>
 </footer>
 </div>
 
 <script>
+// ── State ──
 const chat = document.getElementById('chat');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('sendBtn');
-const threadLabel = document.getElementById('threadLabel');
 const threadList = document.getElementById('threadList');
+const titleInput = document.getElementById('titleInput');
 
 let threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-threadLabel.textContent = threadId.slice(0, 8);
 let isStreaming = false;
+let currentUser = '';
+let currentSteamId = '';
+let currentTheme = 'dark';
+let allThreads = [];
 
-function getUserId() {
-  const inp = document.getElementById('userIdInput');
-  return inp ? inp.value.trim() || 'web_user' : 'web_user';
+// ── Auth ──
+let authMode = 'login';
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  document.getElementById('loginTitle').textContent = authMode === 'login' ? '登录' : '注册';
+  document.getElementById('loginBtn').textContent = authMode === 'login' ? '登录' : '注册';
+  document.getElementById('switchText').textContent = authMode === 'login' ? '还没有账号？' : '已有账号？';
+  document.getElementById('switchLink').textContent = authMode === 'login' ? '去注册' : '去登录';
+  document.getElementById('loginErr').textContent = '';
+}
+async function doAuth() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const errEl = document.getElementById('loginErr');
+  if (!u || !p) { errEl.textContent = '请填写用户名和密码'; return; }
+  const ep = authMode === 'login' ? '/auth/login' : '/auth/register';
+  try {
+    const r = await fetch(ep + '?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      currentUser = d.username || u;
+      localStorage.setItem('steam_user', currentUser);
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('userTag').textContent = currentUser;
+      document.getElementById('setName').value = currentUser;
+      initApp();
+    } else {
+      errEl.textContent = d.message;
+    }
+  } catch (e) { errEl.textContent = '网络错误'; }
+}
+function doLogout() {
+  currentUser = ''; currentSteamId = '';
+  localStorage.removeItem('steam_user');
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('settingsModal').classList.add('hidden');
+  chat.innerHTML = ''; threadList.innerHTML = '';
+  addMessage('system', '已退出登录');
 }
 
-let currentSteamId = '';
-
-async function loadSteamId() {
-  const uid = getUserId();
+// ── Init ──
+async function initApp() {
+  // Load user info
   try {
-    const resp = await fetch('/steam-id?user_id=' + encodeURIComponent(uid));
-    const data = await resp.json();
-    if (data.steam_id) {
-      currentSteamId = data.steam_id;
-      document.getElementById('steamIdInput').value = data.steam_id;
-      document.getElementById('steamStatus').textContent = '已绑定: ' + data.steam_id.slice(0, 10) + '...';
-      document.getElementById('steamStatus').style.color = 'var(--tool-text)';
+    const r = await fetch('/auth/user-info?username=' + encodeURIComponent(currentUser));
+    const d = await r.json();
+    if (d.status === 'ok' && d.user) {
+      currentSteamId = d.user.bound_steam_id || '';
+      currentTheme = d.user.theme || 'dark';
+      document.getElementById('setSteamId').value = currentSteamId;
+      if (currentSteamId) {
+        document.getElementById('setSteamStatus').textContent = '已绑定';
+        document.getElementById('setSteamStatus').style.color = 'var(--tool-text)';
+      }
+      setTheme(currentTheme);
     }
   } catch (_) {}
+  refreshThreads();
 }
 
-async function bindSteam() {
-  const uid = getUserId();
-  const sid = document.getElementById('steamIdInput').value.trim();
-  if (!sid) { alert('请先输入 Steam ID'); return; }
-  document.getElementById('steamStatus').textContent = '绑定中...';
+async function bindSteamId() {
+  const sid = document.getElementById('setSteamId').value.trim();
+  if (!sid) return;
+  document.getElementById('setSteamStatus').textContent = '绑定中...';
   try {
-    const resp = await fetch('/bind-steam?user_id=' + encodeURIComponent(uid) + '&steam_id=' + encodeURIComponent(sid), { method: 'POST' });
-    const data = await resp.json();
-    if (data.status === 'ok') {
-      currentSteamId = data.steam_id;
-      document.getElementById('steamStatus').textContent = '已绑定: ' + data.steam_id.slice(0, 10) + '...';
-      document.getElementById('steamStatus').style.color = 'var(--tool-text)';
+    const r = await fetch('/bind-steam?user_id=' + currentUser + '&steam_id=' + sid, { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      currentSteamId = sid;
+      document.getElementById('setSteamStatus').textContent = '已绑定';
+      document.getElementById('setSteamStatus').style.color = 'var(--tool-text)';
+    } else {
+      document.getElementById('setSteamStatus').textContent = d.message || '绑定失败';
+      document.getElementById('setSteamStatus').style.color = 'var(--accent)';
     }
-  } catch (err) {
-    document.getElementById('steamStatus').textContent = '绑定失败: ' + err.message;
-    document.getElementById('steamStatus').style.color = 'var(--accent)';
+  } catch (e) {
+    document.getElementById('setSteamStatus').textContent = '网络错误';
   }
 }
 
+function setTheme(t) {
+  currentTheme = t;
+  document.body.className = t === 'light' ? 'light' : '';
+  fetch('/auth/theme?username=' + currentUser + '&theme=' + t, { method: 'POST' }).catch(()=>{});
+}
+
+// ── Settings ──
+function openSettings() {
+  document.getElementById('setName').value = currentUser;
+  document.getElementById('setSteamId').value = currentSteamId;
+  document.getElementById('setSteamStatus').textContent = currentSteamId ? '已绑定' : '';
+  document.getElementById('settingsModal').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ── Threads ──
 async function refreshThreads() {
-  const uid = getUserId();
   threadList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">加载中...</div>';
   try {
-    const resp = await fetch('/threads?user_id=' + encodeURIComponent(uid));
-    const data = await resp.json();
-    if (!data.threads || data.threads.length === 0) {
-      threadList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">暂无历史会话</div>';
-      return;
-    }
-    threadList.innerHTML = '';
-    data.threads.forEach(t => {
-      const div = document.createElement('div');
-      div.className = 'thread-item' + (t.thread_id === threadId ? ' active' : '');
-      div.innerHTML = '<div class="id-text">#' + t.thread_id.slice(0, 12) + '</div>'
-        + '<div class="meta-text">' + t.msg_count + ' 条 | ' + (t.last_active || '').slice(0, 16).replace('T', ' ') + '</div>';
-      div.onclick = () => loadThread(t.thread_id);
-      threadList.appendChild(div);
-    });
-  } catch (err) {
-    threadList.innerHTML = '<div style="color:var(--accent);font-size:12px;padding:8px">加载失败: ' + err.message + '</div>';
-  }
+    const r = await fetch('/threads?user_id=' + encodeURIComponent(currentUser));
+    const d = await r.json();
+    allThreads = d.threads || [];
+    renderThreads(allThreads);
+  } catch (e) { threadList.innerHTML = '<div style="color:var(--accent);font-size:12px;padding:8px">加载失败</div>'; }
 }
-
+function filterThreads() {
+  const q = (document.getElementById('searchThreads').value || '').toLowerCase();
+  renderThreads(q ? allThreads.filter(t => (t.title||'').toLowerCase().includes(q) || t.thread_id.toLowerCase().includes(q)) : allThreads);
+}
+function renderThreads(threads) {
+  threadList.innerHTML = '';
+  if (!threads.length) { threadList.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;text-align:center">暂无历史会话</div>'; return; }
+  threads.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'thread-item' + (t.thread_id === threadId ? ' active' : '');
+    div.innerHTML = '<div class="id-text">' + (t.title || '新会话') + '</div>'
+      + '<div class="meta-text">' + (t.msg_count||0) + ' 条 | ' + (t.last_active||'').slice(0,16).replace('T',' ') + '</div>';
+    div.onclick = () => loadThread(t.thread_id);
+    threadList.appendChild(div);
+  });
+}
 async function loadThread(tid) {
   threadId = tid;
-  threadLabel.textContent = threadId.slice(0, 8);
-  chat.innerHTML = '';
-  addMessage('system', '加载中...');
+  titleInput.value = '';
+  chat.innerHTML = ''; addMessage('system', '加载中...');
   try {
-    const resp = await fetch('/messages?user_id=' + encodeURIComponent(getUserId()) + '&thread_id=' + encodeURIComponent(threadId));
-    const data = await resp.json();
+    const r = await fetch('/messages?user_id=' + currentUser + '&thread_id=' + tid);
+    const d = await r.json();
     chat.innerHTML = '';
-    if (!data.messages || data.messages.length === 0) {
-      addMessage('system', '该会话暂无消息记录。');
-    } else {
-      data.messages.forEach(m => addMessage(m.role === 'user' ? 'user' : 'assistant', m.content));
-    }
-  } catch (err) {
-    chat.innerHTML = '';
-    addMessage('system', '加载失败: ' + err.message);
-  }
-  document.querySelectorAll('.thread-item').forEach(el => {
-    el.classList.toggle('active', el.querySelector('.id-text')?.textContent?.startsWith('#' + threadId.slice(0, 12)));
-  });
+    if (d.messages && d.messages.length) {
+      d.messages.forEach(m => addMessage(m.role === 'user' ? 'user' : 'assistant', m.content));
+    } else { addMessage('system', '该会话暂无消息。'); }
+    // Load title
+    try {
+      const tr = await fetch('/threads?user_id=' + currentUser);
+      const td = await tr.json();
+      const found = (td.threads||[]).find(t => t.thread_id === tid);
+      titleInput.value = found?.title || '';
+    } catch(_){}
+  } catch (e) { chat.innerHTML = ''; addMessage('system', '加载失败'); }
+  renderThreads(allThreads);
   chat.scrollTop = chat.scrollHeight;
 }
-
 function newThread() {
   threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-  threadLabel.textContent = threadId.slice(0, 8);
+  titleInput.value = '';
   chat.innerHTML = '';
   addMessage('system', '新会话已开始');
-  document.querySelectorAll('.thread-item').forEach(el => el.classList.remove('active'));
+  renderThreads(allThreads);
+}
+async function saveTitle() {
+  const title = titleInput.value.trim();
+  if (!title || !currentUser) return;
+  try {
+    await fetch('/thread-title?user_id=' + currentUser + '&thread_id=' + threadId + '&title=' + encodeURIComponent(title), { method: 'POST' });
+    // Update in local list
+    const idx = allThreads.findIndex(t => t.thread_id === threadId);
+    if (idx >= 0) allThreads[idx].title = title;
+    renderThreads(allThreads);
+  } catch(_){}
 }
 
+// ── Chat ──
 function renderMarkdown(text) {
   if (!text) return '';
   let html = text;
-  // escape HTML first
   html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // [![alt](img)](store_url) — clickable image linking to store (MUST be first)
   html = html.replace(/\[!\[([^\]]*)\]\(([^)]+)\)\]\(([^)]+)\)/g,
     '<a href="$3" target="_blank"><img src="$2" alt="$1" style="max-width:100%;max-height:200px;border-radius:8px;margin:6px 0;display:block" loading="lazy" /></a>');
-  // plain ![alt](url) images (after nested case already handled)
   html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
     '<img src="$2" alt="$1" style="max-width:100%;border-radius:8px;margin:6px 0;display:block" loading="lazy" />');
-  // clickable links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
     '<a href="$2" target="_blank" style="color:var(--accent);text-decoration:underline">$1</a>');
-  // headings
   html = html.replace(/^#### (.+)$/gm, '<h4 style="margin:8px 0 4px;font-size:14px">$1</h4>');
   html = html.replace(/^### (.+)$/gm, '<h3 style="margin:10px 0 4px;font-size:15px">$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2 style="margin:12px 0 6px;font-size:16px">$1</h2>');
-  // horizontal rule
   html = html.replace(/^---+\s*$/gm, '<hr style="border-color:var(--border);margin:8px 0">');
-  // bold
   html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  // numbered list items
   html = html.replace(/^(\d+)\.{1,2}\s+(.+)$/gm, '<div style="margin:2px 0 2px 8px"><b>$1.</b> $2</div>');
-  // bullet list items
   html = html.replace(/^[-*]\s+(.+)$/gm, '<div style="margin:2px 0 2px 12px">- $1</div>');
-  // emoji fix: wrap emoji spans cleanly
   html = html.replace(/\n/g, '<br>');
   return html;
 }
-
 function addMessage(role, text, toolNames) {
   const div = document.createElement('div');
   div.className = 'message ' + role;
@@ -251,49 +423,38 @@ function addMessage(role, text, toolNames) {
   } else {
     const rendered = role === 'assistant' ? renderMarkdown(text) : text;
     div.innerHTML = '<div class="avatar">' + (role === 'user' ? 'U' : 'A') + '</div><div class="bubble">' + rendered + '</div>';
-    if (toolNames && toolNames.length > 0) {
+    if (toolNames && toolNames.length) {
       div.querySelector('.bubble').insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + toolNames.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
     }
   }
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-  return div;
+  chat.appendChild(div); chat.scrollTop = chat.scrollHeight; return div;
 }
-
 function addStreamingMessage() {
   const div = document.createElement('div');
   div.className = 'message assistant';
   div.innerHTML = '<div class="avatar">A</div><div class="bubble"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></div>';
-  div.id = 'streaming-msg';
-  chat.appendChild(div);
-  return div;
+  div.id = 'streaming-msg'; chat.appendChild(div); return div;
 }
-
 async function send() {
   const msg = input.value.trim();
-  if (!msg || isStreaming) return;
-  isStreaming = true;
-  input.value = ''; input.disabled = true; sendBtn.disabled = true;
-
+  if (!msg || isStreaming || !currentUser) return;
+  isStreaming = true; input.value = ''; input.disabled = true; sendBtn.disabled = true;
   addMessage('user', msg);
   const streamDiv = addStreamingMessage();
   const bubble = streamDiv.querySelector('.bubble');
   let fullReply = ''; const tools = [];
-
   try {
     const resp = await fetch('/chat/stream', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ thread_id: threadId, user_id: getUserId(), message: msg, steam_id: currentSteamId || null })
+      body: JSON.stringify({ thread_id: threadId, user_id: currentUser, message: msg, steam_id: currentSteamId || null })
     });
     const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    const decoder = new TextDecoder(); let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split('\n'); buffer = lines.pop() || '';
       for (const line of lines) {
         const t = line.trim();
         if (!t || !t.startsWith('data: ')) continue;
@@ -304,22 +465,32 @@ async function send() {
         } catch (_) {}
       }
     }
-    if (fullReply) { bubble.innerHTML = renderMarkdown(fullReply); }
-    else { bubble.textContent = '(无回复)'; }
+    if (fullReply) bubble.innerHTML = renderMarkdown(fullReply);
+    else bubble.textContent = '(无回复)';
     if (tools.length) bubble.insertAdjacentHTML('beforeend', '<div style="margin-top:8px">' + tools.map(t => '<span class="tool-badge">' + t + '</span>').join('') + '</div>');
   } catch (err) {
     bubble.innerHTML = '<span style="color:var(--accent)">请求失败: ' + err.message + '</span>';
   } finally {
-    streamDiv.removeAttribute('id');
-    isStreaming = false;
-    input.disabled = false; sendBtn.disabled = false;
-    input.focus(); chat.scrollTop = chat.scrollHeight;
+    streamDiv.removeAttribute('id'); isStreaming = false;
+    input.disabled = false; sendBtn.disabled = false; input.focus();
+    chat.scrollTop = chat.scrollHeight;
+    // Refresh threads after reply (title might have been auto-generated)
+    setTimeout(refreshThreads, 1500);
   }
 }
 
+// ── Startup ──
+const saved = localStorage.getItem('steam_user');
+if (saved) {
+  currentUser = saved;
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('userTag').textContent = currentUser;
+  document.getElementById('setName').value = currentUser;
+  initApp();
+} else {
+  document.getElementById('userTag').textContent = '未登录';
+}
 addMessage('system', '欢迎使用 Steam 游戏推荐助手');
-refreshThreads();
-loadSteamId();
 </script>
 </body>
 </html>

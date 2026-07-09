@@ -27,6 +27,10 @@ async def lifespan(app: FastAPI):
     init_db()
     from ..memory.game_profile import init_game_profile_table
     init_game_profile_table()
+    from ..memory.auth import init_auth_table
+    init_auth_table()
+    from ..memory.thread_title import init_threads_table
+    init_threads_table()
     logging.info("Steam Agent API ready.")
     yield
 
