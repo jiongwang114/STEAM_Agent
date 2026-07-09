@@ -5,7 +5,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
 
 from ..config import CHECKPOINT_DB_PATH
-from .nodes import agent_node, should_continue, tool_node
+from .nodes import agent_node, guard_node, should_continue, tool_node
 from .state import AgentState
 
 _graph = None
@@ -32,11 +32,17 @@ async def build_graph(checkpointer=None):
 def _compile(checkpointer):
     workflow = StateGraph(AgentState)
 
+    workflow.add_node("guard", guard_node)
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", tool_node)
 
-    workflow.set_entry_point("agent")
+    workflow.set_entry_point("guard")
 
+    workflow.add_conditional_edges(
+        "guard",
+        _guard_decision,
+        {"pass": "agent", "block": END},
+    )
     workflow.add_conditional_edges(
         "agent",
         should_continue,
@@ -45,3 +51,15 @@ def _compile(checkpointer):
     workflow.add_edge("tools", "agent")
 
     return workflow.compile(checkpointer=checkpointer)
+
+
+def _guard_decision(state: AgentState) -> str:
+    """Route based on guard_node's decision stored in messages."""
+    messages = state["messages"]
+    if not messages:
+        return "block"
+    last_msg = messages[-1]
+    content = getattr(last_msg, "content", "") if hasattr(last_msg, "content") else str(last_msg)
+    if "GUARD_BLOCK:" in content:
+        return "block"
+    return "pass"

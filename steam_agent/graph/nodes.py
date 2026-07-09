@@ -1,10 +1,60 @@
 import json
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from ..config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, LLM_MAX_TOKENS, LLM_MODEL, LLM_TEMPERATURE
 from ..prompts.system import build_system_prompt
 from .state import AgentState
+
+
+def guard_node(state: AgentState) -> dict:
+    """Three-layer guard before the main agent.
+
+    Layer 1: regex/rule-based (zero cost)
+    Layer 2: LLM jailbreak intent classifier
+    Layer 3: LLM scope boundary classifier
+
+    On any layer blocking: returns AIMessage with GUARD_BLOCK marker.
+    On all pass: returns empty dict (transparent).
+    """
+    messages = state["messages"]
+    if not messages:
+        return {"messages": []}
+
+    # Get the last user message text
+    last_msg = messages[-1]
+    if hasattr(last_msg, "content"):
+        text = last_msg.content if last_msg.content else ""
+    else:
+        text = str(last_msg) if last_msg else ""
+
+    if not text.strip():
+        # Empty message — let agent handle gracefully
+        return {"messages": []}
+
+    # ── Layer 1: Regex rules (zero cost, zero latency) ──
+    from ..guard.layer1_rules import check as layer1_check
+
+    blocked, reason = layer1_check(text)
+    if blocked:
+        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
+
+    # ── Layer 2: Jailbreak intent (LLM, ~0.5s) ──
+    from ..guard.layer2_intent import check as layer2_check
+
+    blocked, reason = layer2_check(text)
+    if blocked:
+        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
+
+    # ── Layer 3: Scope boundary (LLM, ~0.5s) ──
+    from ..guard.layer3_scope import check as layer3_check
+
+    blocked, reason = layer3_check(text)
+    if blocked:
+        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
+
+    # All clear
+    return {"messages": []}
 
 
 def build_llm():
