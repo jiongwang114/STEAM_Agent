@@ -616,6 +616,59 @@
     var isStreaming = false, authMode = 'login';
     var API = '';
 
+    /* ── DOM refs ── */
+    var DOM = {
+      splashScreen: document.getElementById('splash-screen'),
+      btnEnterTerminal: document.getElementById('btn-enter-terminal'),
+      splashInteractiveCore: document.getElementById('splash-interactive-core'),
+      sidebar: document.getElementById('sidebar'),
+      sidebarToggle: document.getElementById('sidebar-toggle'),
+      sidebarOverlay: document.getElementById('sidebar-overlay'),
+      sessionsContainer: document.getElementById('sessions-container'),
+      chatMessagesContainer: document.getElementById('chat-messages-container'),
+      chatForm: document.getElementById('chat-form'),
+      messageInput: document.getElementById('message-input'),
+      currentChatTitle: document.getElementById('current-chat-title'),
+      searchInput: document.getElementById('search-input'),
+      btnNewSession: document.getElementById('btn-new-session'),
+      btnRefreshSessions: document.getElementById('btn-refresh-sessions'),
+      btnSettingsTrigger: document.getElementById('btn-settings-trigger'),
+      modalSettings: document.getElementById('modal-settings'),
+      settingsContent: document.getElementById('settings-content'),
+      btnCloseSettings: document.getElementById('btn-close-settings'),
+      btnCloseSettingsFooter: document.getElementById('btn-close-settings-footer'),
+      steamIdInput: document.getElementById('steam-id-input'),
+      btnBindSteam: document.getElementById('btn-bind-steam'),
+      btnUnbindSteam: document.getElementById('btn-unbind-steam'),
+      settingsSteamStatus: document.getElementById('settings-steam-status'),
+      headerSteamId: document.getElementById('header-steam-id'),
+      steamBadge: document.getElementById('steam-badge'),
+      btnThemeToggle: document.getElementById('btn-theme-toggle'),
+      themeIcon: document.getElementById('theme-icon'),
+      themeText: document.getElementById('theme-text'),
+      btnLogoutSettings: document.getElementById('btn-logout-settings'),
+      btnAuthTrigger: document.getElementById('btn-auth-trigger'),
+      modalAuth: document.getElementById('modal-auth'),
+      authContent: document.getElementById('auth-content'),
+      btnCloseAuth: document.getElementById('btn-close-auth'),
+      tabLogin: document.getElementById('tab-login'),
+      tabRegister: document.getElementById('tab-register'),
+      formAuth: document.getElementById('form-auth'),
+      authUsername: document.getElementById('auth-username'),
+      authPassword: document.getElementById('auth-password'),
+      btnAuthSubmit: document.getElementById('btn-auth-submit'),
+      loggedInProfile: document.getElementById('logged-in-profile'),
+      profileUsername: document.getElementById('profile-username'),
+      profileStatus: document.getElementById('profile-status'),
+      btnLogoutSidebar: document.getElementById('btn-logout-sidebar'),
+      toast: document.getElementById('toast'),
+      toastText: document.getElementById('toast-text'),
+      toastIcon: document.getElementById('toast-icon'),
+      userProfileSection: document.getElementById('user-profile-section'),
+      modalAuthOverlay: document.getElementById('modal-auth-overlay'),
+      modalSettingsOverlay: document.getElementById('modal-settings-overlay')
+    };
+
     /* ── Toast ── */
     function showToast(msg, type) {
       type = type || 'info';
