@@ -31,19 +31,6 @@
       --text-muted: #94a3b8;
     }
 
-    /* 浅色霓虹主题配置 */
-    body.light-theme {
-      --cyber-bg: #f3f4f6;
-      --cyber-panel: rgba(255, 255, 255, 0.9);
-      --cyber-pink: #d90473;
-      --cyber-cyan: #0ea5e9;
-      --cyber-yellow: #ca8a04;
-      --cyber-glow-pink: rgba(217, 4, 115, 0.2);
-      --cyber-glow-cyan: rgba(14, 165, 233, 0.2);
-      --text-main: #1f2937;
-      --text-muted: #4b5563;
-    }
-
     body {
       font-family: 'Inter', -apple-system, sans-serif;
       background-color: var(--cyber-bg);
@@ -223,9 +210,25 @@
       border-radius: 0.25rem;
       color: var(--cyber-pink);
     }
+
+    /* 侧边栏折叠 */
+    #sidebar.collapsed { width: 50px; }
+    #sidebar.collapsed .sidebar-search,
+    #sidebar.collapsed .session-list,
+    #sidebar.collapsed .sidebar-foot .user-info,
+    #sidebar.collapsed .btn-new-session-text { display: none; }
+    #sidebar.collapsed .sidebar-foot { justify-content: center; padding: 10px 0; }
+    #sidebar.collapsed #sidebar-collapse { right: auto; left: 50%; transform: translateX(-50%); }
+    #sidebar:hover #sidebar-collapse { opacity: 1; }
+    /* 侧边栏收起后左侧悬停指示线 */
+    .sidebar-peek { position: fixed; left: 0; top: 0; bottom: 0; width: 4px; z-index: 23; cursor: pointer; }
+    .sidebar-peek:hover { background: var(--cyber-cyan); box-shadow: 0 0 12px var(--cyber-glow-cyan); }
   </style>
 </head>
 <body class="h-screen w-screen overflow-hidden flex flex-col">
+
+  <!-- 星空粒子背景 Canvas -->
+  <canvas id="starfield" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
 
   <!-- ========================================== -->
   <!-- 0. 赛博封面引导页 (Splash Screen) -->
@@ -295,8 +298,11 @@
     <!-- ========================================== -->
     <!-- 1. 侧边栏 (Sidebar) -->
     <!-- ========================================== -->
-    <aside id="sidebar" class="w-80 flex-shrink-0 flex flex-col bg-[#0b0b16] border-r border-[#1a1a36] z-20 transition-all duration-300 md:translate-x-0 -translate-x-full fixed md:relative h-full">
-      
+    <aside id="sidebar" class="w-80 flex-shrink-0 flex flex-col bg-[#0b0b16] border-r border-[#1a1a36] z-20 transition-all duration-300 h-full" style="position:relative">
+
+      <!-- 隐藏按钮 (侧边栏内部) -->
+      <button id="sidebar-collapse" style="position:absolute;top:8px;right:8px;z-index:22;background:rgba(26,26,54,0.8);border:1px solid var(--cyber-cyan);color:var(--cyber-cyan);font-size:14px;width:26px;height:26px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s" title="收起侧边栏">«</button>
+
       <!-- 侧边栏头部: 品牌 Logo & 刷新按钮 -->
       <div class="p-4 border-b border-[#1a1a36] flex items-center justify-between">
         <div class="flex items-center gap-2">
@@ -318,12 +324,12 @@
       <div class="p-4">
         <button id="btn-new-session" class="w-full py-3 btn-cyber-primary flex items-center justify-center gap-2 rounded-xl font-bold tracking-wider text-xs uppercase cyber-font">
           <i data-lucide="plus" class="w-4 h-4"></i>
-          新会话 // NEW RUN
+          <span class="btn-new-session-text">新会话 // NEW RUN</span>
         </button>
       </div>
 
       <!-- 搜索过滤框 -->
-      <div class="px-4 pb-3">
+      <div class="px-4 pb-3 sidebar-search">
         <div class="relative">
           <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <i data-lucide="search" class="w-4 h-4 text-gray-500"></i>
@@ -388,9 +394,14 @@
       <!-- 主区头部 -->
       <header class="h-16 border-b border-[#1a1a36] bg-[#0c0c18]/90 flex items-center justify-between px-6 z-10">
         <div class="flex items-center gap-3">
-          <!-- 移动端侧边栏切换按钮 -->
-          <button id="sidebar-toggle" class="md:hidden p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-[#1a1a36] mr-1">
-            <i data-lucide="menu" class="w-6 h-6"></i>
+          <!-- 移动端 / PC侧边栏切换按钮 -->
+          <button id="sidebar-toggle" class="p-1.5 text-cyan-400 hover:text-white rounded-lg hover:bg-[#1a1a36] mr-1 transition" title="切换侧边栏">
+            <i data-lucide="sidebar" class="w-5 h-5"></i>
+          </button>
+
+          <!-- 侧边栏折叠后显示此按钮，正常状态隐藏 -->
+          <button id="sidebar-show-btn" class="hidden p-1.5 text-cyan-400 hover:text-white rounded-lg hover:bg-[#1a1a36] transition" title="展开侧边栏" onclick="showSidebar()">
+            <i data-lucide="sidebar" class="w-5 h-5"></i>
           </button>
           
           <div>
@@ -611,7 +622,7 @@
   <script>
 
     /* ── Real Backend State ── */
-    var state = { user:null, steamId:'', activeSessionId:null, searchQuery:'', isLightTheme:false, sessions:[] };
+    var state = { user:null, steamId:'', activeSessionId:null, searchQuery:'', sessions:[] };
     var threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
     var isStreaming = false, authMode = 'login';
     var API = '';
@@ -750,9 +761,7 @@
         var d = await r.json();
         if (d.status === 'ok' && d.user) {
           state.steamId = d.user.bound_steam_id || '';
-          state.isLightTheme = d.user.theme === 'light';
           if (state.steamId) updateSteamUI(state.steamId);
-          if (state.isLightTheme) { document.body.classList.add('light-theme'); DOM.themeIcon.setAttribute('data-lucide','sun'); DOM.themeText.innerText='浅色'; }
         }
       } catch(_) {}
       refreshThreads();
@@ -780,11 +789,99 @@
 
     /* ── Theme ── */
     DOM.btnThemeToggle.addEventListener('click', function(){
-      state.isLightTheme=!state.isLightTheme;
-      if (state.isLightTheme) { document.body.classList.add('light-theme'); DOM.themeIcon.setAttribute('data-lucide','sun'); DOM.themeText.innerText='浅色'; }
-      else { document.body.classList.remove('light-theme'); DOM.themeIcon.setAttribute('data-lucide','moon'); DOM.themeText.innerText='深色'; }
-      if (state.user) fetch(API+'/auth/theme?username='+state.user.username+'&theme='+(state.isLightTheme?'light':'dark'),{method:'POST'}).catch(function(){});
+      /* 深色主题已锁定，不做切换 */
     });
+
+    /* ── Sidebar Collapse ── */
+    function toggleSidebar() {
+      var sb = DOM.sidebar;
+      var btn = document.getElementById('sidebar-show-btn');
+      if (sb.classList.contains('collapsed')) {
+        sb.classList.remove('collapsed');
+        if (btn) btn.classList.add('hidden');
+      } else {
+        sb.classList.add('collapsed');
+        if (btn) btn.classList.remove('hidden');
+      }
+    }
+    function showSidebar() {
+      DOM.sidebar.classList.remove('collapsed');
+      var btn = document.getElementById('sidebar-show-btn');
+      if (btn) btn.classList.add('hidden');
+    }
+    document.getElementById('sidebar-collapse').addEventListener('click', toggleSidebar);
+    DOM.sidebarToggle.addEventListener('click', toggleSidebar);
+
+    /* ── Starfield Canvas ── */
+    (function initStarfield() {
+      var c = document.getElementById('starfield');
+      if (!c) return;
+      var ctx = c.getContext('2d');
+      var stars = [];
+      var mouseX = -999, mouseY = -999;
+      var targetMX = -999, targetMY = -999;
+
+      function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
+      resize(); window.addEventListener('resize', resize);
+
+      // Create stars with varied sizes and speeds
+      var count = Math.floor((c.width * c.height) / 12000);
+      for (var i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * c.width,
+          y: Math.random() * c.height,
+          r: Math.random() * 1.5 + 0.4,
+          speed: Math.random() * 0.3 + 0.05,
+          opacity: Math.random() * 0.5 + 0.25,
+          baseX: 0, baseY: 0
+        });
+      }
+
+      document.addEventListener('mousemove', function(e) {
+        targetMX = e.clientX; targetMY = e.clientY;
+      });
+
+      function animate() {
+        // Smooth mouse follow
+        mouseX += (targetMX - mouseX) * 0.05;
+        mouseY += (targetMY - mouseY) * 0.05;
+
+        ctx.clearRect(0, 0, c.width, c.height);
+
+        for (var i = 0; i < stars.length; i++) {
+          var s = stars[i];
+          // Subtle drift toward mouse
+          if (mouseX > -100) {
+            var dx = mouseX - s.x, dy = mouseY - s.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 250) {
+              var force = (250 - dist) / 250 * 0.15;
+              s.x += dx * force; s.y += dy * force;
+            }
+          }
+          // Slow return to original position
+          s.x += (s.baseX - s.x) * 0.002;
+          s.y += (s.baseY - s.y) * 0.002;
+
+          // Draw star
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(200,220,255,' + s.opacity.toFixed(2) + ')';
+          ctx.fill();
+        }
+        requestAnimationFrame(animate);
+      }
+
+      // Record base positions after layout settles
+      setTimeout(function() {
+        for (var i = 0; i < stars.length; i++) {
+          stars[i].baseX = stars[i].x;
+          stars[i].baseY = stars[i].y;
+        }
+      }, 500);
+
+      animate();
+    })();
 
     /* ── Steam ID ── */
     DOM.btnBindSteam.addEventListener('click', async function(){
@@ -901,10 +998,6 @@
 
     /* ── Search ── */
     DOM.searchInput.addEventListener('input',function(e){ state.searchQuery=e.target.value; renderSessions(); });
-
-    /* ── Mobile ── */
-    DOM.sidebarToggle.addEventListener('click',function(){ DOM.sidebar.classList.remove('-translate-x-full'); DOM.sidebarOverlay.classList.remove('hidden'); });
-    DOM.sidebarOverlay.addEventListener('click',function(){ DOM.sidebar.classList.add('-translate-x-full'); DOM.sidebarOverlay.classList.add('hidden'); });
 
     /* ── Boot ── */
     window.onload=function(){ lucide.createIcons(); var s=localStorage.getItem('steam_user'); if(s){ state.user={username:s}; DOM.profileUsername.innerText=s.toUpperCase(); DOM.profileStatus.innerText='已激活'; DOM.btnAuthTrigger.classList.add('hidden'); DOM.loggedInProfile.classList.remove('hidden'); initApp(); } };
