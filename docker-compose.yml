@@ -1,0 +1,21 @@
+services:
+  steam-agent:
+    build: .
+    container_name: steam-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data — keep these across container rebuilds
+      - ./steam_agent/rag/chroma_data:/app/steam_agent/rag/chroma_data
+      - ./data:/app/data
+      - model_cache:/root/.cache/torch/sentence_transformers
+    env_file:
+      - ./steam_agent/.env
+    environment:
+      - CHROMA_PERSIST_DIR=/app/steam_agent/rag/chroma_data
+      - SQLITE_DB_PATH=/app/data/data.db
+      - CHECKPOINT_DB_PATH=/app/data/checkpoints.db
+    restart: unless-stopped
+
+volumes:
+  model_cache:

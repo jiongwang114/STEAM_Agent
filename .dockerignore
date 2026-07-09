@@ -1,0 +1,41 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs (don't need in container)
+DESIGN.md
+RAG评测总结.md
+EVAL_ROADMAP.md
+EVAL_STEPS.md
+FILE_STRUCTURE.md
+MEMORY_TEST_CASES.md
+
+# Test artifacts
+steam_agent/tests/test_logs/
+steam_agent/tests/eval_detailed.csv
+steam_agent/tests/aggregate_report.json
+steam_agent/tests/eval_results.csv
+steam_agent/tests/*_results.csv
+steam_agent/tests/*_changelog.csv
+
+# Claude config
+.claude/
+
+# SQLite WAL/shm (recreated at runtime)
+*.db-shm
+*.db-wal
