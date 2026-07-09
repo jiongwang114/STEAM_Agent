@@ -19,8 +19,7 @@ def archive_conversation(
         return
 
     # ==== Chroma: semantic retrieval (existing) ====
-    text = f"User: {user_message}
-Assistant: {assistant_reply}"
+    text = f"User: {user_message}\nAssistant: {assistant_reply}"
     timestamp = datetime.now(timezone.utc).isoformat()
     doc_id = f"{user_id}_{thread_id}_{timestamp}"
 
