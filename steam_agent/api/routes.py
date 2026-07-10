@@ -19,6 +19,15 @@ router = APIRouter()
 
 _turn_counter: dict[str, int] = defaultdict(int)
 
+# Friendly status text shown while tools are running
+_TOOL_STATUS: dict[str, str] = {
+    "get_user_playtime": "让我翻翻你的游戏库...",
+    "rag_search_similar_games": "帮你找找对味的游戏...",
+    "search_steam_store": "瞄一眼商店价格...",
+    "recall_user_memory": "回忆一下咱之前聊的...",
+    "recall_message_detail": "翻翻之前的对话记录...",
+}
+
 
 async def _get_graph():
     from ..graph.builder import build_graph
@@ -126,16 +135,20 @@ async def chat_stream(req: ChatRequest):
             kind = event.get("event", "")
 
             if kind == "on_chat_model_stream":
+                # Skip guard LLM calls — they use langgraph_node metadata
+                if event.get("metadata", {}).get("langgraph_node") == "guard":
+                    continue
                 chunk = event.get("data", {}).get("chunk")
                 if chunk and hasattr(chunk, "content") and chunk.content:
                     accumulated_reply += chunk.content
                     yield f'data: {json.dumps({"event": "token", "data": chunk.content}, ensure_ascii=False)}\n\n'
 
             elif kind == "on_tool_start":
-                tool_name = event.get("name", "unknown")
-                if tool_name:
+                tool_name = event.get("name", "")
+                if tool_name and tool_name != "save_user_insight":
                     tool_calls_seen.append(tool_name)
-                    yield f'data: {json.dumps({"event": "tool_call", "data": tool_name}, ensure_ascii=False)}\n\n'
+                    text = _TOOL_STATUS.get(tool_name, "马上就好...")
+                    yield f'data: {json.dumps({"event": "status", "data": text}, ensure_ascii=False)}\n\n'
 
         yield f'data: {json.dumps({"event": "done", "data": ""})}\n\n'
 

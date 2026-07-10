@@ -337,6 +337,29 @@
   .typing-dot:nth-child(3) { animation-delay:0.4s; }
   @keyframes typingPulse { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
 
+  /* ── SHIMMER LOADING BAR ── */
+  .loading-bar {
+    height:3px; border-radius:2px; background:var(--bg-surface);
+    margin-bottom:8px; overflow:hidden; position:relative;
+  }
+  .loading-bar::after {
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(90deg, transparent 0%, var(--cyan-dim) 40%, var(--cyan) 50%, var(--cyan-dim) 60%, transparent 100%);
+    animation:shimmer 1.8s ease-in-out infinite;
+  }
+  @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  .loading-status {
+    font-size:12px; color:var(--text-muted);
+    font-family:'JetBrains Mono',monospace;
+    display:flex; align-items:center; gap:6px;
+  }
+  .loading-status .dot-pulse {
+    width:5px; height:5px; border-radius:50%; background:var(--cyan);
+    animation:typingPulse 1.2s infinite;
+  }
+  .loading-status .dot-pulse:nth-child(2) { animation-delay:0.2s; }
+  .loading-status .dot-pulse:nth-child(3) { animation-delay:0.4s; }
+
   /* ── EMPTY STATE ── */
   .empty-state {
     flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -1389,26 +1412,60 @@ function addSystemMsg(md) {
   appendMsg('ai', md);
 }
 
-function showTyping() {
+function buildStreamBubble() {
   var chatArea = document.getElementById('chat-area');
   var es = document.getElementById('empty-state');
   if (es) es.remove();
 
-  var div = document.createElement('div');
-  div.className = 'msg ai';
-  div.id = 'typing';
-  div.innerHTML = '' +
-    '<div class="msg-avatar">SP</div>' +
-    '<div>' +
-      '<div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>' +
-    '</div>';
-  chatArea.appendChild(div);
-  chatArea.scrollTop = chatArea.scrollHeight;
-}
+  var root = document.createElement('div');
+  root.className = 'msg ai';
 
-function removeTyping() {
-  var t = document.getElementById('typing');
-  if (t) t.remove();
+  var bar = document.createElement('div');
+  bar.className = 'loading-bar';
+
+  var dot1 = document.createElement('span');
+  var dot2 = document.createElement('span');
+  var dot3 = document.createElement('span');
+  dot1.className = 'dot-pulse';
+  dot2.className = 'dot-pulse';
+  dot3.className = 'dot-pulse';
+  var textSpan = document.createElement('span');
+  textSpan.textContent = '马上就好...';
+
+  var status = document.createElement('div');
+  status.className = 'loading-status';
+  status.appendChild(dot1);
+  status.appendChild(dot2);
+  status.appendChild(dot3);
+  status.appendChild(textSpan);
+
+  var content = document.createElement('div');
+
+  var bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.appendChild(bar);
+  bubble.appendChild(status);
+  bubble.appendChild(content);
+
+  var time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = getTime();
+
+  var right = document.createElement('div');
+  right.style.cssText = 'flex:1;min-width:0;';
+  right.appendChild(bubble);
+  right.appendChild(time);
+
+  var avatar = document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.textContent = 'SP';
+
+  root.appendChild(avatar);
+  root.appendChild(right);
+  chatArea.appendChild(root);
+  chatArea.scrollTop = chatArea.scrollHeight;
+
+  return { root: root, bar: bar, status: status, text: textSpan, content: content, right: right };
 }
 
 function quickSend(text) {
@@ -1449,7 +1506,8 @@ async function sendMessage() {
     }
   }
 
-  showTyping();
+  var stream = buildStreamBubble();
+  var firstToken = false;
 
   try {
     var res = await fetch('/chat/stream', {
@@ -1464,25 +1522,10 @@ async function sendMessage() {
     });
 
     if (!res.ok) {
-      removeTyping();
+      stream.root.remove();
       appendMsg('ai', '**错误**: 服务器返回 ' + res.status + ' — 请稍后重试。');
       return;
     }
-
-    removeTyping();
-
-    // create streaming bubble
-    var chatArea = document.getElementById('chat-area');
-    var div = document.createElement('div');
-    div.className = 'msg ai';
-    div.innerHTML = '' +
-      '<div class="msg-avatar">SP</div>' +
-      '<div>' +
-        '<div class="msg-bubble stream-bubble"></div>' +
-        '<div class="msg-time">' + getTime() + '</div>' +
-      '</div>';
-    chatArea.appendChild(div);
-    var bubble = div.querySelector('.stream-bubble');
 
     var accumulated = '';
     var reader = res.body.getReader();
@@ -1504,19 +1547,24 @@ async function sendMessage() {
         var jsonStr = trimmed.slice(6);
         try {
           var evt = JSON.parse(jsonStr);
-          if (evt.event === 'token') {
+          if (evt.event === 'status') {
+            stream.text.textContent = evt.data;
+          } else if (evt.event === 'token') {
+            if (!firstToken) {
+              firstToken = true;
+              stream.bar.style.display = 'none';
+            }
             accumulated += evt.data;
             try {
-              bubble.innerHTML = marked.parse(accumulated);
+              stream.content.innerHTML = marked.parse(accumulated);
             } catch (e) {
-              bubble.innerHTML = escapeHtml(accumulated).replace(/\n/g, '<br>');
+              stream.content.innerHTML = escapeHtml(accumulated).replace(/\n/g, '<br>');
             }
+            var chatArea = document.getElementById('chat-area');
             chatArea.scrollTop = chatArea.scrollHeight;
-          } else if (evt.event === 'tool_call') {
-            var toolDiv = document.createElement('div');
-            toolDiv.style.cssText = 'font-size:11px;color:var(--text-muted);font-family:JetBrains Mono,monospace;margin:4px 0;';
-            toolDiv.textContent = '⚙ ' + evt.data;
-            bubble.appendChild(toolDiv);
+          } else if (evt.event === 'done') {
+            stream.bar.remove();
+            stream.status.remove();
           }
         } catch (e) {
           // ignore partial parse errors
@@ -1524,8 +1572,9 @@ async function sendMessage() {
       }
     }
 
-    if (!accumulated) {
-      bubble.innerHTML = '（助手没有返回内容，请重试）';
+    if (!firstToken) {
+      stream.root.remove();
+      appendMsg('ai', '（助手没有返回内容，请重试）');
     }
 
     // refresh thread list after first exchange
@@ -1533,7 +1582,7 @@ async function sendMessage() {
       loadThreads().catch(function() {});
     }
   } catch (e) {
-    removeTyping();
+    stream.root.remove();
     appendMsg('ai', '**连接失败**: ' + escapeHtml(e.message) + '\n\n请检查网络后重试。');
   } finally {
     state.isStreaming = false;
