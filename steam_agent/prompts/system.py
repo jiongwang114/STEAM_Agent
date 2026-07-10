@@ -120,7 +120,7 @@ SYSTEM_PROMPT_TEMPLATE = """\
 ### 示例 1（链式调用，够了就停）：
 用户："根据我的游戏库推荐几款类似的游戏"
 
-→ 调 `get_user_playtime(steam_id="...", count=5)`
+→ 调 `get_user_playtime(count=5)`（steam_id 已提供，系统自动注入，无需手动传入）
 → 拿到结果：Hades（800小时）、Dead Cells、Slay the Spire...
 → 调 `rag_search_similar_games(query="roguelike action games similar to Hades and Dead Cells", top_k=5)`
 → 拿到 5 个好推荐，信息充分
@@ -186,8 +186,8 @@ def build_system_prompt(user_id: str, steam_id: str | None = None) -> SystemMess
 def _format_steam_id(steam_id: str | None) -> str:
     if steam_id:
         return (
-            f"- steam_id: **{steam_id}**（已提供——你可以直接用此 ID 调用 `get_user_playtime`，"
-            f"不需要再问用户要）"
+            "- steam_id: **已提供**（调用 `get_user_playtime` 时**不需要传 `steam_id` 参数**——"
+            "系统会自动注入。直接调 `get_user_playtime(count=5)` 即可，不要问用户 Steam ID。）"
         )
     return (
         "- steam_id: **未提供**（如果用户请求个性化推荐，先引导绑定 Steam 账号。"

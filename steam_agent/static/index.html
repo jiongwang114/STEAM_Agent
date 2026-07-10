@@ -1,1007 +1,1402 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STEAM.AGNT // 赛博游戏推荐终端</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Orbitron & Rajdhani & Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2 family=Inter:wght@300;400;500;600&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Marked.js for Markdown parsing -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Canvas Confetti for "Ready to Play" celebration -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STEAM PLAY — Steam AI 游戏推荐</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg-void: #05070F;
+    --bg-panel: #0A0D1A;
+    --bg-surface: #111827;
+    --bg-hover: #1a2035;
+    --cyan: #00F5FF;
+    --magenta: #FF006E;
+    --violet: #7B2FFF;
+    --cyan-dim: rgba(0,245,255,0.15);
+    --cyan-glow: rgba(0,245,255,0.4);
+    --magenta-dim: rgba(255,0,110,0.15);
+    --violet-dim: rgba(123,47,255,0.15);
+    --text-primary: #E8EEFF;
+    --text-secondary: #8899BB;
+    --text-muted: #445577;
+    --border: rgba(0,245,255,0.12);
+    --border-strong: rgba(0,245,255,0.3);
+    --sidebar-w: 260px;
+    --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .light-mode {
+    --bg-void: #EEF2FF;
+    --bg-panel: #E4EAFB;
+    --bg-surface: #D8E2F8;
+    --bg-hover: #C8D4F0;
+    --cyan: #0066CC;
+    --magenta: #CC0055;
+    --violet: #6622CC;
+    --cyan-dim: rgba(0,102,204,0.1);
+    --cyan-glow: rgba(0,102,204,0.35);
+    --magenta-dim: rgba(204,0,85,0.1);
+    --violet-dim: rgba(102,34,204,0.1);
+    --text-primary: #0A0D1A;
+    --text-secondary: #334477;
+    --text-muted: #8899BB;
+    --border: rgba(0,102,204,0.15);
+    --border-strong: rgba(0,102,204,0.4);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; background:var(--bg-void); color:var(--text-primary); font-family:'Inter',sans-serif; }
 
-  <style>
-    /* 赛博朋克主题核心色彩与样式配置 */
-    :root {
-      --cyber-bg: #06060f;
-      --cyber-panel: rgba(12, 12, 28, 0.85);
-      --cyber-pink: #ff007f;
-      --cyber-cyan: #00f0ff;
-      --cyber-yellow: #fefe00;
-      --cyber-glow-pink: rgba(255, 0, 127, 0.4);
-      --cyber-glow-cyan: rgba(0, 240, 255, 0.4);
-      --text-main: #e2e8f0;
-      --text-muted: #94a3b8;
-    }
+  /* ── CANVAS ── */
+  #starfield { position:fixed; inset:0; z-index:0; pointer-events:none; }
 
-    body {
-      font-family: 'Inter', -apple-system, sans-serif;
-      background-color: var(--cyber-bg);
-      color: var(--text-main);
-      transition: background-color 0.3s ease, color 0.3s ease;
-      background-image: 
-        radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 90% 80%, rgba(255, 0, 127, 0.05) 0%, transparent 40%);
-    }
+  /* ── COVER SCREEN ── */
+  #cover {
+    position:fixed; inset:0; z-index:100;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:var(--bg-void);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  #cover.hidden { opacity:0; pointer-events:none; transform:scale(1.05); }
 
-    .cyber-font {
-      font-family: 'Orbitron', 'Rajdhani', sans-serif;
-    }
+  .cover-grid {
+    position:absolute; inset:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px);
+    background-size:60px 60px;
+    animation:gridPulse 4s ease-in-out infinite;
+  }
+  @keyframes gridPulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
 
-    /* 更圆滑、流畅的圆角与发光特效 */
-    .border-cyber-cyan {
-      border: 1px solid var(--cyber-cyan);
-      box-shadow: 0 0 15px var(--cyber-glow-cyan);
-    }
+  .cover-scanline {
+    position:absolute; inset:0; pointer-events:none;
+    background:repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px
+    );
+  }
 
-    .border-cyber-pink {
-      border: 1px solid var(--cyber-pink);
-      box-shadow: 0 0 15px var(--cyber-glow-pink);
-    }
+  .cover-content { position:relative; text-align:center; max-width:700px; padding:2rem; }
 
-    .btn-cyber-primary {
-      background: linear-gradient(135deg, var(--cyber-pink) 0%, #b30059 100%);
-      color: #ffffff;
-      border: 1px solid var(--cyber-pink);
-      text-shadow: 0 0 5px rgba(255, 255, 255, 0.6);
-      box-shadow: 0 0 12px var(--cyber-glow-pink);
-      border-radius: 12px; /* 柔和流畅的圆角 */
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-cyber-primary:hover {
-      filter: brightness(1.15);
-      box-shadow: 0 0 25px var(--cyber-pink);
-      transform: translateY(-2px);
-    }
+  .cover-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:3px;
+    color:var(--cyan); border:1px solid var(--border-strong);
+    padding:6px 16px; border-radius:2px; margin-bottom:2rem;
+    animation:badgeBlink 2s infinite;
+    background:var(--cyan-dim);
+  }
+  @keyframes badgeBlink { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .badge-dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); animation:dotPulse 1.5s infinite; }
+  @keyframes dotPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0.4} }
 
-    .btn-cyber-secondary {
-      background: rgba(0, 240, 255, 0.05);
-      color: var(--cyber-cyan);
-      border: 1px solid var(--cyber-cyan);
-      box-shadow: 0 0 10px var(--cyber-glow-cyan);
-      border-radius: 12px; /* 柔和流畅的圆角 */
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .btn-cyber-secondary:hover {
-      background: var(--cyber-cyan);
-      color: #000000;
-      box-shadow: 0 0 22px var(--cyber-cyan);
-      transform: translateY(-2px);
-    }
+  .cover-title {
+    font-family:'Orbitron',monospace; font-size:clamp(2.5rem,6vw,4.5rem);
+    font-weight:900; line-height:1.05;
+    color:var(--text-primary);
+    text-shadow: 0 0 40px var(--cyan-glow), 0 0 80px rgba(0,245,255,0.2);
+    letter-spacing:2px; margin-bottom:0.5rem;
+  }
+  .cover-title span { color:var(--cyan); }
+  .cover-subtitle {
+    font-family:'Orbitron',monospace; font-size:clamp(0.9rem,2vw,1.2rem);
+    color:var(--magenta); letter-spacing:6px; margin-bottom:2rem;
+    text-transform:uppercase; font-weight:600;
+  }
 
-    /* 炫酷网格背景叠加 */
-    .cyber-grid {
-      position: fixed;
-      inset: 0;
-      background-image: 
-        linear-gradient(rgba(18, 16, 35, 0.25) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(18, 16, 35, 0.25) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: -1;
-    }
+  .cover-desc {
+    font-size:1rem; line-height:1.8; color:var(--text-secondary);
+    margin-bottom:3rem; max-width:560px; margin-left:auto; margin-right:auto;
+  }
+  .cover-desc em { color:var(--cyan); font-style:normal; font-weight:600; }
 
-    /* 滚动条 */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.1);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: var(--cyber-cyan);
-      border-radius: 99px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--cyber-pink);
-    }
+  .cover-enter {
+    position:relative; display:inline-flex; align-items:center; gap:12px;
+    font-family:'Orbitron',monospace; font-size:0.9rem; font-weight:700;
+    letter-spacing:3px; text-transform:uppercase;
+    color:var(--bg-void); background:var(--cyan);
+    border:none; padding:16px 40px; cursor:pointer;
+    clip-path:polygon(12px 0%, 100% 0%, calc(100% - 12px) 100%, 0% 100%);
+    transition:var(--transition);
+    animation:enterPulse 2s ease-in-out infinite;
+  }
+  .cover-enter:hover { background:var(--text-primary); transform:scale(1.05); }
+  @keyframes enterPulse { 0%,100%{box-shadow:0 0 20px var(--cyan-glow)} 50%{box-shadow:0 0 40px var(--cyan),0 0 80px var(--cyan-dim)} }
 
-    /* 故障艺术动效 */
-    @keyframes glitch {
-      0% { text-shadow: 2px 1px 0px var(--cyber-pink), -1px -2px 0px var(--cyber-cyan); }
-      50% { text-shadow: -2px 2px 0px var(--cyber-pink), 3px -1px 0px var(--cyber-cyan); }
-      100% { text-shadow: 1px -2px 0px var(--cyber-pink), -3px 2px 0px var(--cyber-cyan); }
-    }
-    .glitch-text:hover {
-      animation: glitch 0.3s infinite linear alternate-reverse;
-    }
+  .cover-corner {
+    position:absolute; width:20px; height:20px; border-color:var(--cyan); border-style:solid;
+  }
+  .corner-tl { top:20px; left:20px; border-width:2px 0 0 2px; }
+  .corner-tr { top:20px; right:20px; border-width:2px 2px 0 0; }
+  .corner-bl { bottom:20px; left:20px; border-width:0 0 2px 2px; }
+  .corner-br { bottom:20px; right:20px; border-width:0 2px 2px 0; }
 
-    /* 旋转流光动画 */
-    @keyframes spin-slow {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .animate-spin-slow {
-      animation: spin-slow 12s linear infinite;
-    }
+  .cover-orbs {
+    position:absolute; inset:0; pointer-events:none; overflow:hidden;
+  }
+  .orb {
+    position:absolute; border-radius:50%; filter:blur(80px); opacity:0.15;
+    animation:orbFloat 8s ease-in-out infinite;
+  }
+  .orb1 { width:400px; height:400px; background:var(--violet); top:-100px; left:-100px; animation-delay:0s; }
+  .orb2 { width:300px; height:300px; background:var(--cyan); bottom:-80px; right:-60px; animation-delay:3s; }
+  .orb3 { width:200px; height:200px; background:var(--magenta); top:50%; left:50%; transform:translate(-50%,-50%); animation-delay:1.5s; }
+  @keyframes orbFloat { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(20px,-15px) scale(1.05)} 66%{transform:translate(-10px,20px) scale(0.95)} }
 
-    /* 封面雷达扫描器动画 */
-    @keyframes radar-pulse {
-      0% { transform: scale(0.9); opacity: 0.8; }
-      50% { transform: scale(1.15); opacity: 0.3; }
-      100% { transform: scale(1.3); opacity: 0; }
-    }
-    .radar-ring {
-      animation: radar-pulse 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
-    }
+  /* ── APP SHELL ── */
+  #app { position:fixed; inset:0; z-index:1; display:flex; }
 
-    /* 打字等待特效 */
-    .dot-flashing {
-      position: relative;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: var(--cyber-cyan);
-      color: var(--cyber-cyan);
-      animation: dot-flashing 1s infinite linear alternate;
-      animation-delay: .5s;
-    }
-    .dot-flashing::before, .dot-flashing::after {
-      content: '';
-      display: inline-block;
-      position: absolute;
-      top: 0;
-    }
-    .dot-flashing::before {
-      left: -16px;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: var(--cyber-cyan);
-      color: var(--cyber-cyan);
-      animation: dot-flashing 1s infinite linear alternate;
-      animation-delay: 0s;
-    }
-    .dot-flashing::after {
-      left: 16px;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: var(--cyber-cyan);
-      color: var(--cyber-cyan);
-      animation: dot-flashing 1s infinite linear alternate;
-      animation-delay: 1s;
-    }
-    @keyframes dot-flashing {
-      0% { background-color: var(--cyber-cyan); }
-      50%, 100% { background-color: rgba(0, 240, 255, 0.2); }
-    }
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width:var(--sidebar-w); flex-shrink:0;
+    background:var(--bg-panel);
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column;
+    transition:var(--transition); overflow:hidden;
+    position:relative; z-index:10;
+  }
+  #sidebar.collapsed { width:0; border-right:none; }
+  #sidebar.collapsed * { opacity:0; pointer-events:none; }
 
-    /* Markdown 渲染定制样式 */
-    .prose-cyber h1, .prose-cyber h2, .prose-cyber h3 {
-      font-family: 'Orbitron', sans-serif;
-      color: var(--cyber-cyan);
-      margin-top: 0.5em;
-      margin-bottom: 0.5em;
-      font-weight: bold;
-    }
-    .prose-cyber ul {
-      list-style-type: square;
-      padding-left: 1.25rem;
-      margin-bottom: 0.75rem;
-    }
-    .prose-cyber li {
-      margin-bottom: 0.25rem;
-    }
-    .prose-cyber p {
-      margin-bottom: 0.75rem;
-      line-height: 1.6;
-    }
-    .prose-cyber code {
-      background: rgba(0, 240, 255, 0.1);
-      padding: 0.125rem 0.25rem;
-      border-radius: 0.25rem;
-      color: var(--cyber-pink);
-    }
+  .sidebar-header {
+    padding:16px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .sidebar-logo {
+    font-family:'Orbitron',monospace; font-size:14px; font-weight:700;
+    color:var(--cyan); letter-spacing:2px;
+  }
+  .sidebar-logo span { color:var(--magenta); }
 
-    /* 侧边栏折叠 */
-    #sidebar.collapsed { width: 50px; }
-    #sidebar.collapsed .sidebar-search,
-    #sidebar.collapsed .session-list,
-    #sidebar.collapsed .sidebar-foot .user-info,
-    #sidebar.collapsed .btn-new-session-text { display: none; }
-    #sidebar.collapsed .sidebar-foot { justify-content: center; padding: 10px 0; }
-    #sidebar.collapsed #sidebar-collapse { right: auto; left: 50%; transform: translateX(-50%); }
-    #sidebar:hover #sidebar-collapse { opacity: 1; }
-    /* 侧边栏收起后左侧悬停指示线 */
-    .sidebar-peek { position: fixed; left: 0; top: 0; bottom: 0; width: 4px; z-index: 23; cursor: pointer; }
-    .sidebar-peek:hover { background: var(--cyber-cyan); box-shadow: 0 0 12px var(--cyber-glow-cyan); }
-  </style>
+  .btn-new-session {
+    width:100%; display:flex; align-items:center; gap:10px;
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:500;
+    color:var(--text-primary); background:var(--cyan-dim);
+    border:1px solid var(--border-strong); padding:10px 14px;
+    cursor:pointer; transition:var(--transition); margin:12px 0;
+    clip-path:polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  .btn-new-session:hover { background:var(--cyan); color:var(--bg-void); }
+  .btn-new-session i { font-size:16px; }
+
+  .sidebar-search {
+    padding:0 12px 12px;
+  }
+  .search-wrap {
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-surface); border:1px solid var(--border);
+    padding:8px 12px; border-radius:2px;
+    transition:var(--transition);
+  }
+  .search-wrap:focus-within { border-color:var(--border-strong); background:var(--bg-hover); }
+  .search-wrap i { color:var(--text-muted); font-size:15px; }
+  .search-wrap input {
+    background:none; border:none; outline:none;
+    color:var(--text-primary); font-size:13px; font-family:'Inter',sans-serif;
+    width:100%;
+  }
+  .search-wrap input::placeholder { color:var(--text-muted); }
+
+  .sidebar-sessions {
+    flex:1; overflow-y:auto; padding:4px 8px;
+  }
+  .sidebar-sessions::-webkit-scrollbar { width:3px; }
+  .sidebar-sessions::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:2px; }
+
+  .session-label {
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px;
+    color:var(--text-muted); text-transform:uppercase;
+    padding:8px 8px 4px;
+  }
+  .session-item {
+    display:flex; align-items:center; gap:8px;
+    padding:9px 10px; border-radius:2px; cursor:pointer;
+    font-size:13px; color:var(--text-secondary);
+    transition:var(--transition); border:1px solid transparent;
+    margin-bottom:2px;
+  }
+  .session-item:hover { background:var(--bg-hover); color:var(--text-primary); border-color:var(--border); }
+  .session-item.active { background:var(--cyan-dim); color:var(--cyan); border-color:var(--border-strong); }
+  .session-item i { font-size:14px; flex-shrink:0; }
+  .session-item span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .sidebar-footer {
+    padding:12px;
+    border-top:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .btn-icon {
+    width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+    background:none; border:1px solid var(--border); border-radius:2px;
+    color:var(--text-secondary); cursor:pointer; transition:var(--transition);
+    font-size:18px;
+  }
+  .btn-icon:hover { border-color:var(--border-strong); color:var(--cyan); background:var(--cyan-dim); }
+
+  /* ── MAIN ── */
+  #main { flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    height:56px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 20px; border-bottom:1px solid var(--border);
+    background:rgba(10,13,26,0.8); backdrop-filter:blur(20px);
+    flex-shrink:0; z-index:5;
+  }
+  .topbar-left { display:flex; align-items:center; gap:12px; }
+
+  .btn-toggle-sidebar {
+    background:none; border:1px solid var(--border); border-radius:2px;
+    color:var(--text-secondary); cursor:pointer; padding:7px 9px;
+    font-size:18px; transition:var(--transition);
+  }
+  .btn-toggle-sidebar:hover { border-color:var(--border-strong); color:var(--cyan); }
+
+  .topbar-title {
+    font-family:'Orbitron',monospace; font-size:13px; font-weight:600;
+    color:var(--text-primary); letter-spacing:1px;
+  }
+  .status-dot {
+    width:7px; height:7px; border-radius:50%; background:var(--cyan);
+    display:inline-block; margin-right:6px;
+    animation:dotPulse 2s infinite;
+  }
+
+  .topbar-right { display:flex; align-items:center; gap:10px; }
+  .btn-auth {
+    font-family:'Orbitron',monospace; font-size:11px; font-weight:600;
+    letter-spacing:1px; padding:7px 16px; border-radius:2px; cursor:pointer;
+    transition:var(--transition);
+  }
+  .btn-login {
+    background:none; border:1px solid var(--border-strong); color:var(--cyan);
+  }
+  .btn-login:hover { background:var(--cyan-dim); }
+  .btn-register {
+    background:var(--cyan); border:1px solid var(--cyan); color:var(--bg-void);
+    clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+  }
+  .btn-register:hover { background:var(--text-primary); border-color:var(--text-primary); }
+
+  /* ── CHAT AREA ── */
+  #chat-area {
+    flex:1; overflow-y:auto; padding:24px;
+    display:flex; flex-direction:column; gap:16px;
+  }
+  #chat-area::-webkit-scrollbar { width:4px; }
+  #chat-area::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:2px; }
+
+  .msg { display:flex; gap:12px; animation:msgIn 0.3s ease; }
+  @keyframes msgIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+  .msg.user { flex-direction:row-reverse; }
+
+  .msg-avatar {
+    width:36px; height:36px; border-radius:2px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; font-family:'Orbitron',monospace;
+  }
+  .msg.ai .msg-avatar { background:var(--cyan-dim); border:1px solid var(--border-strong); color:var(--cyan); }
+  .msg.user .msg-avatar { background:var(--magenta-dim); border:1px solid rgba(255,0,110,0.3); color:var(--magenta); }
+
+  .msg-bubble {
+    max-width:72%; padding:12px 16px; border-radius:2px;
+    font-size:14px; line-height:1.7; color:var(--text-primary);
+    border:1px solid var(--border);
+  }
+  .msg.ai .msg-bubble { background:var(--bg-panel); border-top-left-radius:0; }
+  .msg.user .msg-bubble { background:var(--violet-dim); border:1px solid var(--violet-dim); border-top-right-radius:0; }
+
+  .msg-bubble p { margin-bottom:0.5em; }
+  .msg-bubble p:last-child { margin-bottom:0; }
+  .msg-bubble h1,.msg-bubble h2,.msg-bubble h3 { font-family:'Orbitron',monospace; color:var(--cyan); margin:0.8em 0 0.4em; font-size:1em; }
+  .msg-bubble code { font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--bg-surface); padding:1px 5px; border-radius:2px; color:var(--cyan); }
+  .msg-bubble pre { background:var(--bg-surface); padding:12px; border-radius:2px; overflow-x:auto; margin:0.5em 0; border:1px solid var(--border); }
+  .msg-bubble pre code { background:none; padding:0; }
+  .msg-bubble ul,.msg-bubble ol { padding-left:20px; margin:0.5em 0; }
+  .msg-bubble li { margin-bottom:4px; }
+  .msg-bubble strong { color:var(--cyan); }
+  .msg-bubble a { color:var(--cyan); text-decoration:none; border-bottom:1px solid var(--border-strong); }
+  .msg-bubble blockquote { border-left:3px solid var(--violet); padding-left:12px; color:var(--text-secondary); margin:0.5em 0; }
+  .msg-bubble hr { border:none; border-top:1px solid var(--border); margin:0.8em 0; }
+  .msg-bubble table { width:100%; border-collapse:collapse; font-size:13px; margin:0.5em 0; }
+  .msg-bubble th { background:var(--cyan-dim); color:var(--cyan); padding:6px 10px; text-align:left; border:1px solid var(--border); font-family:'Orbitron',monospace; font-size:11px; letter-spacing:1px; }
+  .msg-bubble td { padding:6px 10px; border:1px solid var(--border); }
+  .msg-bubble tr:hover td { background:var(--bg-hover); }
+  .msg-bubble img { max-width:100%; border-radius:4px; margin:4px 0; }
+
+  .msg-time { font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-top:4px; }
+
+  .typing-indicator { display:flex; gap:5px; align-items:center; padding:4px 0; }
+  .typing-dot { width:6px; height:6px; border-radius:50%; background:var(--cyan); animation:typingPulse 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay:0.2s; }
+  .typing-dot:nth-child(3) { animation-delay:0.4s; }
+  @keyframes typingPulse { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:24px; opacity:0.85;
+  }
+  .empty-icon { font-size:64px; color:var(--cyan); opacity:0.5; }
+  .empty-title { font-family:'Orbitron',monospace; font-size:1.4rem; color:var(--text-primary); font-weight:700; }
+  .empty-desc { font-size:14px; color:var(--text-secondary); max-width:360px; line-height:1.7; }
+  .empty-tags { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .empty-tag {
+    font-size:12px; color:var(--cyan); border:1px solid var(--border-strong);
+    padding:5px 12px; border-radius:2px; cursor:pointer; transition:var(--transition);
+    font-family:'JetBrains Mono',monospace;
+    background:var(--cyan-dim);
+  }
+  .empty-tag:hover { background:var(--cyan); color:var(--bg-void); }
+
+  /* ── INPUT AREA ── */
+  .input-area {
+    padding:16px 24px; border-top:1px solid var(--border);
+    background:rgba(10,13,26,0.8); backdrop-filter:blur(20px);
+    flex-shrink:0;
+  }
+  .input-wrap {
+    display:flex; gap:10px; align-items:flex-end;
+    background:var(--bg-surface); border:1px solid var(--border);
+    border-radius:4px; padding:10px 12px;
+    transition:var(--transition);
+  }
+  .input-wrap:focus-within { border-color:var(--border-strong); background:var(--bg-hover); }
+
+  .input-wrap textarea {
+    flex:1; background:none; border:none; outline:none; resize:none;
+    color:var(--text-primary); font-size:14px; font-family:'Inter',sans-serif;
+    line-height:1.6; max-height:140px; min-height:24px;
+  }
+  .input-wrap textarea::placeholder { color:var(--text-muted); }
+
+  .btn-send {
+    width:38px; height:38px; flex-shrink:0;
+    background:var(--cyan); border:none; border-radius:2px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; color:var(--bg-void); transition:var(--transition);
+    clip-path:polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  }
+  .btn-send:hover { background:var(--text-primary); transform:scale(1.05); }
+  .btn-send:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+  .input-hint { font-size:11px; color:var(--text-muted); text-align:center; margin-top:8px; font-family:'JetBrains Mono',monospace; letter-spacing:1px; }
+
+  /* ── SETTINGS PANEL ── */
+  #settings-overlay {
+    position:fixed; inset:0; z-index:200;
+    background:rgba(5,7,15,0.8); backdrop-filter:blur(6px);
+    display:flex; align-items:flex-end; justify-content:flex-start;
+    padding:0 0 80px 16px;
+    opacity:0; pointer-events:none; transition:opacity 0.3s;
+  }
+  #settings-overlay.visible { opacity:1; pointer-events:all; }
+
+  .settings-panel {
+    background:var(--bg-panel); border:1px solid var(--border-strong);
+    border-radius:4px; width:300px;
+    box-shadow:0 0 40px rgba(0,245,255,0.1), 0 20px 60px rgba(0,0,0,0.6);
+    transform:translateY(20px) scale(0.97);
+    transition:transform 0.3s ease, opacity 0.3s;
+    overflow:hidden;
+  }
+  #settings-overlay.visible .settings-panel { transform:none; }
+
+  .settings-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; border-bottom:1px solid var(--border);
+    background:var(--cyan-dim);
+  }
+  .settings-title { font-family:'Orbitron',monospace; font-size:12px; font-weight:700; color:var(--cyan); letter-spacing:2px; }
+  .btn-close-settings {
+    background:none; border:none; color:var(--text-muted); cursor:pointer;
+    font-size:20px; transition:var(--transition);
+  }
+  .btn-close-settings:hover { color:var(--magenta); }
+
+  .settings-body { padding:16px; display:flex; flex-direction:column; gap:12px; }
+
+  .settings-row { display:flex; flex-direction:column; gap:6px; }
+  .settings-label { font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; letter-spacing:1px; text-transform:uppercase; }
+
+  .steam-id-wrap {
+    display:flex; gap:8px;
+  }
+  .steam-id-input {
+    flex:1; background:var(--bg-surface); border:1px solid var(--border);
+    color:var(--text-primary); font-family:'JetBrains Mono',monospace; font-size:13px;
+    padding:9px 12px; border-radius:2px; outline:none; transition:var(--transition);
+  }
+  .steam-id-input:focus { border-color:var(--border-strong); }
+  .steam-id-input::placeholder { color:var(--text-muted); }
+  .btn-bind {
+    background:var(--cyan); border:none; color:var(--bg-void);
+    font-family:'Orbitron',monospace; font-size:11px; font-weight:700;
+    padding:9px 14px; border-radius:2px; cursor:pointer; letter-spacing:1px;
+    transition:var(--transition); white-space:nowrap;
+  }
+  .btn-bind:hover { background:var(--text-primary); }
+
+  .steam-id-link {
+    font-size:12px; color:var(--cyan); text-decoration:none;
+    display:flex; align-items:center; gap:4px; opacity:0.8; transition:var(--transition);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .steam-id-link:hover { opacity:1; }
+
+  .theme-toggle {
+    display:flex; background:var(--bg-surface); border:1px solid var(--border); border-radius:2px; overflow:hidden;
+  }
+  .theme-btn {
+    flex:1; padding:9px; display:flex; align-items:center; justify-content:center; gap:6px;
+    font-size:12px; color:var(--text-secondary); cursor:pointer; transition:var(--transition);
+    background:none; border:none; font-family:'Orbitron',monospace; letter-spacing:1px;
+  }
+  .theme-btn.active { background:var(--cyan-dim); color:var(--cyan); }
+  .theme-btn:hover:not(.active) { background:var(--bg-hover); color:var(--text-primary); }
+
+  .settings-divider { border:none; border-top:1px solid var(--border); }
+
+  .btn-logout {
+    width:100%; padding:10px; background:var(--magenta-dim); border:1px solid rgba(255,0,110,0.3);
+    color:var(--magenta); font-family:'Orbitron',monospace; font-size:12px; font-weight:700;
+    letter-spacing:2px; cursor:pointer; border-radius:2px; transition:var(--transition);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn-logout:hover { background:var(--magenta); color:var(--bg-void); }
+
+  /* ── AUTH MODAL ── */
+  #auth-overlay {
+    position:fixed; inset:0; z-index:300;
+    background:rgba(5,7,15,0.9); backdrop-filter:blur(8px);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity 0.3s;
+  }
+  #auth-overlay.visible { opacity:1; pointer-events:all; }
+
+  .auth-panel {
+    background:var(--bg-panel); border:1px solid var(--border-strong);
+    border-radius:4px; width:360px; padding:32px;
+    box-shadow:0 0 60px rgba(0,245,255,0.1);
+    transform:scale(0.95); transition:transform 0.3s;
+    position:relative;
+  }
+  #auth-overlay.visible .auth-panel { transform:none; }
+
+  .auth-title { font-family:'Orbitron',monospace; font-size:1.1rem; color:var(--cyan); font-weight:700; letter-spacing:2px; margin-bottom:8px; }
+  .auth-sub { font-size:13px; color:var(--text-secondary); margin-bottom:24px; }
+  .auth-error { font-size:12px; color:var(--magenta); margin-bottom:12px; display:none; }
+
+  .auth-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:24px; }
+  .auth-tab {
+    flex:1; padding:10px; text-align:center;
+    font-family:'Orbitron',monospace; font-size:12px; letter-spacing:1px;
+    color:var(--text-muted); cursor:pointer; border-bottom:2px solid transparent;
+    transition:var(--transition); background:none; border-top:none; border-left:none; border-right:none;
+  }
+  .auth-tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+
+  .auth-field { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .auth-field label { font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; letter-spacing:1px; }
+  .auth-field input {
+    background:var(--bg-surface); border:1px solid var(--border);
+    color:var(--text-primary); font-size:14px; padding:10px 12px;
+    border-radius:2px; outline:none; transition:var(--transition);
+    font-family:'Inter',sans-serif;
+  }
+  .auth-field input:focus { border-color:var(--border-strong); }
+
+  .btn-auth-submit {
+    width:100%; padding:12px; background:var(--cyan); border:none;
+    color:var(--bg-void); font-family:'Orbitron',monospace; font-size:13px;
+    font-weight:700; letter-spacing:2px; cursor:pointer; border-radius:2px;
+    transition:var(--transition); margin-top:8px;
+    clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  }
+  .btn-auth-submit:hover { background:var(--text-primary); }
+
+  .btn-auth-close {
+    position:absolute; top:16px; right:16px;
+    background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:22px;
+    transition:var(--transition);
+  }
+  .btn-auth-close:hover { color:var(--magenta); }
+
+  /* ── SIDEBAR REFRESH IN HEADER ── */
+  .sidebar-refresh-btn {
+    background:none; border:1px solid var(--border); border-radius:2px;
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--text-secondary); font-size:15px; transition:var(--transition);
+  }
+  .sidebar-refresh-btn:hover { color:var(--cyan); border-color:var(--border-strong); }
+  .sidebar-refresh-btn:hover i { animation:spin 0.5s linear; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+</style>
 </head>
-<body class="h-screen w-screen overflow-hidden flex flex-col">
+<body>
 
-  <!-- 星空粒子背景 Canvas -->
-  <canvas id="starfield" style="position:fixed;inset:0;z-index:-1;pointer-events:none;"></canvas>
+<!-- STARFIELD -->
+<canvas id="starfield"></canvas>
 
-  <!-- ========================================== -->
-  <!-- 0. 赛博封面引导页 (Splash Screen) -->
-  <!-- ========================================== -->
-  <div id="splash-screen" class="fixed inset-0 z-50 bg-[#04040a] flex flex-col items-center justify-center transition-all duration-1000 overflow-hidden">
-    
-    <!-- 封面背景网格及粒子 -->
-    <div class="absolute inset-0 cyber-grid opacity-60"></div>
-    <div class="absolute w-[600px] h-[600px] bg-gradient-to-tr from-[#ff007f]/10 to-[#00f0ff]/10 rounded-full filter blur-[120px] pointer-events-none"></div>
-
-    <!-- 交互核心：扫描雷达 -->
-    <div class="relative mb-8 flex items-center justify-center cursor-pointer group" id="splash-interactive-core">
-      <div class="absolute w-48 h-48 rounded-full border border-pink-500/20 radar-ring"></div>
-      <div class="absolute w-64 h-64 rounded-full border border-cyan-500/10 radar-ring" style="animation-delay: 1s;"></div>
-      <div class="w-36 h-36 rounded-full bg-slate-900/90 border border-cyber-cyan shadow-[0_0_30px_var(--cyber-glow-cyan)] flex items-center justify-center transition-all duration-500 group-hover:scale-105 group-hover:border-cyber-pink group-hover:shadow-[0_0_35px_var(--cyber-glow-pink)]">
-        <i data-lucide="gamepad-2" class="w-16 h-16 text-cyan-400 group-hover:text-pink-500 transition-colors duration-500 animate-pulse"></i>
-      </div>
-      <!-- 旋转外环刻度 -->
-      <div class="absolute w-40 h-40 border-2 border-dashed border-cyan-400/40 rounded-full animate-spin-slow"></div>
+<!-- COVER SCREEN -->
+<div id="cover">
+  <div class="cover-orbs">
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
+  <div class="cover-grid"></div>
+  <div class="cover-scanline"></div>
+  <div class="cover-corner corner-tl"></div>
+  <div class="cover-corner corner-tr"></div>
+  <div class="cover-corner corner-bl"></div>
+  <div class="cover-corner corner-br"></div>
+  <div class="cover-content">
+    <div class="cover-badge">
+      <div class="badge-dot"></div>
+      AI AGENT ONLINE · STEAM v2.4.1
     </div>
+    <div class="cover-title">STEAM<span>PLAY</span></div>
+    <div class="cover-subtitle">Steam 游戏推荐 AI Agent</div>
+    <p class="cover-desc">
+      接入你的 <em>Steam 游戏库</em>，由神经网络驱动的智能推荐引擎将深度解析你的游玩记录、偏好风格与心情状态——在无垠的游戏宇宙中，<em>精准定位</em>你下一段值得投入的冒险。
+    </p>
+    <button class="cover-enter" onclick="enterApp()">
+      <i class="ti ti-player-play"></i>
+      进入系统
+    </button>
+  </div>
+</div>
 
-    <!-- 文本描述与引导区 -->
-    <div class="max-w-xl text-center px-6 z-10 select-none">
-      <h1 class="text-4xl md:text-5xl font-black tracking-[0.25em] text-white cyber-font mb-2 glitch-text">
-        STEAM<span class="text-pink-500">.</span>AGNT
-      </h1>
-      <p class="text-xs text-cyan-400 tracking-[0.4em] font-bold uppercase mb-6">次世代神经游戏探索协议</p>
-      
-      <!-- 描述代理的一段话 -->
-      <div class="p-5 bg-slate-900/60 border border-slate-800/80 rounded-2xl backdrop-blur-md text-sm text-slate-300 leading-relaxed mb-8 shadow-xl text-left">
-        <p class="font-semibold text-cyan-400/90 mb-2 flex items-center gap-1.5 font-mono text-xs">
-          <i data-lucide="terminal" class="w-4 h-4"></i> AGENT PROFILE // 特工档案简报：
-        </p>
-        <span class="text-slate-400">
-          STEAM.AGNT 是一款深度耦合人类游戏基因（Gaming DNA）与 Steam 实时内容库的次世代 AI 推荐终端。我们摒弃了呆板的传统标签检索，通过比对您的库存特征、愿望单指纹以及游玩时长，秒级重构您的数字娱乐品味。无论是高难度肉鸽的深渊淬炼，还是唯美科幻宇宙的浪漫考古，在此处皆可一键触达。
-        </span>
-      </div>
-
-      <!-- 引导按钮 -->
-      <button id="btn-enter-terminal" class="px-8 py-4 btn-cyber-primary text-sm font-black tracking-widest uppercase flex items-center gap-3 mx-auto shadow-[0_0_20px_var(--cyber-glow-pink)]">
-        <span>初始化神经链路 // CONNECT TO AGENT</span>
-        <i data-lucide="shield-check" class="w-5 h-5"></i>
+<!-- APP -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">STEAM<span>PLAY</span></div>
+      <button class="sidebar-refresh-btn" title="刷新会话列表" onclick="refreshSessions()">
+        <i class="ti ti-refresh"></i>
       </button>
     </div>
 
-    <!-- 底部状态码 -->
-    <div class="absolute bottom-6 font-mono text-[9px] text-gray-600 tracking-wider flex gap-4">
-      <span>LATENCY: 12ms</span>
-      <span>|</span>
-      <span>SYSTEM: STABLE</span>
-      <span>|</span>
-      <span>MEM: ALLOCATED</span>
-    </div>
-  </div>
-
-  <!-- 全局自定义通知 -->
-  <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none transform -translate-y-4 opacity-0 transition-all duration-300">
-    <div class="px-6 py-3 bg-[#101024] border border-cyber-cyan text-white text-sm font-semibold tracking-wider flex items-center gap-3 shadow-[0_0_15px_rgba(0,240,255,0.4)] rounded-full">
-      <span id="toast-icon">👾</span>
-      <span id="toast-text" class="cyber-font">系统就绪</span>
-    </div>
-  </div>
-
-  <!-- 主布局容器 -->
-  <div class="flex flex-1 overflow-hidden">
-    
-    <!-- ========================================== -->
-    <!-- 1. 侧边栏 (Sidebar) -->
-    <!-- ========================================== -->
-    <aside id="sidebar" class="w-80 flex-shrink-0 flex flex-col bg-[#0b0b16] border-r border-[#1a1a36] z-20 transition-all duration-300 h-full" style="position:relative">
-
-      <!-- 隐藏按钮 (侧边栏内部) -->
-      <button id="sidebar-collapse" style="position:absolute;top:8px;right:8px;z-index:22;background:rgba(26,26,54,0.8);border:1px solid var(--cyber-cyan);color:var(--cyber-cyan);font-size:14px;width:26px;height:26px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s" title="收起侧边栏">«</button>
-
-      <!-- 侧边栏头部: 品牌 Logo & 刷新按钮 -->
-      <div class="p-4 border-b border-[#1a1a36] flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center shadow-lg">
-            <i data-lucide="gamepad-2" class="w-5 h-5 text-white"></i>
-          </div>
-          <div>
-            <h1 class="text-md font-black tracking-widest text-white cyber-font glitch-text cursor-pointer">STEAM.AGNT</h1>
-            <p class="text-[9px] text-gray-500 tracking-wider">CYBERPUNK ENGINE v2.5</p>
-          </div>
-        </div>
-        <!-- 侧边栏刷新按钮 (圆角优化) -->
-        <button id="btn-refresh-sessions" class="p-2 text-gray-400 hover:text-cyan-400 hover:bg-[#1a1a36] rounded-xl transition duration-200 group" title="刷新会话">
-          <i data-lucide="refresh-cw" class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"></i>
-        </button>
-      </div>
-
-      <!-- 新建会话操作区 (圆角优化) -->
-      <div class="p-4">
-        <button id="btn-new-session" class="w-full py-3 btn-cyber-primary flex items-center justify-center gap-2 rounded-xl font-bold tracking-wider text-xs uppercase cyber-font">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          <span class="btn-new-session-text">新会话 // NEW RUN</span>
-        </button>
-      </div>
-
-      <!-- 搜索过滤框 -->
-      <div class="px-4 pb-3 sidebar-search">
-        <div class="relative">
-          <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <i data-lucide="search" class="w-4 h-4 text-gray-500"></i>
-          </span>
-          <input 
-            type="text" 
-            id="search-input" 
-            placeholder="搜索运行记录..." 
-            class="w-full pl-9 pr-4 py-2 bg-[#080811] border border-[#1d1d3d] text-xs text-slate-300 placeholder-gray-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition rounded-xl"
-          />
-        </div>
-      </div>
-
-      <!-- 历史会话列表 -->
-      <div class="flex-1 overflow-y-auto px-4 py-2 space-y-2" id="sessions-container">
-        <!-- 动态生成列表 -->
-      </div>
-
-      <!-- 侧边栏底部: 齿轮 & 用户档案 & 登录模块 -->
-      <div class="p-4 border-t border-[#1a1a36] bg-[#070710] flex items-center justify-between gap-3">
-        <!-- 左下角齿轮按钮 (圆角优化) -->
-        <button id="btn-settings-trigger" class="p-2.5 text-gray-400 hover:text-cyan-400 hover:bg-[#1a1a36] rounded-xl transition duration-200" title="打开系统设置">
-          <i data-lucide="settings" class="w-5 h-5 animate-spin-slow"></i>
-        </button>
-
-        <!-- 登录 / 注册入口 & 用户卡片 -->
-        <div id="user-profile-section" class="flex-1 flex items-center justify-end">
-          <!-- 未登录状态 (圆角优化) -->
-          <button id="btn-auth-trigger" class="px-4 py-2 btn-cyber-secondary rounded-xl font-bold tracking-wider text-[11px] cyber-font uppercase flex items-center gap-1.5">
-            <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
-            授权登录
-          </button>
-          
-          <!-- 已登录状态 -->
-          <div id="logged-in-profile" class="hidden flex items-center gap-2 w-full justify-between">
-            <div class="flex items-center gap-2 overflow-hidden">
-              <div class="relative flex-shrink-0">
-                <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&q=80" alt="Avatar" class="w-8 h-8 rounded-lg border border-cyan-400 object-cover" />
-                <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border border-[#090912] rounded-full"></span>
-              </div>
-              <div class="overflow-hidden">
-                <p id="profile-username" class="text-xs font-bold text-white tracking-wide truncate">CYBER_USER</p>
-                <p id="profile-status" class="text-[9px] text-gray-500 truncate font-semibold">Ready to game</p>
-              </div>
-            </div>
-            <button id="btn-logout-sidebar" class="p-1 text-gray-500 hover:text-red-400 transition" title="注销">
-              <i data-lucide="power" class="w-4 h-4"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- 侧边栏手机端折叠遮罩层 -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/70 z-10 hidden md:hidden"></div>
-
-    <!-- ========================================== -->
-    <!-- 2. 主聊天内容区 (Main Content) -->
-    <!-- ========================================== -->
-    <main class="flex-1 flex flex-col overflow-hidden relative">
-      
-      <!-- 主区头部 -->
-      <header class="h-16 border-b border-[#1a1a36] bg-[#0c0c18]/90 flex items-center justify-between px-6 z-10">
-        <div class="flex items-center gap-3">
-          <!-- 移动端 / PC侧边栏切换按钮 -->
-          <button id="sidebar-toggle" class="p-1.5 text-cyan-400 hover:text-white rounded-lg hover:bg-[#1a1a36] mr-1 transition" title="切换侧边栏">
-            <i data-lucide="sidebar" class="w-5 h-5"></i>
-          </button>
-
-          <!-- 侧边栏折叠后显示此按钮，正常状态隐藏 -->
-          <button id="sidebar-show-btn" class="hidden p-1.5 text-cyan-400 hover:text-white rounded-lg hover:bg-[#1a1a36] transition" title="展开侧边栏" onclick="showSidebar()">
-            <i data-lucide="sidebar" class="w-5 h-5"></i>
-          </button>
-          
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-black tracking-widest text-white uppercase cyber-font" id="current-chat-title">Steam 专属神经推荐终端</span>
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-medium bg-[#1a2d24] text-emerald-400 border border-emerald-500/30">
-                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-1 animate-pulse"></span> AGENT 在线
-              </span>
-            </div>
-            <p class="text-[10px] text-gray-500 mt-0.5">已链接 Steam AI 大模型，精准捕捉游戏基因图谱</p>
-          </div>
-        </div>
-
-        <!-- 头部 Steam ID 关联状态 -->
-        <div class="flex items-center gap-2">
-          <div id="steam-badge" class="hidden md:flex items-center gap-2 bg-[#12122b]/80 px-3 py-1.5 rounded-xl border border-gray-800 text-xs text-gray-400">
-            <i data-lucide="steam" class="w-4 h-4 text-[#107c10] fill-current" style="color: #66c0f4;"></i>
-            <span>绑定的 SteamID: <strong id="header-steam-id" class="text-cyan-400 font-mono">未绑定</strong></span>
-          </div>
-        </div>
-      </header>
-
-      <!-- 聊天消息展示区域 -->
-      <section class="flex-1 overflow-y-auto p-6 space-y-6" id="chat-messages-container">
-        <!-- 聊天信息动态插入 -->
-      </section>
-
-      <!-- 聊天控制及底板输入区域 -->
-      <footer class="p-6 bg-gradient-to-t from-[#06060f] via-[#0c0c1a] to-transparent border-t border-[#1a1a36]/50">
-        <div class="max-w-4xl mx-auto space-y-3">
-          
-          <!-- Steam ID 引导跳转与提示 -->
-          <div class="flex items-center justify-between text-xs px-1">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 bg-[#ff007f] rounded-full animate-ping"></span>
-              <span class="text-gray-400">想排除已拥有的游戏？即刻关联你的 Steam ID。</span>
-            </div>
-            <!-- 跳转至 steam 账户页方便获取 ID -->
-            <a 
-              href="https://store.steampowered.com/account/" 
-              target="_blank" 
-              class="text-cyan-400 hover:text-cyan-300 font-bold transition flex items-center gap-1 hover:underline"
-            >
-              如何获取 Steam ID? 
-              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-            </a>
-          </div>
-
-          <!-- 发送输入栏 (圆角优化) -->
-          <form id="chat-form" class="relative flex items-center">
-            <div class="absolute left-4 text-gray-500">
-              <i data-lucide="terminal" class="w-5 h-5"></i>
-            </div>
-            <input 
-              type="text" 
-              id="message-input" 
-              placeholder="键入您的偏好：如“节奏感强、太空科幻、带有经营模拟要素的肉鸽”"
-              class="w-full py-4 pl-12 pr-28 bg-[#0b0b14] border border-[#1f1f42] text-sm text-white placeholder-gray-600 rounded-2xl focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition shadow-[inset_0_1px_4px_rgba(0,0,0,0.8)]"
-              autocomplete="off"
-            />
-            <!-- 发送按钮 (圆角优化) -->
-            <button 
-              type="submit" 
-              class="absolute right-2 px-5 py-2.5 btn-cyber-primary rounded-xl font-bold tracking-widest text-xs uppercase cyber-font flex items-center gap-1.5"
-            >
-              <span>发送</span>
-              <i data-lucide="send" class="w-3.5 h-3.5"></i>
-            </button>
-          </form>
-
-          <p class="text-[10px] text-center text-gray-500">
-            * 本智能 Agent 包含创意工坊数据整合，推荐结果可直接点燃试玩。
-          </p>
-        </div>
-      </footer>
-    </main>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- 3. 设置面板弹窗 (Settings Panel Modal) -->
-  <!-- ========================================== -->
-  <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center hidden">
-    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="modal-settings-overlay"></div>
-    <div class="relative w-full max-w-md p-6 bg-[#0f0f20] border-cyber-cyan z-10 rounded-2xl shadow-2xl transition duration-300 transform scale-95 opacity-0" id="settings-content">
-      
-      <!-- 弹窗标题 -->
-      <div class="flex items-center justify-between border-b border-[#202048] pb-4 mb-4">
-        <div class="flex items-center gap-2">
-          <i data-lucide="sliders" class="w-5 h-5 text-cyan-400 animate-pulse"></i>
-          <h3 class="text-md font-bold tracking-widest text-white uppercase cyber-font">终端配置核心 // CONFIGS</h3>
-        </div>
-        <!-- 关闭按钮 -->
-        <button class="text-gray-400 hover:text-red-400 transition" id="btn-close-settings">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="space-y-6">
-        <!-- Steam 绑定区块 (圆角优化) -->
-        <div class="space-y-2">
-          <label class="text-xs font-bold tracking-wider text-slate-400 block uppercase cyber-font">关联 Steam ID 数据库</label>
-          <div class="flex gap-2">
-            <input 
-              type="text" 
-              id="steam-id-input" 
-              placeholder="17位 Steam 社区 ID (如 7656119803..."
-              class="flex-1 px-3 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white placeholder-gray-600 rounded-xl focus:outline-none focus:border-cyan-400 font-mono"
-            />
-            <!-- 绑定 Steam ID 按钮 -->
-            <button id="btn-bind-steam" class="px-4 py-2 btn-cyber-primary rounded-xl text-xs font-bold cyber-font">
-              确认绑定
-            </button>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] text-gray-500">已绑定：<span id="settings-steam-status" class="text-cyan-400 font-mono">无</span></span>
-            <button id="btn-unbind-steam" class="hidden text-[10px] text-red-400 hover:underline">解除绑定</button>
-          </div>
-        </div>
-
-        <!-- 主题切换区块 (圆角优化) -->
-        <div class="flex items-center justify-between p-3 bg-[#080812] rounded-xl border border-[#1f1f46]">
-          <div>
-            <h4 class="text-xs font-bold tracking-wider text-slate-300 uppercase cyber-font">霓虹主题切换</h4>
-            <p class="text-[10px] text-gray-500">切换深色赛博与浅色赛博风</p>
-          </div>
-          <!-- 主题切换按钮 -->
-          <button id="btn-theme-toggle" class="flex items-center gap-2 px-3 py-1.5 bg-[#1b1b3a] border border-cyan-400/50 rounded-xl text-xs text-cyan-400 hover:bg-cyan-500/10 transition font-bold cyber-font">
-            <i data-lucide="moon" id="theme-icon" class="w-4 h-4"></i>
-            <span id="theme-text">深色赛博</span>
-          </button>
-        </div>
-
-        <!-- 退出登录与关闭区块 (圆角优化) -->
-        <div class="pt-4 border-t border-[#202048] flex gap-2 justify-end">
-          <!-- 退出登录按钮 -->
-          <button id="btn-logout-settings" class="px-4 py-2 bg-[#2d0f1b] border border-red-500/40 text-red-400 hover:bg-red-500/10 hover:border-red-500 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cyber-font uppercase">
-            <i data-lucide="power" class="w-3.5 h-3.5"></i>
-            注销用户
-          </button>
-          <!-- 关闭按钮 -->
-          <button id="btn-close-settings-footer" class="px-4 py-2 bg-[#1b1b36] hover:bg-[#252549] text-gray-400 rounded-xl text-xs transition font-semibold">
-            关闭
-          </button>
+    <div style="padding:12px 12px 0">
+      <button class="btn-new-session" onclick="newSession()">
+        <i class="ti ti-plus"></i>
+        新会话
+      </button>
+      <div class="sidebar-search">
+        <div class="search-wrap">
+          <i class="ti ti-search"></i>
+          <input type="text" placeholder="搜索对话..." oninput="filterSessions(this.value)">
         </div>
       </div>
     </div>
+
+    <div class="sidebar-sessions" id="session-list">
+      <div class="session-label">最近对话</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;" id="sidebar-version">STEAM · 2.4.1</div>
+      <button class="btn-icon" title="设置" onclick="toggleSettings()"><i class="ti ti-settings"></i></button>
+    </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- 4. 登录 / 注册弹窗 (Auth Modal) -->
-  <!-- ========================================== -->
-  <div id="modal-auth" class="fixed inset-0 z-50 flex items-center justify-center hidden">
-    <div class="absolute inset-0 bg-black/85 backdrop-blur-sm" id="modal-auth-overlay"></div>
-    <div class="relative w-full max-w-sm p-6 bg-[#0f0f20] border-cyber-pink z-10 rounded-2xl shadow-2xl transition duration-300 transform scale-95 opacity-0" id="auth-content">
-      
-      <!-- 弹窗标签切换 -->
-      <div class="flex border-b border-[#202048] mb-6">
-        <button id="tab-login" class="flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font">
-          终端登入
+  <!-- MAIN -->
+  <div id="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn-toggle-sidebar" onclick="toggleSidebar()" title="显示/隐藏侧边栏">
+          <i class="ti ti-layout-sidebar"></i>
         </button>
-        <button id="tab-register" class="flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font">
-          注册协议
+        <div class="topbar-title">
+          <span class="status-dot"></span>推荐引擎已就绪
+        </div>
+      </div>
+      <div class="topbar-right" id="topbar-auth">
+        <button class="btn-auth btn-login" onclick="showAuth('login')">登录</button>
+        <button class="btn-auth btn-register" onclick="showAuth('register')">注册</button>
+      </div>
+      <div class="topbar-right" id="topbar-user" style="display:none;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);" id="topbar-username"></span>
+        <button class="btn-auth btn-login" onclick="logout()" style="font-size:10px;">退出</button>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div id="chat-area">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon"><i class="ti ti-device-gamepad-2"></i></div>
+        <div class="empty-title">你想玩什么类型的游戏？</div>
+        <div class="empty-desc">告诉我你的偏好、心情或者 Steam 游戏库，我会帮你找到完美匹配的下一款游戏。</div>
+        <div class="empty-tags">
+          <div class="empty-tag" onclick="quickSend('推荐几款好玩的开放世界游戏')">开放世界</div>
+          <div class="empty-tag" onclick="quickSend('我想玩多人联机游戏，有什么推荐？')">多人联机</div>
+          <div class="empty-tag" onclick="quickSend('推荐适合新手的RPG游戏')">角色扮演</div>
+          <div class="empty-tag" onclick="quickSend('有哪些独立游戏值得一玩？')">独立游戏</div>
+          <div class="empty-tag" onclick="quickSend('我喜欢策略类游戏，推荐几款')">策略游戏</div>
+          <div class="empty-tag" onclick="quickSend('今晚想玩恐怖游戏，有什么推荐？')">恐怖惊悚</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="msg-input" placeholder="描述你想玩的游戏类型，或者让我分析你的 Steam 库..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="btn-send" id="send-btn" onclick="sendMessage()" title="发送">
+          <i class="ti ti-send"></i>
         </button>
       </div>
+      <div class="input-hint">ENTER 发送 · SHIFT+ENTER 换行 · 绑定 Steam ID 获取个性化推荐</div>
+    </div>
+  </div>
+</div>
 
-      <!-- 登入表单 -->
-      <form id="form-auth" class="space-y-4">
-        <div>
-          <label class="text-[10px] font-bold tracking-wider text-slate-400 block mb-1 uppercase">特工代号 (Username)</label>
-          <div class="relative">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-              <i data-lucide="user" class="w-4 h-4"></i>
-            </span>
-            <input 
-              type="text" 
-              id="auth-username"
-              required
-              class="w-full pl-9 pr-4 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white rounded-xl focus:outline-none focus:border-pink-500 font-mono"
-              placeholder="请输入代号..."
-            />
-          </div>
+<!-- SETTINGS PANEL -->
+<div id="settings-overlay" onclick="closeSettingsOnBg(event)">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">系统设置</div>
+      <button class="btn-close-settings" onclick="toggleSettings()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="settings-body">
+      <div class="settings-row">
+        <div class="settings-label">Steam ID 绑定</div>
+        <div class="steam-id-wrap">
+          <input class="steam-id-input" type="text" placeholder="输入 Steam ID..." id="steam-id-input">
+          <button class="btn-bind" onclick="bindSteamId()">绑定</button>
         </div>
+        <a href="https://store.steampowered.com/account/" target="_blank" class="steam-id-link">
+          <i class="ti ti-external-link" style="font-size:13px"></i>
+          如何获取我的 Steam ID？
+        </a>
+        <div id="steam-id-status" style="font-size:11px;color:var(--cyan);margin-top:2px;display:none;"></div>
+      </div>
 
-        <div>
-          <label class="text-[10px] font-bold tracking-wider text-slate-400 block mb-1 uppercase">密钥证书 (Password)</label>
-          <div class="relative">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
-              <i data-lucide="lock" class="w-4 h-4"></i>
-            </span>
-            <input 
-              type="password" 
-              id="auth-password"
-              required
-              class="w-full pl-9 pr-4 py-2 bg-[#080812] border border-[#1f1f46] text-xs text-white rounded-xl focus:outline-none focus:border-pink-500 font-mono"
-              placeholder="请输入密码..."
-            />
-          </div>
+      <hr class="settings-divider">
+
+      <div class="settings-row">
+        <div class="settings-label">主题外观</div>
+        <div class="theme-toggle">
+          <button class="theme-btn active" id="theme-dark" onclick="setTheme('dark')">
+            <i class="ti ti-moon"></i> 暗黑
+          </button>
+          <button class="theme-btn" id="theme-light" onclick="setTheme('light')">
+            <i class="ti ti-sun"></i> 明亮
+          </button>
         </div>
+      </div>
 
-        <button type="submit" id="btn-auth-submit" class="w-full py-3 btn-cyber-primary rounded-xl font-bold tracking-widest text-xs uppercase cyber-font">
-          建立连接 // CONNECT
-        </button>
+      <hr class="settings-divider">
 
-        <p class="text-[9px] text-center text-gray-500 mt-2">
-          * 访问本终端需要遵守《赛博安全及密码法案 v12.4》。
-        </p>
-      </form>
-
-      <!-- 绝对定位的关闭按钮 -->
-      <button class="absolute top-4 right-4 text-gray-400 hover:text-white transition" id="btn-close-auth">
-        <i data-lucide="x" class="w-5 h-5"></i>
+      <button class="btn-logout" onclick="logout()">
+        <i class="ti ti-logout"></i>
+        退出登录
       </button>
     </div>
   </div>
+</div>
 
+<!-- AUTH MODAL -->
+<div id="auth-overlay" onclick="closeAuthOnBg(event)">
+  <div class="auth-panel">
+    <button class="btn-auth-close" onclick="hideAuth()"><i class="ti ti-x"></i></button>
+    <div class="auth-title" id="auth-modal-title">欢迎回来</div>
+    <div class="auth-sub" id="auth-modal-sub">登录以同步你的游戏偏好与 Steam 数据</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="switchTab('login', this)">登录</button>
+      <button class="auth-tab" id="auth-tab-register" onclick="switchTab('register', this)">注册</button>
+    </div>
+    <div class="auth-error" id="auth-error"></div>
+    <div id="auth-form">
+      <div class="auth-field">
+        <label>用户名</label>
+        <input type="text" id="auth-username" placeholder="输入用户名">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" id="auth-password" placeholder="••••••••">
+      </div>
+      <button class="btn-auth-submit" id="auth-submit-btn" onclick="doAuth()">进入系统</button>
+    </div>
+  </div>
+</div>
 
-  <!-- JavaScript Core -->
-  <script>
+<script>
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+var state = {
+  username: '',
+  steamId: '',
+  threadId: '',
+  isLoggedIn: false,
+  isStreaming: false,
+  currentAuthTab: 'login',
+};
 
-    /* ── Real Backend State ── */
-    var state = { user:null, steamId:'', activeSessionId:null, searchQuery:'', sessions:[] };
-    var threadId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-    var isStreaming = false, authMode = 'login';
-    var API = '';
+function generateThreadId() {
+  return 'thread_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+}
 
-    /* ── DOM refs ── */
-    var DOM = {
-      splashScreen: document.getElementById('splash-screen'),
-      btnEnterTerminal: document.getElementById('btn-enter-terminal'),
-      splashInteractiveCore: document.getElementById('splash-interactive-core'),
-      sidebar: document.getElementById('sidebar'),
-      sidebarToggle: document.getElementById('sidebar-toggle'),
-      sidebarOverlay: document.getElementById('sidebar-overlay'),
-      sessionsContainer: document.getElementById('sessions-container'),
-      chatMessagesContainer: document.getElementById('chat-messages-container'),
-      chatForm: document.getElementById('chat-form'),
-      messageInput: document.getElementById('message-input'),
-      currentChatTitle: document.getElementById('current-chat-title'),
-      searchInput: document.getElementById('search-input'),
-      btnNewSession: document.getElementById('btn-new-session'),
-      btnRefreshSessions: document.getElementById('btn-refresh-sessions'),
-      btnSettingsTrigger: document.getElementById('btn-settings-trigger'),
-      modalSettings: document.getElementById('modal-settings'),
-      settingsContent: document.getElementById('settings-content'),
-      btnCloseSettings: document.getElementById('btn-close-settings'),
-      btnCloseSettingsFooter: document.getElementById('btn-close-settings-footer'),
-      steamIdInput: document.getElementById('steam-id-input'),
-      btnBindSteam: document.getElementById('btn-bind-steam'),
-      btnUnbindSteam: document.getElementById('btn-unbind-steam'),
-      settingsSteamStatus: document.getElementById('settings-steam-status'),
-      headerSteamId: document.getElementById('header-steam-id'),
-      steamBadge: document.getElementById('steam-badge'),
-      btnThemeToggle: document.getElementById('btn-theme-toggle'),
-      themeIcon: document.getElementById('theme-icon'),
-      themeText: document.getElementById('theme-text'),
-      btnLogoutSettings: document.getElementById('btn-logout-settings'),
-      btnAuthTrigger: document.getElementById('btn-auth-trigger'),
-      modalAuth: document.getElementById('modal-auth'),
-      authContent: document.getElementById('auth-content'),
-      btnCloseAuth: document.getElementById('btn-close-auth'),
-      tabLogin: document.getElementById('tab-login'),
-      tabRegister: document.getElementById('tab-register'),
-      formAuth: document.getElementById('form-auth'),
-      authUsername: document.getElementById('auth-username'),
-      authPassword: document.getElementById('auth-password'),
-      btnAuthSubmit: document.getElementById('btn-auth-submit'),
-      loggedInProfile: document.getElementById('logged-in-profile'),
-      profileUsername: document.getElementById('profile-username'),
-      profileStatus: document.getElementById('profile-status'),
-      btnLogoutSidebar: document.getElementById('btn-logout-sidebar'),
-      toast: document.getElementById('toast'),
-      toastText: document.getElementById('toast-text'),
-      toastIcon: document.getElementById('toast-icon'),
-      userProfileSection: document.getElementById('user-profile-section'),
-      modalAuthOverlay: document.getElementById('modal-auth-overlay'),
-      modalSettingsOverlay: document.getElementById('modal-settings-overlay')
-    };
+state.threadId = generateThreadId();
 
-    /* ── Toast ── */
-    function showToast(msg, type) {
-      type = type || 'info';
-      var icons = { success:'OK', error:'ERR', info:'i', steam:'S' };
-      DOM.toastIcon.innerText = icons[type] || '?';
-      DOM.toastText.innerText = msg;
-      var box = DOM.toast.firstElementChild;
-      if (type === 'error') { box.style.boxShadow = '0 0 15px rgba(239,68,68,0.5)'; box.style.borderColor = '#ef4444'; }
-      else if (type === 'success') { box.style.boxShadow = '0 0 15px rgba(16,185,129,0.5)'; box.style.borderColor = '#10b981'; }
-      else { box.style.boxShadow = '0 0 15px var(--cyber-glow-cyan)'; box.style.borderColor = 'var(--cyber-cyan)'; }
-      DOM.toast.classList.remove('opacity-0','-translate-y-4');
-      DOM.toast.classList.add('opacity-100','translate-y-0');
-      setTimeout(function(){ DOM.toast.classList.remove('opacity-100','translate-y-0'); DOM.toast.classList.add('opacity-0','-translate-y-4'); }, 3000);
+function userId() {
+  return state.username || 'anonymous';
+}
+
+// ═══════════════════════════════════════
+//  API HELPERS
+// ═══════════════════════════════════════
+async function apiGet(path) {
+  var res = await fetch(path);
+  if (!res.ok) {
+    var txt = await res.text();
+    throw new Error(txt || res.statusText);
+  }
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  var res = await fetch(path, {
+    method: 'POST',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    var txt = await res.text();
+    throw new Error(txt || res.statusText);
+  }
+  return res.json();
+}
+
+// ═══════════════════════════════════════
+//  STARFIELD
+// ═══════════════════════════════════════
+var canvas = document.getElementById('starfield');
+var ctx = canvas.getContext('2d');
+var stars = [], mouse = {x: -1000, y: -1000}, W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+window.addEventListener('mousemove', function(e) { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+for (var i = 0; i < 400; i++) {
+  stars.push({
+    x: Math.random() * 2000 - 1000, y: Math.random() * 2000 - 1000,
+    z: Math.random() * 1000,
+    size: Math.random() * 2.5 + 0.5,
+    hue: Math.random() > 0.85 ? (Math.random() > 0.5 ? 185 : 290) : 220,
+    speed: Math.random() * 0.3 + 0.1
+  });
+}
+
+function drawStars() {
+  var isDark = !document.body.classList.contains('light-mode');
+  ctx.clearRect(0, 0, W, H);
+
+  var mx = (mouse.x / W - 0.5) * 30;
+  var my = (mouse.y / H - 0.5) * 30;
+
+  stars.forEach(function(s) {
+    s.z -= s.speed;
+    if (s.z <= 0) {
+      s.x = Math.random() * 2000 - 1000;
+      s.y = Math.random() * 2000 - 1000;
+      s.z = 1000;
+    }
+    var sx = (s.x / s.z) * W / 2 + W / 2 + mx;
+    var sy = (s.y / s.z) * H / 2 + H / 2 + my;
+    var r = (1 - s.z / 1000) * s.size * 2;
+    var opacity = (1 - s.z / 1000) * (isDark ? 1.0 : 0.4);
+    if (sx < -5 || sx > W+5 || sy < -5 || sy > H+5) return;
+    ctx.beginPath();
+    ctx.arc(sx, sy, Math.max(r, 0.3), 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + s.hue + ', 90%, 80%, ' + opacity + ')';
+    ctx.fill();
+  });
+
+  var nearStars = stars.filter(function(s) {
+    var sx = (s.x / s.z) * W / 2 + W / 2 + mx;
+    var sy = (s.y / s.z) * H / 2 + H / 2 + my;
+    var dx = sx - mouse.x, dy = sy - mouse.y;
+    return Math.sqrt(dx*dx+dy*dy) < 180;
+  }).slice(0, 5);
+
+  for (var i = 0; i < nearStars.length; i++) {
+    for (var j = i+1; j < nearStars.length; j++) {
+      var a = nearStars[i], b = nearStars[j];
+      var ax = (a.x / a.z) * W/2 + W/2 + mx;
+      var ay = (a.y / a.z) * H/2 + H/2 + my;
+      var bx = (b.x / b.z) * W/2 + W/2 + mx;
+      var by = (b.y / b.z) * H/2 + H/2 + my;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.strokeStyle = 'rgba(0,245,255,' + (isDark ? 0.15 : 0.06) + ')';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+  requestAnimationFrame(drawStars);
+}
+drawStars();
+
+// ═══════════════════════════════════════
+//  COVER
+// ═══════════════════════════════════════
+function enterApp() {
+  document.getElementById('cover').classList.add('hidden');
+  setTimeout(function() {
+    var c = document.getElementById('cover');
+    if (c) c.style.display = 'none';
+  }, 900);
+}
+
+// ═══════════════════════════════════════
+//  SIDEBAR
+// ═══════════════════════════════════════
+var sidebarOpen = true;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  updateGearPosition();
+}
+
+function selectSession(el) {
+  var items = document.querySelectorAll('#session-list .session-item');
+  for (var i = 0; i < items.length; i++) { items[i].classList.remove('active'); }
+  el.classList.add('active');
+}
+
+async function refreshSessions() {
+  if (!state.isLoggedIn) return;
+  var btn = document.querySelector('.sidebar-refresh-btn i');
+  btn.style.transition = 'transform 0.5s ease';
+  btn.style.transform = 'rotate(360deg)';
+  setTimeout(function() { btn.style.transition = 'none'; btn.style.transform = ''; }, 500);
+  await loadThreads();
+}
+
+function filterSessions(val) {
+  var items = document.querySelectorAll('#session-list .session-item');
+  for (var i = 0; i < items.length; i++) {
+    var span = items[i].querySelector('span');
+    items[i].style.display = span && span.textContent.toLowerCase().indexOf(val.toLowerCase()) !== -1 ? '' : 'none';
+  }
+}
+
+// ═══════════════════════════════════════
+//  THREADS (from backend)
+// ═══════════════════════════════════════
+async function loadThreads() {
+  if (!state.isLoggedIn) return;
+  try {
+    var data = await apiGet('/threads?user_id=' + encodeURIComponent(userId()));
+    var threads = data.threads || [];
+    var list = document.getElementById('session-list');
+
+    // remove old dynamic items
+    var oldItems = list.querySelectorAll('.session-item');
+    for (var i = 0; i < oldItems.length; i++) { oldItems[i].remove(); }
+
+    if (threads.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'session-item';
+      empty.innerHTML = '<i class="ti ti-message-circle"></i><span style="color:var(--text-muted)">暂无对话</span>';
+      empty.style.pointerEvents = 'none';
+      list.appendChild(empty);
+      return;
     }
 
-    /* ── Modal ── */
-    function openModal(mid, cid) {
-      document.getElementById(mid).classList.remove('hidden');
-      setTimeout(function(){ var c=document.getElementById(cid); c.classList.remove('scale-95','opacity-0'); c.classList.add('scale-100','opacity-100'); }, 50);
+    for (var t = 0; t < threads.length; t++) {
+      var thread = threads[t];
+      var item = document.createElement('div');
+      item.className = 'session-item';
+      item.dataset.threadId = thread.thread_id;
+      item.innerHTML = '<i class="ti ti-message-circle"></i><span>' + escapeHtml(thread.title || thread.thread_id) + '</span>';
+      item.onclick = (function(tid) {
+        return function() {
+          selectSession(this);
+          loadMessages(tid).catch(function() {});
+        };
+      })(thread.thread_id);
+      list.appendChild(item);
     }
-    function closeModal(mid, cid) {
-      var c=document.getElementById(cid); c.classList.remove('scale-100','opacity-100'); c.classList.add('scale-95','opacity-0');
-      setTimeout(function(){ document.getElementById(mid).classList.add('hidden'); }, 250);
+  } catch (e) {
+    console.error('loadThreads:', e);
+  }
+}
+
+async function loadMessages(threadId) {
+  state.threadId = threadId;
+  var chatArea = document.getElementById('chat-area');
+  var es = document.getElementById('empty-state');
+  if (es) es.remove();
+
+  // remove existing messages
+  var msgs = chatArea.querySelectorAll('.msg');
+  for (var i = 0; i < msgs.length; i++) { msgs[i].remove(); }
+
+  try {
+    var data = await apiGet('/messages?user_id=' + encodeURIComponent(userId()) + '&thread_id=' + encodeURIComponent(threadId));
+    var messageList = data.messages || [];
+    for (var m = 0; m < messageList.length; m++) {
+      var msg = messageList[m];
+      if (msg.role === 'user') appendMsg('user', msg.content);
+      else if (msg.role === 'assistant') appendMsg('ai', msg.content);
     }
+  } catch (e) {
+    console.error('loadMessages:', e);
+  }
+}
 
-    /* ── Splash Screen ── */
-    DOM.splashInteractiveCore.addEventListener('click', function(){ confetti({ particleCount:50, spread:60, colors:['#00f0ff','#ff007f'] }); });
-    DOM.btnEnterTerminal.addEventListener('click', function(){
-      DOM.splashScreen.classList.add('opacity-0','pointer-events-none','scale-110');
-      setTimeout(function(){ DOM.splashScreen.classList.add('hidden'); }, 1000);
-      confetti({ particleCount:150, spread:80, origin:{y:0.6}, colors:['#ff007f','#00f0ff','#fefe00'] });
-      showToast('链路建立成功！点左下角登录开始','success');
-    });
-    window.startGameCelebration = function(n){ showToast('打开 '+n+' ...','steam'); confetti({ particleCount:150, spread:80, origin:{y:0.6}, colors:['#ff007f','#00f0ff','#fefe00'] }); };
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+function toggleSettings() {
+  document.getElementById('settings-overlay').classList.toggle('visible');
+}
+function closeSettingsOnBg(e) {
+  if (e.target === document.getElementById('settings-overlay')) toggleSettings();
+}
 
-    /* ── Auth Tabs ── */
-    function switchAuthTab(t) {
-      authMode = t;
-      DOM.tabLogin.className = t==='login'
-        ? 'flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font'
-        : 'flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font';
-      DOM.tabRegister.className = t==='register'
-        ? 'flex-1 py-2 text-sm font-bold tracking-widest text-center uppercase border-b-2 border-cyber-pink text-pink-500 cyber-font'
-        : 'flex-1 py-2 text-sm font-bold tracking-widest text-center text-gray-400 hover:text-white uppercase border-b-2 border-transparent hover:border-gray-700 cyber-font';
-      DOM.btnAuthSubmit.innerText = t==='login' ? '登录 // CONNECT' : '注册 // SIGN UP';
-    }
-    DOM.tabLogin.addEventListener('click', function(){ switchAuthTab('login'); });
-    DOM.tabRegister.addEventListener('click', function(){ switchAuthTab('register'); });
+function setTheme(mode) {
+  if (mode === 'light') {
+    document.body.classList.add('light-mode');
+    document.getElementById('theme-light').classList.add('active');
+    document.getElementById('theme-dark').classList.remove('active');
+  } else {
+    document.body.classList.remove('light-mode');
+    document.getElementById('theme-dark').classList.add('active');
+    document.getElementById('theme-light').classList.remove('active');
+  }
+  if (state.isLoggedIn) {
+    apiPost('/auth/theme?username=' + encodeURIComponent(state.username) + '&theme=' + encodeURIComponent(mode), null).catch(function() {});
+  }
+}
 
-    /* ── Auth Submit ── */
-    DOM.formAuth.addEventListener('submit', async function(e){
-      e.preventDefault();
-      var u = DOM.authUsername.value.trim(), p = DOM.authPassword.value.trim();
-      if (!u || !p) { showToast('请填写账户名和密码','error'); return; }
-      var ep = authMode === 'login' ? '/auth/login' : '/auth/register';
-      try {
-        var r = await fetch(API + ep + '?username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p), {method:'POST'});
-        var d = await r.json();
-        if (d.status === 'ok') {
-          state.user = { username: d.username || u };
-          localStorage.setItem('steam_user', state.user.username);
-          DOM.profileUsername.innerText = (d.username||u).toUpperCase();
-          DOM.profileStatus.innerText = '已激活';
-          DOM.btnAuthTrigger.classList.add('hidden');
-          DOM.loggedInProfile.classList.remove('hidden');
-          closeModal('modal-auth','auth-content');
-          showToast('欢迎回来','success');
-          confetti({ particleCount:80, spread:60, colors:['#00f0ff','#ff007f'] });
-          initApp();
-        } else { showToast(d.message || '失败','error'); }
-      } catch(ex) { showToast('网络错误: ' + ex.message, 'error'); }
-    });
+async function bindSteamId() {
+  if (!state.isLoggedIn) {
+    alert('请先登录后再绑定 Steam ID');
+    return;
+  }
+  var val = document.getElementById('steam-id-input').value.trim();
+  if (!val) return;
 
-    /* ── Init ── */
-    async function initApp() {
-      if (!state.user) return;
-      try {
-        var r = await fetch(API + '/auth/user-info?username=' + encodeURIComponent(state.user.username));
-        var d = await r.json();
-        if (d.status === 'ok' && d.user) {
-          state.steamId = d.user.bound_steam_id || '';
-          if (state.steamId) updateSteamUI(state.steamId);
-        }
-      } catch(_) {}
-      refreshThreads();
-    }
-    function updateSteamUI(sid) { DOM.settingsSteamStatus.innerText=sid; DOM.btnUnbindSteam.classList.remove('hidden'); DOM.headerSteamId.innerText=sid; DOM.steamBadge.classList.remove('hidden'); }
+  var btn = document.querySelector('.btn-bind');
+  btn.textContent = '...';
+  btn.disabled = true;
 
-    /* ── Logout ── */
-    function logout() {
-      state.user=null; state.steamId=''; localStorage.removeItem('steam_user');
-      DOM.btnAuthTrigger.classList.remove('hidden'); DOM.loggedInProfile.classList.add('hidden');
-      DOM.steamBadge.classList.add('hidden'); DOM.headerSteamId.innerText='未绑定';
-      DOM.settingsSteamStatus.innerText='无'; DOM.btnUnbindSteam.classList.add('hidden');
-      closeModal('modal-settings','settings-content'); closeModal('modal-auth','auth-content');
-      DOM.chatMessagesContainer.innerHTML=''; DOM.sessionsContainer.innerHTML=''; showToast('已退出','info');
-    }
-
-    /* ── Panel Events ── */
-    DOM.btnSettingsTrigger.addEventListener('click', function(){ openModal('modal-settings','settings-content'); });
-    DOM.btnCloseSettings.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
-    DOM.btnCloseSettingsFooter.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
-    DOM.modalSettingsOverlay.addEventListener('click', function(){ closeModal('modal-settings','settings-content'); });
-    DOM.btnAuthTrigger.addEventListener('click', function(){ switchAuthTab('login'); openModal('modal-auth','auth-content'); });
-    DOM.btnCloseAuth.addEventListener('click', function(){ closeModal('modal-auth','auth-content'); });
-    DOM.modalAuthOverlay.addEventListener('click', function(){ closeModal('modal-auth','auth-content'); });
-
-    /* ── Theme ── */
-    DOM.btnThemeToggle.addEventListener('click', function(){
-      /* 深色主题已锁定，不做切换 */
-    });
-
-    /* ── Sidebar Collapse ── */
-    function toggleSidebar() {
-      var sb = DOM.sidebar;
-      var btn = document.getElementById('sidebar-show-btn');
-      if (sb.classList.contains('collapsed')) {
-        sb.classList.remove('collapsed');
-        if (btn) btn.classList.add('hidden');
-      } else {
-        sb.classList.add('collapsed');
-        if (btn) btn.classList.remove('hidden');
-      }
-    }
-    function showSidebar() {
-      DOM.sidebar.classList.remove('collapsed');
-      var btn = document.getElementById('sidebar-show-btn');
-      if (btn) btn.classList.add('hidden');
-    }
-    document.getElementById('sidebar-collapse').addEventListener('click', toggleSidebar);
-    DOM.sidebarToggle.addEventListener('click', toggleSidebar);
-
-    /* ── Starfield Canvas ── */
-    (function initStarfield() {
-      var c = document.getElementById('starfield');
-      if (!c) return;
-      var ctx = c.getContext('2d');
-      var stars = [];
-      var mouseX = -999, mouseY = -999;
-      var targetMX = -999, targetMY = -999;
-
-      function resize() { c.width = window.innerWidth; c.height = window.innerHeight; }
-      resize(); window.addEventListener('resize', resize);
-
-      // Create stars with varied sizes and speeds
-      var count = Math.floor((c.width * c.height) / 12000);
-      for (var i = 0; i < count; i++) {
-        stars.push({
-          x: Math.random() * c.width,
-          y: Math.random() * c.height,
-          r: Math.random() * 1.5 + 0.4,
-          speed: Math.random() * 0.3 + 0.05,
-          opacity: Math.random() * 0.5 + 0.25,
-          baseX: 0, baseY: 0
-        });
-      }
-
-      document.addEventListener('mousemove', function(e) {
-        targetMX = e.clientX; targetMY = e.clientY;
-      });
-
-      function animate() {
-        // Smooth mouse follow
-        mouseX += (targetMX - mouseX) * 0.05;
-        mouseY += (targetMY - mouseY) * 0.05;
-
-        ctx.clearRect(0, 0, c.width, c.height);
-
-        for (var i = 0; i < stars.length; i++) {
-          var s = stars[i];
-          // Subtle drift toward mouse
-          if (mouseX > -100) {
-            var dx = mouseX - s.x, dy = mouseY - s.y;
-            var dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 250) {
-              var force = (250 - dist) / 250 * 0.15;
-              s.x += dx * force; s.y += dy * force;
-            }
-          }
-          // Slow return to original position
-          s.x += (s.baseX - s.x) * 0.002;
-          s.y += (s.baseY - s.y) * 0.002;
-
-          // Draw star
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(200,220,255,' + s.opacity.toFixed(2) + ')';
-          ctx.fill();
-        }
-        requestAnimationFrame(animate);
-      }
-
-      // Record base positions after layout settles
+  try {
+    var res = await apiPost('/bind-steam?user_id=' + encodeURIComponent(userId()) + '&steam_id=' + encodeURIComponent(val), null);
+    if (res.status === 'ok') {
+      state.steamId = val;
+      document.getElementById('steam-id-input').value = maskSteamId(val);
+      btn.textContent = '✓ 已绑定';
+      btn.style.background = '#00F5FF';
+      var statusEl = document.getElementById('steam-id-status');
+      statusEl.textContent = '已绑定: ' + maskSteamId(val);
+      statusEl.style.display = 'block';
+      addSystemMsg('✓ 已成功绑定 Steam ID\n\n现在我可以分析你的游戏库，提供个性化推荐！');
       setTimeout(function() {
-        for (var i = 0; i < stars.length; i++) {
-          stars[i].baseX = stars[i].x;
-          stars[i].baseY = stars[i].y;
-        }
-      }, 500);
+        btn.textContent = '绑定';
+        btn.style.background = '';
+        btn.disabled = false;
+      }, 2000);
+    } else {
+      btn.textContent = '绑定';
+      btn.disabled = false;
+      alert('绑定失败: ' + (res.message || '未知错误'));
+    }
+  } catch (e) {
+    btn.textContent = '绑定';
+    btn.disabled = false;
+    alert('绑定失败: ' + e.message);
+  }
+}
 
-      animate();
-    })();
+async function loadSteamId() {
+  if (!state.isLoggedIn) return;
+  try {
+    var res = await apiGet('/steam-id?user_id=' + encodeURIComponent(userId()));
+    if (res.steam_id) {
+      state.steamId = res.steam_id;
+      document.getElementById('steam-id-input').value = maskSteamId(res.steam_id);
+      var statusEl = document.getElementById('steam-id-status');
+      statusEl.textContent = '已绑定: ' + maskSteamId(res.steam_id);
+      statusEl.style.display = 'block';
+    }
+  } catch (e) {
+    console.error('loadSteamId:', e);
+  }
+}
 
-    /* ── Steam ID ── */
-    DOM.btnBindSteam.addEventListener('click', async function(){
-      var v = DOM.steamIdInput.value.trim();
-      if (!v) { showToast('请输入 Steam ID','error'); return; }
-      if (!/^\d{17}$/.test(v)) { showToast('格式不正确（17位数字）','error'); return; }
-      if (!state.user) { showToast('请先登录','error'); return; }
-      try {
-        var r = await fetch(API + '/bind-steam?user_id=' + state.user.username + '&steam_id=' + v, {method:'POST'});
-        var d = await r.json();
-        if (d.status === 'ok') { state.steamId=v; updateSteamUI(v); DOM.steamIdInput.value=''; closeModal('modal-settings','settings-content'); showToast('Steam ID 绑定成功','success'); }
-        else { showToast(d.message || '绑定失败','error'); }
-      } catch(ex) { showToast('网络错误','error'); }
+function logout() {
+  state.username = '';
+  state.steamId = '';
+  state.isLoggedIn = false;
+  state.threadId = generateThreadId();
+  updateAuthUI();
+  toggleSettings();
+
+  var chatArea = document.getElementById('chat-area');
+  chatArea.innerHTML = '<div class="empty-state" id="empty-state">' +
+    '<div class="empty-icon"><i class="ti ti-device-gamepad-2"></i></div>' +
+    '<div class="empty-title">你想玩什么类型的游戏？</div>' +
+    '<div class="empty-desc">告诉我你的偏好、心情或者 Steam 游戏库，我会帮你找到完美匹配的下一款游戏。</div>' +
+    '<div class="empty-tags">' +
+      '<div class="empty-tag" onclick="quickSend(\'推荐几款好玩的开放世界游戏\')">开放世界</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'我想玩多人联机游戏，有什么推荐？\')">多人联机</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'推荐适合新手的RPG游戏\')">角色扮演</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'有哪些独立游戏值得一玩？\')">独立游戏</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'我喜欢策略类游戏，推荐几款\')">策略游戏</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'今晚想玩恐怖游戏，有什么推荐？\')">恐怖惊悚</div>' +
+    '</div></div>';
+
+  var oldItems = document.querySelectorAll('#session-list .session-item');
+  for (var i = 0; i < oldItems.length; i++) { oldItems[i].remove(); }
+  document.getElementById('steam-id-input').value = '';
+  document.getElementById('steam-id-status').style.display = 'none';
+}
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+function showAuth(tab) {
+  document.getElementById('auth-overlay').classList.add('visible');
+  switchTab(tab, document.getElementById('auth-tab-' + tab));
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-username').value = '';
+  document.getElementById('auth-password').value = '';
+}
+
+function hideAuth() {
+  document.getElementById('auth-overlay').classList.remove('visible');
+}
+
+function closeAuthOnBg(e) {
+  if (e.target === document.getElementById('auth-overlay')) hideAuth();
+}
+
+function switchTab(tab, el) {
+  state.currentAuthTab = tab;
+  var tabs = document.querySelectorAll('.auth-tab');
+  for (var i = 0; i < tabs.length; i++) { tabs[i].classList.remove('active'); }
+  el.classList.add('active');
+  document.getElementById('auth-submit-btn').textContent = tab === 'login' ? '进入系统' : '创建账号';
+  document.getElementById('auth-modal-title').textContent = tab === 'login' ? '欢迎回来' : '创建账号';
+  document.getElementById('auth-modal-sub').textContent = tab === 'login'
+    ? '登录以同步你的游戏偏好与 Steam 数据'
+    : '注册新账号，开始你的游戏探索之旅';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function doAuth() {
+  var username = document.getElementById('auth-username').value.trim();
+  var password = document.getElementById('auth-password').value.trim();
+  var errEl = document.getElementById('auth-error');
+
+  if (!username || !password) {
+    errEl.textContent = '请填写用户名和密码';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  var isLogin = state.currentAuthTab === 'login';
+  var endpoint = isLogin ? '/auth/login' : '/auth/register';
+  var btn = document.getElementById('auth-submit-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  try {
+    var res = await apiPost(
+      endpoint + '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+      null
+    );
+
+    if (res.status === 'ok') {
+      state.username = username;
+      state.isLoggedIn = true;
+      state.threadId = generateThreadId();
+      hideAuth();
+      updateAuthUI();
+      await loadSteamId();
+      await loadThreads();
+      addSystemMsg('**欢迎回来，指挥官！**\n\n你的 Steam 数据已同步。告诉我今晚想玩什么？');
+    } else {
+      errEl.textContent = res.message || '操作失败';
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    errEl.textContent = '网络错误: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = isLogin ? '进入系统' : '创建账号';
+    btn.disabled = false;
+  }
+}
+
+function updateAuthUI() {
+  document.getElementById('topbar-auth').style.display = state.isLoggedIn ? 'none' : '';
+  document.getElementById('topbar-user').style.display = state.isLoggedIn ? '' : 'none';
+  document.getElementById('topbar-username').textContent = state.isLoggedIn ? state.username : '';
+  document.getElementById('sidebar-version').textContent = state.isLoggedIn
+    ? (state.username + ' · STEAM')
+    : 'STEAM · 2.4.1';
+}
+
+// ═══════════════════════════════════════
+//  CHAT
+// ═══════════════════════════════════════
+function newSession() {
+  state.threadId = generateThreadId();
+  var chatArea = document.getElementById('chat-area');
+  chatArea.innerHTML = '<div class="empty-state" id="empty-state">' +
+    '<div class="empty-icon"><i class="ti ti-device-gamepad-2"></i></div>' +
+    '<div class="empty-title">你想玩什么类型的游戏？</div>' +
+    '<div class="empty-desc">告诉我你的偏好、心情或者 Steam 游戏库，我会帮你找到完美匹配的下一款游戏。</div>' +
+    '<div class="empty-tags">' +
+      '<div class="empty-tag" onclick="quickSend(\'推荐几款好玩的开放世界游戏\')">开放世界</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'我想玩多人联机游戏，有什么推荐？\')">多人联机</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'推荐适合新手的RPG游戏\')">角色扮演</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'有哪些独立游戏值得一玩？\')">独立游戏</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'我喜欢策略类游戏，推荐几款\')">策略游戏</div>' +
+      '<div class="empty-tag" onclick="quickSend(\'今晚想玩恐怖游戏，有什么推荐？\')">恐怖惊悚</div>' +
+    '</div></div>';
+
+  if (state.isLoggedIn) {
+    var list = document.getElementById('session-list');
+    var items = list.querySelectorAll('.session-item');
+    for (var i = 0; i < items.length; i++) { items[i].classList.remove('active'); }
+    var item = document.createElement('div');
+    item.className = 'session-item active';
+    item.dataset.threadId = state.threadId;
+    item.innerHTML = '<i class="ti ti-message-circle"></i><span>新对话</span>';
+    item.onclick = function() { selectSession(item); };
+    list.insertBefore(item, list.firstChild);
+  }
+}
+
+function getTime() {
+  return new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+}
+
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function maskSteamId(sid) {
+  if (!sid || sid.length <= 4) return sid;
+  return '****' + sid.slice(-4);
+}
+
+function appendMsg(role, content) {
+  var chatArea = document.getElementById('chat-area');
+  var es = document.getElementById('empty-state');
+  if (es) es.remove();
+
+  var div = document.createElement('div');
+  div.className = 'msg ' + role;
+
+  var avatar = role === 'ai' ? 'SP' : 'ME';
+  var rendered;
+  if (role === 'ai') {
+    try {
+      rendered = marked.parse(content);
+    } catch (e) {
+      rendered = escapeHtml(content).replace(/\n/g, '<br>');
+    }
+  } else {
+    rendered = escapeHtml(content).replace(/\n/g, '<br>');
+  }
+
+  div.innerHTML = '' +
+    '<div class="msg-avatar">' + avatar + '</div>' +
+    '<div>' +
+      '<div class="msg-bubble">' + rendered + '</div>' +
+      '<div class="msg-time">' + getTime() + '</div>' +
+    '</div>';
+  chatArea.appendChild(div);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  return div;
+}
+
+function addSystemMsg(md) {
+  appendMsg('ai', md);
+}
+
+function showTyping() {
+  var chatArea = document.getElementById('chat-area');
+  var es = document.getElementById('empty-state');
+  if (es) es.remove();
+
+  var div = document.createElement('div');
+  div.className = 'msg ai';
+  div.id = 'typing';
+  div.innerHTML = '' +
+    '<div class="msg-avatar">SP</div>' +
+    '<div>' +
+      '<div class="msg-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>' +
+    '</div>';
+  chatArea.appendChild(div);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function removeTyping() {
+  var t = document.getElementById('typing');
+  if (t) t.remove();
+}
+
+function quickSend(text) {
+  document.getElementById('msg-input').value = text;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+async function sendMessage() {
+  if (state.isStreaming) return;
+  var input = document.getElementById('msg-input');
+  var text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+  state.isStreaming = true;
+
+  appendMsg('user', text);
+
+  // update session name for brand-new sessions
+  if (state.isLoggedIn) {
+    var activeItem = document.querySelector('#session-list .session-item.active span');
+    if (activeItem && activeItem.textContent === '新对话') {
+      activeItem.textContent = text.substring(0, 16) + (text.length > 16 ? '...' : '');
+    }
+  }
+
+  showTyping();
+
+  try {
+    var res = await fetch('/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        thread_id: state.threadId,
+        user_id: userId(),
+        message: text,
+        steam_id: state.steamId || null,
+      }),
     });
-    DOM.btnUnbindSteam.addEventListener('click', function(){ state.steamId=''; DOM.settingsSteamStatus.innerText='无'; DOM.btnUnbindSteam.classList.add('hidden'); DOM.steamBadge.classList.add('hidden'); DOM.headerSteamId.innerText='未绑定'; showToast('已解绑','info'); });
-    DOM.btnLogoutSidebar.addEventListener('click', logout);
-    DOM.btnLogoutSettings.addEventListener('click', logout);
 
-    /* ── Threads ── */
-    async function refreshThreads() {
-      if (!state.user) return;
-      try { var r=await fetch(API+'/threads?user_id='+encodeURIComponent(state.user.username)); var d=await r.json(); state.sessions=d.threads||[]; } catch(e){ state.sessions=[]; }
-      renderSessions();
-    }
-    function renderSessions() {
-      DOM.sessionsContainer.innerHTML='';
-      var q=(DOM.searchInput.value||'').toLowerCase();
-      var filtered=state.sessions.filter(function(s){return (s.title||'新会话').toLowerCase().indexOf(q)>=0;});
-      if (!filtered.length) { DOM.sessionsContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500 uppercase tracking-widest">暂无会话</div>'; return; }
-      filtered.forEach(function(s){
-        var active=s.thread_id===state.activeSessionId;
-        var cls=active?'border-l-4 border-cyber-pink bg-pink-500/10 text-white font-semibold':'text-gray-400 hover:text-white hover:bg-white/5';
-        var div=document.createElement('div');
-        div.className='p-3 rounded-xl cursor-pointer transition flex flex-col gap-1 border border-[#1a1a36]/40 '+cls;
-        var timeStr = (s.last_active||'').slice(0,16).replace('T',' ');
-        div.innerHTML='<div class="flex items-center justify-between"><span class="text-xs truncate font-medium flex-1">'+(s.title||'新会话')+'</span></div><span class="text-[9px] text-gray-500 font-mono self-end">'+(s.msg_count||0)+' 条 | '+timeStr+'</span>';
-        div.addEventListener('click',function(){ loadThread(s.thread_id); });
-        DOM.sessionsContainer.appendChild(div);
-      });
-    }
-    async function loadThread(tid) {
-      state.activeSessionId=tid; DOM.currentChatTitle.innerText='加载中...'; renderSessions(); DOM.chatMessagesContainer.innerHTML='';
-      try {
-        var r=await fetch(API+'/messages?user_id='+state.user.username+'&thread_id='+tid);
-        var d=await r.json();
-        if (d.messages&&d.messages.length) d.messages.forEach(function(m){ renderMessage(m.role==='user'?'user':'agent',m.content); });
-        var found=state.sessions.find(function(t){return t.thread_id===tid;});
-        DOM.currentChatTitle.innerText=(found&&found.title)?found.title:'新会话';
-      }catch(e){ DOM.chatMessagesContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500">加载失败</div>'; }
-      DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight;
+    if (!res.ok) {
+      removeTyping();
+      appendMsg('ai', '**错误**: 服务器返回 ' + res.status + ' — 请稍后重试。');
+      return;
     }
 
-    /* ── Chat ── */
-    function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-    function renderMessage(sender,text) {
-      var isAgent=sender==='agent';
-      var wrapper=document.createElement('div');
-      wrapper.className='flex '+(isAgent?'justify-start':'justify-end')+' items-start gap-3 w-full';
-      var avatar=isAgent
-        ? '<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan shadow-[0_0_8px_var(--cyber-glow-cyan)] flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div>'
-        : '<div class="w-9 h-9 rounded-xl bg-[#12122b] flex items-center justify-center border border-cyber-pink shadow-[0_0_8px_var(--cyber-glow-pink)] flex-shrink-0"><i data-lucide="user" class="w-5 h-5 text-white"></i></div>';
-      var bubbleStyle=isAgent?'bg-[#101024]/90 border border-slate-800 text-slate-100 prose-cyber rounded-2xl rounded-tl-sm':'bg-[#ff007f]/10 border border-[#ff007f]/30 text-white rounded-2xl rounded-tr-sm';
-      var rendered=isAgent?marked.parse(text):esc(text);
-      wrapper.innerHTML=(isAgent?avatar:'')+'<div class="max-w-[80%] md:max-w-[70%] p-4 '+bubbleStyle+' shadow-lg relative"><span class="absolute top-1 right-2 text-[8px] text-gray-600 font-mono uppercase tracking-wider">'+(isAgent?'AGENT':'USER')+'</span><div class="text-sm leading-relaxed whitespace-pre-line">'+rendered+'</div></div>'+(isAgent?'':avatar);
-      DOM.chatMessagesContainer.appendChild(wrapper);
-    }
+    removeTyping();
 
-    DOM.chatForm.addEventListener('submit', async function(e){
-      e.preventDefault();
-      var text=DOM.messageInput.value.trim();
-      if (!text||isStreaming) return;
-      if (!state.user) { showToast('请先登录','error'); return; }
-      if (!state.activeSessionId) state.activeSessionId=threadId;
-      isStreaming=true; DOM.messageInput.value=''; renderMessage('user',text);
+    // create streaming bubble
+    var chatArea = document.getElementById('chat-area');
+    var div = document.createElement('div');
+    div.className = 'msg ai';
+    div.innerHTML = '' +
+      '<div class="msg-avatar">SP</div>' +
+      '<div>' +
+        '<div class="msg-bubble stream-bubble"></div>' +
+        '<div class="msg-time">' + getTime() + '</div>' +
+      '</div>';
+    chatArea.appendChild(div);
+    var bubble = div.querySelector('.stream-bubble');
 
-      var typingId='typing-'+Date.now();
-      var tw=document.createElement('div');
-      tw.className='flex justify-start items-center gap-3 w-full'; tw.id=typingId;
-      tw.innerHTML='<div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="p-4 bg-[#101024]/90 border border-slate-800 rounded-2xl flex items-center justify-center min-w-[80px] h-12"><div class="dot-flashing"></div></div>';
-      DOM.chatMessagesContainer.appendChild(tw); DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight;
+    var accumulated = '';
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
 
-      var fullReply=''; var tools=[];
-      try {
-        var resp=await fetch(API+'/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({thread_id:state.activeSessionId,user_id:state.user.username,message:text,steam_id:state.steamId||null})});
-        var reader=resp.body.getReader(); var decoder=new TextDecoder(); var buffer='';
-        while(true){
-          var r2=await reader.read();
-          if (r2.done) break;
-          buffer+=decoder.decode(r2.value,{stream:true});
-          var lines=buffer.split('\n'); buffer=lines.pop()||'';
-          for (var i=0;i<lines.length;i++){
-            var t=lines[i].trim();
-            if (!t||!t.startsWith('data: ')) continue;
-            try{ var evt=JSON.parse(t.slice(6)); if(evt.event==='token') fullReply+=evt.data; else if(evt.event==='tool_call') tools.push(evt.data); } catch(_){}
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+
+      buffer += decoder.decode(chunk.value, { stream: true });
+      var lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (var li = 0; li < lines.length; li++) {
+        var trimmed = lines[li].trim();
+        if (!trimmed || trimmed.indexOf('data: ') !== 0) continue;
+
+        var jsonStr = trimmed.slice(6);
+        try {
+          var evt = JSON.parse(jsonStr);
+          if (evt.event === 'token') {
+            accumulated += evt.data;
+            try {
+              bubble.innerHTML = marked.parse(accumulated);
+            } catch (e) {
+              bubble.innerHTML = escapeHtml(accumulated).replace(/\n/g, '<br>');
+            }
+            chatArea.scrollTop = chatArea.scrollHeight;
+          } else if (evt.event === 'tool_call') {
+            var toolDiv = document.createElement('div');
+            toolDiv.style.cssText = 'font-size:11px;color:var(--text-muted);font-family:JetBrains Mono,monospace;margin:4px 0;';
+            toolDiv.textContent = '⚙ ' + evt.data;
+            bubble.appendChild(toolDiv);
           }
+        } catch (e) {
+          // ignore partial parse errors
         }
-        var node=document.getElementById(typingId);
-        if (node){
-          var toolsHtml=tools.length?'<div style="margin-top:8px;font-size:10px;color:#a0a0b0">'+tools.map(esc).join(' . ')+'</div>':'';
-          node.outerHTML='<div class="flex justify-start items-start gap-3 w-full"><div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="max-w-[80%] md:max-w-[70%] p-4 bg-[#101024]/90 border border-slate-800 text-slate-100 prose-cyber rounded-2xl rounded-tl-sm shadow-lg relative"><span class="absolute top-1 right-2 text-[8px] text-gray-600 font-mono uppercase tracking-wider">AGENT</span><div class="text-sm leading-relaxed whitespace-pre-line">'+marked.parse(fullReply||'(无回复)')+'</div>'+toolsHtml+'</div></div>';
-        }
-        setTimeout(function(){ refreshThreads(); },2000);
-      } catch(err) {
-        var node2=document.getElementById(typingId);
-        if (node2) node2.outerHTML='<div class="flex justify-start items-start gap-3 w-full"><div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 to-cyan-500 flex items-center justify-center border border-cyber-cyan flex-shrink-0"><i data-lucide="cpu" class="w-5 h-5 text-white"></i></div><div class="p-4 bg-[#101024]/90 border border-red-500/40 text-red-400 rounded-2xl text-sm">请求失败: '+esc(err.message)+'</div></div>';
-      } finally { isStreaming=false; DOM.chatMessagesContainer.scrollTop=DOM.chatMessagesContainer.scrollHeight; }
-    });
+      }
+    }
 
-    /* ── New Session ── */
-    DOM.btnNewSession.addEventListener('click',function(){ threadId=crypto.randomUUID?crypto.randomUUID():Date.now().toString(36); state.activeSessionId=threadId; DOM.currentChatTitle.innerText='新会话'; DOM.chatMessagesContainer.innerHTML='<div class="text-center py-8 text-xs text-gray-500">新会话已开始</div>'; renderSessions(); });
+    if (!accumulated) {
+      bubble.innerHTML = '（助手没有返回内容，请重试）';
+    }
 
-    /* ── Refresh ── */
-    DOM.btnRefreshSessions.addEventListener('click',function(){ DOM.btnRefreshSessions.firstElementChild.classList.add('rotate-180'); refreshThreads().then(function(){ setTimeout(function(){ DOM.btnRefreshSessions.firstElementChild.classList.remove('rotate-180'); },500); }); });
+    // refresh thread list after first exchange
+    if (state.isLoggedIn) {
+      loadThreads().catch(function() {});
+    }
+  } catch (e) {
+    removeTyping();
+    appendMsg('ai', '**连接失败**: ' + escapeHtml(e.message) + '\n\n请检查网络后重试。');
+  } finally {
+    state.isStreaming = false;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('msg-input').focus();
+  }
+}
 
-    /* ── Search ── */
-    DOM.searchInput.addEventListener('input',function(e){ state.searchQuery=e.target.value; renderSessions(); });
-
-    /* ── Boot ── */
-    window.onload=function(){ lucide.createIcons(); var s=localStorage.getItem('steam_user'); if(s){ state.user={username:s}; DOM.profileUsername.innerText=s.toUpperCase(); DOM.profileStatus.innerText='已激活'; DOM.btnAuthTrigger.classList.add('hidden'); DOM.loggedInProfile.classList.remove('hidden'); initApp(); } };
-
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+updateAuthUI();
 </script>
 </body>
 </html>

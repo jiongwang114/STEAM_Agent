@@ -4,7 +4,7 @@ import urllib.request
 from ..config import STEAM_API_KEY, STEAM_API_URL
 
 
-def get_user_playtime(steam_id: str, count: int = 10) -> dict:
+def get_user_playtime(steam_id: str = "", count: int = 10) -> dict:
     """
     Get a Steam user's owned games with playtime, sorted by total playtime descending.
     """

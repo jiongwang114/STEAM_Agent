@@ -101,8 +101,14 @@ def tool_node(state: AgentState) -> dict:
 
     for tool_call in last_message.tool_calls:
         tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
+        tool_args = dict(tool_call["args"])
         tool_call_id = tool_call["id"]
+
+        # Auto-inject steam_id from state — LLM never sees the real value
+        if tool_name == "get_user_playtime" and not tool_args.get("steam_id"):
+            sid = state.get("steam_id", "")
+            if sid:
+                tool_args["steam_id"] = sid
 
         if tool_name in tool_map:
             try:
