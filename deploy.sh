@@ -42,7 +42,6 @@ DEEPSEEK_API_KEY=sk-请替换为你的key
 STEAM_API_KEY=请替换为你的Steam API Key
 HOST=0.0.0.0
 PORT=8000
-LANGCHAIN_TRACING_V2=false
 ENVEOF
     echo "  ⚠ steam_agent/.env 已生成模板，请编辑填入真实 Key: vi steam_agent/.env"
 else
