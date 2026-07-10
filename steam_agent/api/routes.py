@@ -185,6 +185,17 @@ async def read_messages(user_id: str = Query(...), thread_id: str = Query(...)):
     return {"messages": msgs}
 
 
+@router.delete("/threads")
+async def delete_thread(user_id: str = Query(...), thread_id: str = Query(...)):
+    """Delete a conversation thread and all its data across all storage layers."""
+    from ..memory.message_store import delete_thread as do_delete
+
+    ok = do_delete(user_id, thread_id)
+    if ok:
+        return {"status": "ok", "message": "会话已删除"}
+    return {"status": "error", "message": "会话不存在或无权操作"}
+
+
 # ── Steam ID 绑定 API ──
 
 @router.post("/bind-steam")

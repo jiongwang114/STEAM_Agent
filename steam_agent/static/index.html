@@ -537,6 +537,51 @@
   .sidebar-refresh-btn:hover i { animation:spin 0.5s linear; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  .session-item { position:relative; }
+  .session-item .btn-delete-thread {
+    position:absolute; right:6px; top:50%; transform:translateY(-50%);
+    width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--text-muted); cursor:pointer;
+    font-size:16px; border-radius:2px; transition:var(--transition);
+    opacity:0; pointer-events:none;
+  }
+  .session-item:hover .btn-delete-thread { opacity:1; pointer-events:all; }
+  .btn-delete-thread:hover { color:var(--magenta); background:var(--magenta-dim); }
+
+  /* ── CONFIRM MODAL ── */
+  #confirm-overlay {
+    position:fixed; inset:0; z-index:400;
+    background:rgba(5,7,15,0.9); backdrop-filter:blur(6px);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity 0.3s;
+  }
+  #confirm-overlay.visible { opacity:1; pointer-events:all; }
+  .confirm-panel {
+    background:var(--bg-panel); border:1px solid var(--border-strong);
+    border-radius:4px; width:380px; padding:28px;
+    box-shadow:0 0 60px rgba(255,0,110,0.15);
+    text-align:center;
+    transform:scale(0.95); transition:transform 0.3s;
+  }
+  #confirm-overlay.visible .confirm-panel { transform:none; }
+  .confirm-icon { font-size:48px; color:var(--magenta); margin-bottom:16px; }
+  .confirm-title { font-family:'Orbitron',monospace; font-size:1rem; color:var(--text-primary); margin-bottom:8px; }
+  .confirm-desc { font-size:13px; color:var(--text-secondary); margin-bottom:24px; line-height:1.6; }
+  .confirm-desc strong { color:var(--cyan); }
+  .confirm-actions { display:flex; gap:10px; justify-content:center; }
+  .btn-confirm-cancel {
+    padding:8px 24px; background:none; border:1px solid var(--border);
+    color:var(--text-secondary); font-family:'Inter',sans-serif; font-size:13px;
+    cursor:pointer; border-radius:2px; transition:var(--transition);
+  }
+  .btn-confirm-cancel:hover { border-color:var(--border-strong); color:var(--text-primary); }
+  .btn-confirm-delete {
+    padding:8px 24px; background:var(--magenta-dim); border:1px solid rgba(255,0,110,0.4);
+    color:var(--magenta); font-family:'Orbitron',monospace; font-size:12px; font-weight:700;
+    letter-spacing:1px; cursor:pointer; border-radius:2px; transition:var(--transition);
+  }
+  .btn-confirm-delete:hover { background:var(--magenta); color:var(--bg-void); }
+
 </style>
 </head>
 <body>
@@ -726,6 +771,19 @@
         <input type="password" id="auth-password" placeholder="••••••••">
       </div>
       <button class="btn-auth-submit" id="auth-submit-btn" onclick="doAuth()">进入系统</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-overlay" onclick="closeConfirmOnBg(event)">
+  <div class="confirm-panel">
+    <div class="confirm-icon"><i class="ti ti-alert-triangle"></i></div>
+    <div class="confirm-title">确认删除</div>
+    <div class="confirm-desc">确定要删除会话 <strong id="confirm-thread-title">...</strong> 吗？<br>此操作不可撤销，所有对话记录将被永久清除。</div>
+    <div class="confirm-actions">
+      <button class="btn-confirm-cancel" onclick="hideConfirm()">取消</button>
+      <button class="btn-confirm-delete" id="confirm-delete-btn" onclick="doDeleteThread()">确认删除</button>
     </div>
   </div>
 </div>
@@ -926,13 +984,24 @@ async function loadThreads() {
       var item = document.createElement('div');
       item.className = 'session-item';
       item.dataset.threadId = thread.thread_id;
-      item.innerHTML = '<i class="ti ti-message-circle"></i><span>' + escapeHtml(thread.title || thread.thread_id) + '</span>';
+      item.innerHTML = '<i class="ti ti-message-circle"></i><span>' + escapeHtml(thread.title || thread.thread_id) + '</span>' +
+        '<button class="btn-delete-thread" title="删除会话"><i class="ti ti-trash"></i></button>';
       item.onclick = (function(tid) {
-        return function() {
+        return function(e) {
+          // ignore clicks on the delete button itself
+          if (e.target.closest('.btn-delete-thread')) return;
           selectSession(this);
           loadMessages(tid).catch(function() {});
         };
       })(thread.thread_id);
+      // attach delete handler
+      (function(el, tid, title) {
+        var btn = el.querySelector('.btn-delete-thread');
+        btn.onclick = function(e) {
+          e.stopPropagation();
+          showConfirm(tid, title);
+        };
+      })(item, thread.thread_id, thread.title || thread.thread_id);
       list.appendChild(item);
     }
   } catch (e) {
@@ -1073,6 +1142,76 @@ function logout() {
 }
 
 // ═══════════════════════════════════════
+//  CONFIRM & DELETE
+// ═══════════════════════════════════════
+var _pendingDeleteThreadId = '';
+
+function showConfirm(threadId, title) {
+  _pendingDeleteThreadId = threadId;
+  document.getElementById('confirm-thread-title').textContent = title;
+  document.getElementById('confirm-overlay').classList.add('visible');
+}
+
+function hideConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('visible');
+  _pendingDeleteThreadId = '';
+}
+
+function closeConfirmOnBg(e) {
+  if (e.target === document.getElementById('confirm-overlay')) hideConfirm();
+}
+
+async function doDeleteThread() {
+  var tid = _pendingDeleteThreadId;
+  if (!tid) return;
+
+  var btn = document.getElementById('confirm-delete-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  try {
+    var res = await fetch('/threads?user_id=' + encodeURIComponent(userId()) + '&thread_id=' + encodeURIComponent(tid), { method: 'DELETE' });
+    var data = await res.json();
+
+    if (res.ok && data.status === 'ok') {
+      // remove from sidebar
+      var items = document.querySelectorAll('#session-list .session-item');
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].dataset.threadId === tid) {
+          items[i].remove();
+          break;
+        }
+      }
+      // if this was the active thread, clear chat and start fresh
+      if (state.threadId === tid) {
+        state.threadId = generateThreadId();
+        var chatArea = document.getElementById('chat-area');
+        chatArea.innerHTML = '<div class="empty-state" id="empty-state">' +
+          '<div class="empty-icon"><i class="ti ti-device-gamepad-2"></i></div>' +
+          '<div class="empty-title">你想玩什么类型的游戏？</div>' +
+          '<div class="empty-desc">告诉我你的偏好、心情或者 Steam 游戏库，我会帮你找到完美匹配的下一款游戏。</div>' +
+          '<div class="empty-tags">' +
+            '<div class="empty-tag" onclick="quickSend(\'推荐几款好玩的开放世界游戏\')">开放世界</div>' +
+            '<div class="empty-tag" onclick="quickSend(\'我想玩多人联机游戏，有什么推荐？\')">多人联机</div>' +
+            '<div class="empty-tag" onclick="quickSend(\'推荐适合新手的RPG游戏\')">角色扮演</div>' +
+            '<div class="empty-tag" onclick="quickSend(\'有哪些独立游戏值得一玩？\')">独立游戏</div>' +
+            '<div class="empty-tag" onclick="quickSend(\'我喜欢策略类游戏，推荐几款\')">策略游戏</div>' +
+            '<div class="empty-tag" onclick="quickSend(\'今晚想玩恐怖游戏，有什么推荐？\')">恐怖惊悚</div>' +
+          '</div></div>';
+      }
+    } else {
+      alert('删除失败: ' + (data.message || '未知错误'));
+    }
+  } catch (e) {
+    alert('删除失败: ' + e.message);
+  } finally {
+    hideConfirm();
+    btn.textContent = '确认删除';
+    btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════
 function showAuth(tab) {
@@ -1184,8 +1323,18 @@ function newSession() {
     var item = document.createElement('div');
     item.className = 'session-item active';
     item.dataset.threadId = state.threadId;
-    item.innerHTML = '<i class="ti ti-message-circle"></i><span>新对话</span>';
-    item.onclick = function() { selectSession(item); };
+    item.innerHTML = '<i class="ti ti-message-circle"></i><span>新对话</span>' +
+      '<button class="btn-delete-thread" title="删除会话"><i class="ti ti-trash"></i></button>';
+    item.onclick = function(e) {
+      if (e.target.closest('.btn-delete-thread')) return;
+      selectSession(item);
+    };
+    // attach delete handler
+    var delBtn = item.querySelector('.btn-delete-thread');
+    delBtn.onclick = function(e) {
+      e.stopPropagation();
+      showConfirm(state.threadId, '新对话');
+    };
     list.insertBefore(item, list.firstChild);
   }
 }

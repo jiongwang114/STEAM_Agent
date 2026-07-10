@@ -107,3 +107,66 @@ def get_messages_by_turn(user_id: str, thread_id: str, turn_number: int | None =
     rows = cursor.fetchall()
     conn.close()
     return [{"turn": r[0], "role": r[1], "content": r[2], "time": r[3]} for r in rows]
+
+
+def delete_thread(user_id: str, thread_id: str) -> bool:
+    """Delete a thread and all its data from all 4 storage layers.
+
+    Returns True if at least one message record was found and deleted.
+    """
+    import sqlite3 as _sqlite3
+
+    deleted_any = False
+
+    # ── Layer 1: messages (SQLite) ──
+    init_messages_table()
+    conn = _get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE user_id = ? AND thread_id = ?",
+            (user_id, thread_id),
+        )
+        if cur.fetchone()[0] > 0:
+            conn.execute(
+                "DELETE FROM messages WHERE user_id = ? AND thread_id = ?",
+                (user_id, thread_id),
+            )
+            conn.commit()
+            deleted_any = True
+    finally:
+        conn.close()
+
+    # ── Layer 2: threads_meta (SQLite) ──
+    try:
+        from .thread_title import init_threads_table
+        init_threads_table()
+        conn2 = _get_conn()
+        conn2.execute(
+            "DELETE FROM threads_meta WHERE user_id = ? AND thread_id = ?",
+            (user_id, thread_id),
+        )
+        conn2.commit()
+        conn2.close()
+    except Exception:
+        pass
+
+    # ── Layer 3: LangGraph checkpoints (checkpoints.db) ──
+    try:
+        from ..config import CHECKPOINT_DB_PATH
+        cp_conn = _sqlite3.connect(CHECKPOINT_DB_PATH)
+        cp_conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+        cp_conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+        cp_conn.commit()
+        cp_conn.close()
+    except Exception:
+        pass
+
+    # ── Layer 4: ChromaDB semantic memory ──
+    try:
+        from ..rag.vector_store import get_user_memory_collection
+        collection = get_user_memory_collection()
+        collection.delete(where={"thread_id": thread_id})
+    except Exception:
+        pass
+
+    return deleted_any
