@@ -12,6 +12,7 @@ services:
     env_file:
       - ./steam_agent/.env
     environment:
+      - HF_ENDPOINT=https://hf-mirror.com
       - CHROMA_PERSIST_DIR=/app/steam_agent/rag/chroma_data
       - SQLITE_DB_PATH=/app/data/data.db
       - CHECKPOINT_DB_PATH=/app/data/checkpoints.db

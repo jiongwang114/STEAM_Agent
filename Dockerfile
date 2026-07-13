@@ -2,21 +2,26 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies (Debian 国内镜像)
-RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources \
+# Build args: 内地默认用镜像，服务器传 --build-arg 关掉
+ARG USE_APT_MIRROR=true
+ARG PIP_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
+
+# System dependencies
+RUN if [ "$USE_APT_MIRROR" = "true" ]; then \
+        sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/debian.sources; \
+    fi \
     && apt-get update && apt-get install -y --no-install-recommends gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies (PyPI 国内镜像)
+# Python dependencies
 COPY steam_agent/requirements.txt .
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+RUN pip install --no-cache-dir -i ${PIP_INDEX} -r requirements.txt
 
 # Copy project
 COPY steam_agent/ ./steam_agent/
 
 RUN mkdir -p /app/steam_agent/rag/chroma_data /app/data /root/.cache/torch
 ENV SENTENCE_TRANSFORMERS_HOME=/root/.cache/torch/sentence_transformers
-ENV HF_ENDPOINT=https://hf-mirror.com
 
 EXPOSE 8000
 
