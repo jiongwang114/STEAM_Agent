@@ -8,12 +8,12 @@ from .state import AgentState
 
 
 def guard_node(state: AgentState) -> dict:
-    """Three-layer guard before the main agent.
+    """Two-layer guard before the main agent.
 
-    Layer 1: regex/rule-based (zero cost)
-    Layer 2: LLM jailbreak intent classifier
-    Layer 3: LLM scope boundary classifier
+    Layer 1: regex/rule-based — zero-width chars + political forbidden words (zero cost)
+    Layer 3: LLM red-line classifier — adult content + politics (~0.5s)
 
+    Short messages (< 4 chars) skip the LLM layer.
     On any layer blocking: returns AIMessage with GUARD_BLOCK marker.
     On all pass: returns empty dict (transparent).
     """
@@ -32,6 +32,14 @@ def guard_node(state: AgentState) -> dict:
         # Empty message — let agent handle gracefully
         return {"messages": []}
 
+    # Short messages don't carry injection/scope risk — skip LLM guard layers
+    if len(text.strip()) < 4:
+        from ..guard.layer1_rules import check as layer1_check
+        blocked, reason = layer1_check(text)
+        if blocked:
+            return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
+        return {"messages": []}
+
     # ── Layer 1: Regex rules (zero cost, zero latency) ──
     from ..guard.layer1_rules import check as layer1_check
 
@@ -39,14 +47,7 @@ def guard_node(state: AgentState) -> dict:
     if blocked:
         return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
 
-    # ── Layer 2: Jailbreak intent (LLM, ~0.5s) ──
-    from ..guard.layer2_intent import check as layer2_check
-
-    blocked, reason = layer2_check(text)
-    if blocked:
-        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
-
-    # ── Layer 3: Scope boundary (LLM, ~0.5s) ──
+    # ── Layer 3: Red-line classifier (LLM, ~0.5s) ──
     from ..guard.layer3_scope import check as layer3_check
 
     blocked, reason = layer3_check(text)
