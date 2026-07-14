@@ -27,6 +27,9 @@
     --border-strong: rgba(0,245,255,0.3);
     --sidebar-w: 260px;
     --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    --frosted-bg: rgba(10,13,26,0.8);
+    --overlay-bg: rgba(5,7,15,0.8);
+    --overlay-bg-heavy: rgba(5,7,15,0.9);
   }
   .light-mode {
     --bg-void: #EEF2FF;
@@ -45,6 +48,9 @@
     --text-muted: #8899BB;
     --border: rgba(0,102,204,0.15);
     --border-strong: rgba(0,102,204,0.4);
+    --frosted-bg: rgba(228,234,251,0.8);
+    --overlay-bg: rgba(238,242,255,0.8);
+    --overlay-bg-heavy: rgba(238,242,255,0.9);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; background:var(--bg-void); color:var(--text-primary); font-family:'Inter',sans-serif; }
@@ -244,7 +250,7 @@
   .topbar {
     height:56px; display:flex; align-items:center; justify-content:space-between;
     padding:0 20px; border-bottom:1px solid var(--border);
-    background:rgba(10,13,26,0.8); backdrop-filter:blur(20px);
+    background:var(--frosted-bg); backdrop-filter:blur(20px);
     flex-shrink:0; z-index:5;
   }
   .topbar-left { display:flex; align-items:center; gap:12px; }
@@ -380,7 +386,7 @@
   /* ── INPUT AREA ── */
   .input-area {
     padding:16px 24px; border-top:1px solid var(--border);
-    background:rgba(10,13,26,0.8); backdrop-filter:blur(20px);
+    background:var(--frosted-bg); backdrop-filter:blur(20px);
     flex-shrink:0;
   }
   .input-wrap {
@@ -413,7 +419,7 @@
   /* ── SETTINGS PANEL ── */
   #settings-overlay {
     position:fixed; inset:0; z-index:200;
-    background:rgba(5,7,15,0.8); backdrop-filter:blur(6px);
+    background:var(--overlay-bg); backdrop-filter:blur(6px);
     display:flex; align-items:flex-end; justify-content:flex-start;
     padding:0 0 80px 16px;
     opacity:0; pointer-events:none; transition:opacity 0.3s;
@@ -496,7 +502,7 @@
   /* ── AUTH MODAL ── */
   #auth-overlay {
     position:fixed; inset:0; z-index:300;
-    background:rgba(5,7,15,0.9); backdrop-filter:blur(8px);
+    background:var(--overlay-bg-heavy); backdrop-filter:blur(8px);
     display:flex; align-items:center; justify-content:center;
     opacity:0; pointer-events:none; transition:opacity 0.3s;
   }
@@ -574,7 +580,7 @@
   /* ── CONFIRM MODAL ── */
   #confirm-overlay {
     position:fixed; inset:0; z-index:400;
-    background:rgba(5,7,15,0.9); backdrop-filter:blur(6px);
+    background:var(--overlay-bg-heavy); backdrop-filter:blur(6px);
     display:flex; align-items:center; justify-content:center;
     opacity:0; pointer-events:none; transition:opacity 0.3s;
   }
