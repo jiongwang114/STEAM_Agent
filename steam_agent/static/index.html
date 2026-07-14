@@ -1078,6 +1078,7 @@ function setTheme(mode) {
   if (state.isLoggedIn) {
     apiPost('/auth/theme?username=' + encodeURIComponent(state.username) + '&theme=' + encodeURIComponent(mode), null).catch(function() {});
   }
+  localStorage.setItem('steam_play_theme', mode);
 }
 
 async function bindSteamId() {
@@ -1141,6 +1142,7 @@ function logout() {
   state.steamId = '';
   state.isLoggedIn = false;
   state.threadId = generateThreadId();
+  localStorage.removeItem('steam_play_username');
   updateAuthUI();
   toggleSettings();
 
@@ -1293,6 +1295,7 @@ async function doAuth() {
       state.username = username;
       state.isLoggedIn = true;
       state.threadId = generateThreadId();
+      localStorage.setItem('steam_play_username', username);
       hideAuth();
       updateAuthUI();
       await loadSteamId();
@@ -1594,7 +1597,30 @@ async function sendMessage() {
 // ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
-updateAuthUI();
+(function initSession() {
+  // Restore theme
+  var savedTheme = localStorage.getItem('steam_play_theme');
+  if (savedTheme === 'light' || savedTheme === 'dark') {
+    setTheme(savedTheme);
+  }
+
+  // Restore login session
+  var savedUsername = localStorage.getItem('steam_play_username');
+  if (savedUsername) {
+    state.username = savedUsername;
+    state.isLoggedIn = true;
+    updateAuthUI();
+    loadSteamId().catch(function() {});
+    loadThreads().catch(function() {});
+
+    // Skip cover animation for returning users
+    var cover = document.getElementById('cover');
+    cover.classList.add('hidden');
+    cover.style.display = 'none';
+  } else {
+    updateAuthUI();
+  }
+})();
 </script>
 </body>
 </html>
