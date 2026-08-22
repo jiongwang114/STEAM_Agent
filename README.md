@@ -3,7 +3,7 @@
 > 基于 LangGraph 的自主 Agent，结合 RAG 语义检索与用户记忆系统，提供个性化 Steam 游戏推荐。
 > 不是固定流程的推荐引擎——Agent 自主决定何时调用什么工具、信息够了就停。
 >
-> 在线体验：[www.jiongplay.cn](https://www.jiongplay.cn)
+> 在线体验：[www.jiongplay.cn](http://www.jiongplay.cn)
 
 ## 架构
 
