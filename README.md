@@ -13,10 +13,17 @@ graph TD
     guard -->|pass| agent["🧠 agent<br/>DeepSeek + bind_tools"]
     guard -->|block| END_NODE((END))
 
-    agent -->|has tool_calls| tools["🔧 tools<br/>6 个工具"]
-    agent -->|no tool_calls| END_NODE
+    agent -->|has tool_calls| tools["🔧 tools + policy<br/>配额 / 去重 / 执行"]
+    agent -->|no tool_calls| validate["✅ validate<br/>链接 / 价格 / 协议"]
 
-    tools --> agent
+    tools -->|budget available| agent
+    tools -->|budget exhausted| finalize["🧾 finalize<br/>无工具证据总结"]
+    finalize --> validate
+    validate -->|pass| END_NODE
+    validate -->|fail once| repair["🩹 repair<br/>无工具修复"]
+    repair --> validate
+    validate -->|fail again| fallback["降级答复"]
+    fallback --> END_NODE
 
     subgraph External["外部服务"]
         STEAM[("Steam Web API")]
@@ -36,10 +43,13 @@ Agent 循环：LLM 收到工具结果后重新评估信息是否充分 → 不�
 ## 核心能力
 
 - **自主工具调用** — Agent 动态决定工具调用的顺序和次数，不是写死的 if/else
-- **RAG 语义检索** — 250 款游戏知识库，中文 query 自动翻译为英文再 embedding
-- **用户记忆系统** — 结构化画像（偏好/约束/事实）自动注入 System Prompt + 对话历史语义召回
+- **工具调用治理** — 代码强制执行轮次预算、重复调用拦截、单工具配额和预算耗尽总结
+- **混合 RAG 检索** — 418 款游戏，Dense + BM25 + RRF + 本地 CrossEncoder 重排
+- **记忆质量治理** — 来源/置信度、语义去重、冲突替代、TTL 和 Prompt 注入预算
 - **三层安全防护** — 正则规则（零成本）→ LLM 越狱检测 → LLM 边界分类，逐层拦截
 - **流式响应** — SSE 逐 token 输出，工具执行时显示中文状态提示
+- **线上可观测性** — 请求 ID、结构化日志、接口延迟、TTFT、token 与工具调用指标
+- **自动化质量门禁** — 单测、故障注入、Memory/RAG 基线和每 PR 真实模型 3 次重复评测
 - **匿名用户渐进引导** — 未绑定 Steam 时先做通用推荐，需要个性化时自然引导绑定
 
 ## 技术栈
@@ -53,8 +63,16 @@ Agent 循环：LLM 收到工具结果后重新评估信息是否充分 → 不�
 | 后端 | FastAPI + Uvicorn + SSE |
 | 多轮对话 | LangGraph SqliteSaver（每 thread_id 状态隔离） |
 | 结构化存储 | SQLite（画像、消息、认证、游戏档案缓存） |
-| 可观测性 | LangSmith Tracing |
+| 可观测性 | LangSmith Tracing + 内建运行指标 + JSON 结构化日志 |
 | 部署 | Docker + docker-compose |
+
+## Agent 工程化
+
+LLM 负责选择工具与组织答案，但不会独占运行时控制权。`tool_policy` 和运行上下文在确定性代码中执行 token、wall-clock、轮次、单轮调用和单工具预算。相同调用不会重复访问外部服务；empty 结果之后也不能换关键词再次调用同一工具。
+
+达到预算后，Graph 路由到不绑定工具的 `finalize`。最终文本还要校验 appid、价格证据和内部协议泄露；失败时只允许一次无工具修复，再失败就明确降级。工具执行统一分类为 success、empty、invalid_input、timeout、rate_limited、upstream_error 和 policy_blocked，并具有有限重试与熔断。
+
+完整设计与量化结果见 [Agent 工程化设计](docs/AGENT_ENGINEERING.md)，演进状态见 [AGENT_ENGINEERING_ROADMAP.md](AGENT_ENGINEERING_ROADMAP.md)。
 
 ## 快速开始
 
@@ -82,7 +100,7 @@ pip install -r steam_agent/requirements.txt
 cp steam_agent/.env.example steam_agent/.env
 # 编辑 .env 填入 STEAM_API_KEY 和 DEEPSEEK_API_KEY
 
-# 构建游戏知识库（约 5-10 分钟，250 款游戏）
+# 构建游戏知识库（约 5-10 分钟，418 款游戏）
 python -m steam_agent.rag.ingest
 
 # 启动服务
@@ -116,6 +134,35 @@ docker compose build --build-arg USE_APT_MIRROR=false --build-arg PIP_INDEX=http
 | `POST` | `/auth/register` | 用户注册 |
 | `POST` | `/auth/login` | 用户登录 |
 | `GET` | `/health` | 健康检查 |
+| `GET` | `/metrics` | HTTP 与 Agent 运行指标快照 |
+
+## 可观测性
+
+每个 HTTP 响应都包含 `X-Request-ID`。调用方也可以传入该请求头，将前端错误、API 日志与 LangSmith trace 关联起来。服务日志采用单行 JSON，记录路由、状态码和耗时。
+
+`GET /metrics` 不依赖额外监控服务，适合本地开发、演示和轻量部署。返回内容包括：
+
+- HTTP 请求量、状态码和接口延迟分布（平均值、P50、P95、P99）
+- 同步与流式 Agent 的请求量、成功/失败/取消状态和总耗时
+- SSE 首 token 时间（TTFT）
+- 输入/输出 token 总量与各工具调用次数
+
+延迟样本采用有界内存窗口，累计计数器不会因为运行时间增长而持续占用内存。生产环境可以定时采集该端点，或继续使用 LangSmith 查看单次 Agent 的完整调用链。
+
+```bash
+curl -H "X-Request-ID: demo-001" http://localhost:8000/health
+curl http://localhost:8000/metrics
+```
+
+本地运行与 CI 相同的验证：
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+python -m evals.cli validate
+python -m evals.cli run-robustness
+python -m evals.cli run-memory
+python -m compileall -q steam_agent evals tests
+```
 
 **请求示例：**
 
@@ -135,7 +182,7 @@ POST /chat
 |---|---|
 | `get_user_playtime` | 需要了解用户偏好时，调用 Steam API 获取游戏库 |
 | `rag_search_similar_games` | 语义推荐、"类似 XXX"、"找 YYY 类型"，每轮最多调一次 |
-| `search_steam_store` | 查价格/在售状态/评分，或 RAG 无结果时降级 |
+| `search_steam_store` | 用户明确查询具体游戏/类型的价格、在售状态或评分 |
 | `save_user_insight` | Agent 主动发现偏好/约束/事实时自动保存，用户无感知 |
 | `recall_user_memory` | 模糊回忆历史对话（"之前聊过的那个卡牌游戏"） |
 | `recall_message_detail` | 精确查询某轮对话的完整内容 |
@@ -151,8 +198,8 @@ POST /chat
 ┌── 长期记忆 ──────────────────────────────────────────┐
 │                                                       │
 │  ① 结构化画像 (user_insights / SQLite)                │
-│     Agent 主动保存偏好/约束/事实                       │
-│     → 新会话自动注入 System Prompt（免费获取）          │
+│     来源/置信度 + 去重/冲突替代 + TTL                  │
+│     → 只注入有效且高置信的有限条目                      │
 │                                                       │
 │  ② 对话记忆 (user_memory / Chroma)                    │
 │     每轮对话自动归档，embedding 后写入                  │

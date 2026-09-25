@@ -58,6 +58,17 @@ def get_thread_title(user_id: str, thread_id: str) -> str:
     return row[0] if row else "新会话"
 
 
+def delete_thread_title(user_id: str, thread_id: str) -> None:
+    init_threads_table()
+    conn = _get_conn()
+    conn.execute(
+        "DELETE FROM threads_meta WHERE user_id=? AND thread_id=?",
+        (user_id, thread_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_thread_list_with_titles(user_id: str) -> list[dict]:
     """Get thread list with titles, fallback to message count from messages table."""
     init_threads_table()
@@ -77,11 +88,18 @@ def auto_generate_title(user_id: str, thread_id: str, user_message: str) -> str:
     Falls back to first 20 chars of the message."""
     try:
         from langchain_openai import ChatOpenAI
-        from ..config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+        from ..config import (
+            DEEPSEEK_API_KEY,
+            DEEPSEEK_BASE_URL,
+            LLM_MAX_RETRIES,
+            LLM_REQUEST_TIMEOUT_SECONDS,
+        )
+        from ..model_routing import select_model
 
         llm = ChatOpenAI(
-            model="deepseek-chat", temperature=0.0, max_tokens=32,
+            model=select_model("title").model, temperature=0.0, max_tokens=32,
             api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES,
         )
         prompt = (
             f"将以下用户的第一句话概括为6个字以内的会话标题，只输出标题本身不要解释：\n\n"

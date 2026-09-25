@@ -1,0 +1,30 @@
+{
+  "source_report": "judge-calibration-v1.json",
+  "manifest": {
+    "run_id": "judge-calibration-20260715T084235Z",
+    "created_at": "2026-07-15T08:42:35.200078+00:00",
+    "git_sha": "507fffab314c1a6b4b0b6405eb61844a2cc9c88e",
+    "model": "deepseek-chat-judge",
+    "model_parameters": {
+      "temperature": 0
+    },
+    "prompt_hash": "20f2159d6524c50f5c484e4b1ae7ff06485a7c6a08288021c772a8dca8037cc3",
+    "dataset_hashes": {
+      "judge_calibration.v1.jsonl": "77d9e4d7bc0fda91d8515b31ce133900acc9cf7c277fcc67d98e7bcaa1f547a4"
+    },
+    "index_manifest_hash": "",
+    "repeats": 1,
+    "candidate_label": "judge-calibration"
+  },
+  "summary": {
+    "relevance_mae": 0.4166666666666667,
+    "helpfulness_mae": 0.5833333333333334,
+    "groundedness_mae": 0.5833333333333334,
+    "overall_mae": 0.5,
+    "cases": 12,
+    "overall_exact": 0.6666666666666666,
+    "overall_within_one": 0.9166666666666666,
+    "quadratic_weighted_kappa": 0.7798165137614679,
+    "gate_passed": true
+  }
+}

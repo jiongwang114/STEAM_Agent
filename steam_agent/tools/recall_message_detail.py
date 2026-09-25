@@ -7,26 +7,11 @@ def recall_message_detail(
     turn_number: int | None = None,
     role: str | None = None,
 ) -> dict:
-    """
-    Exact lookup of conversation messages by user, thread, and optional turn/role.
-
-    Use this when the user asks about a SPECIFIC turn or wants to see the full
-    transcript of a past conversation — not for fuzzy/semantic recall.
-
-    Examples:
-    - "上次对话第 1 轮我问了什么" → turn_number=1, role="user"
-    - "把之前那个会话的完整对话发给我" → no filters, returns all
-    - "第 3 轮你推荐了什么" → turn_number=3, role="assistant"
-
-    Args:
-        user_id: system user ID (use the value from session state)
-        thread_id: which conversation session to query
-        turn_number: optional, filter to a specific turn
-        role: optional, filter to "user" or "assistant"
-
-    Returns:
-        {"messages": [{"turn": 1, "role": "user", "content": "...", "time": "..."}, ...]}
-    """
+    """Look up an explicitly requested conversation thread, turn, or role exactly."""
+    if not thread_id or len(thread_id) > 128:
+        return {"error": "thread_id 无效"}
+    if turn_number is not None and (turn_number < 1 or turn_number > 1000000):
+        return {"error": "turn_number 无效"}
     valid_roles = {None, "user", "assistant"}
     if role not in valid_roles:
         return {"error": f"role 必须为 'user'、'assistant' 或省略，收到: '{role}'"}

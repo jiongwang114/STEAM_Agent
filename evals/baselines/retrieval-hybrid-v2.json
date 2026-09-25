@@ -1,0 +1,105 @@
+{
+  "source_report": "retrieval-hybrid-weighted-v2.json",
+  "manifest": {
+    "run_id": "hybrid-weighted-v2-20260715T095007Z",
+    "created_at": "2026-07-15T09:50:07.548971+00:00",
+    "git_sha": "507fffab314c1a6b4b0b6405eb61844a2cc9c88e",
+    "model": "retrieval",
+    "model_parameters": {},
+    "prompt_hash": "22e5dba0aabfc0f50c0d6aec8cb9c3562adfc4ade0bcfb7a3c5000ea76f8a48d",
+    "dataset_hashes": {
+      "retrieval_gate.v1.jsonl": "9cd750916768f19f439c834bd35579ddcd51be663719be2ab1bec3d117d82ca5"
+    },
+    "index_manifest_hash": "56062a01dd88d5021c7ff2e3b17aff863829bad2a0fc7bb41e67b1eedb2dd568",
+    "repeats": 1,
+    "candidate_label": "hybrid-weighted-v2"
+  },
+  "summary": {
+    "dev": {
+      "constraint_accuracy": 1.0,
+      "hard_negative_rate": 0.0,
+      "hit_rate@10": 1.0,
+      "mrr@10": 0.9,
+      "ndcg@10": 0.7131435571451902,
+      "precision@10": 0.4850793650793651,
+      "recall@10": 0.7938095238095239,
+      "timings": {
+        "dense_ms": {
+          "p50_ms": 69.857,
+          "p95_ms": 10029.125
+        },
+        "end_to_end_ms": {
+          "p50_ms": 500.766,
+          "p95_ms": 20495.986
+        },
+        "fusion_ms": {
+          "p50_ms": 0.061,
+          "p95_ms": 0.086
+        },
+        "index_load_ms": {
+          "p50_ms": 0.001,
+          "p95_ms": 202.47
+        },
+        "lexical_ms": {
+          "p50_ms": 3.614,
+          "p95_ms": 4.454
+        },
+        "rerank_ms": {
+          "p50_ms": 432.803,
+          "p95_ms": 10080.711
+        },
+        "total_ms": {
+          "p50_ms": 500.567,
+          "p95_ms": 20315.892
+        },
+        "translation_ms": {
+          "p50_ms": 0.007,
+          "p95_ms": 0.009
+        }
+      }
+    },
+    "test": {
+      "constraint_accuracy": 1.0,
+      "hard_negative_rate": 0.0,
+      "hit_rate@10": 0.9,
+      "mrr@10": 0.5,
+      "ndcg@10": 0.42274122733434105,
+      "precision@10": 0.27111111111111114,
+      "recall@10": 0.5166666666666666,
+      "timings": {
+        "dense_ms": {
+          "p50_ms": 65.649,
+          "p95_ms": 82.073
+        },
+        "end_to_end_ms": {
+          "p50_ms": 543.376,
+          "p95_ms": 1399.977
+        },
+        "fusion_ms": {
+          "p50_ms": 0.069,
+          "p95_ms": 0.09
+        },
+        "index_load_ms": {
+          "p50_ms": 0.001,
+          "p95_ms": 0.003
+        },
+        "lexical_ms": {
+          "p50_ms": 2.368,
+          "p95_ms": 4.513
+        },
+        "rerank_ms": {
+          "p50_ms": 455.952,
+          "p95_ms": 509.108
+        },
+        "total_ms": {
+          "p50_ms": 526.996,
+          "p95_ms": 582.166
+        },
+        "translation_ms": {
+          "p50_ms": 0.008,
+          "p95_ms": 817.621
+        }
+      }
+    }
+  }
+}

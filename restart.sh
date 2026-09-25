@@ -23,7 +23,7 @@ docker stop steam-agent 2>/dev/null || true
 docker rm steam-agent 2>/dev/null || true
 
 docker run -d --name steam-agent \
-  -p 80:8000 \
+  -p 8000:8000 \
   -v $(pwd)/steam_agent/rag/chroma_data:/app/steam_agent/rag/chroma_data \
   -v $(pwd)/data:/app/data \
   -v steam_model_cache:/root/.cache/torch/sentence_transformers \
@@ -37,4 +37,5 @@ docker run -d --name steam-agent \
 echo ""
 echo "=== 重启完成 ==="
 echo "日志: docker logs -f steam-agent"
-echo "健康: curl http://localhost/health"
+echo "存活: curl http://localhost:8000/health"
+echo "就绪: curl http://localhost:8000/ready"

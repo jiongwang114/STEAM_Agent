@@ -1,17 +1,27 @@
+from __future__ import annotations
+
+import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from ..config import SQLITE_DB_PATH
 
 
+MemoryScope = Literal["stable", "temporary", "session"]
+_VALID_CATEGORIES = {"preference", "constraint", "fact"}
+_VALID_SCOPES = {"stable", "temporary", "session"}
+
+
 def _get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(SQLITE_DB_PATH)
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
 
-def init_db():
+def init_db() -> None:
     conn = _get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS user_insights (
@@ -22,26 +32,126 @@ def init_db():
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
+    additions = {
+        "normalized_key": "TEXT NOT NULL DEFAULT ''",
+        "polarity": "INTEGER NOT NULL DEFAULT 0",
+        "confidence": "REAL NOT NULL DEFAULT 1.0",
+        "source": "TEXT NOT NULL DEFAULT 'legacy'",
+        "scope": "TEXT NOT NULL DEFAULT 'stable'",
+        "expires_at": "TEXT",
+        "updated_at": "TEXT NOT NULL DEFAULT ''",
+        "active": "INTEGER NOT NULL DEFAULT 1",
+        "superseded_by": "INTEGER",
+    }
+    existing = {row[1] for row in conn.execute("PRAGMA table_info(user_insights)")}
+    for column, declaration in additions.items():
+        if column not in existing:
+            conn.execute(f"ALTER TABLE user_insights ADD COLUMN {column} {declaration}")
+    legacy_rows = conn.execute(
+        "SELECT id, insight, category, created_at FROM user_insights WHERE normalized_key=''"
+    ).fetchall()
+    for row in legacy_rows:
+        conn.execute(
+            "UPDATE user_insights SET normalized_key=?, polarity=?, updated_at=? WHERE id=?",
+            (
+                canonical_memory_key(row["insight"], row["category"]),
+                memory_polarity(row["insight"]),
+                row["created_at"],
+                row["id"],
+            ),
+        )
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_insights_user_id
-        ON user_insights(user_id)
+        CREATE INDEX IF NOT EXISTS idx_insights_user_active
+        ON user_insights(user_id, active, updated_at DESC)
     """)
     conn.commit()
     conn.close()
 
 
-def add_insight(user_id: str, insight: str, category: str):
+def add_insight(
+    user_id: str,
+    insight: str,
+    category: str,
+    *,
+    confidence: float = 1.0,
+    source: str = "explicit_user",
+    scope: MemoryScope = "stable",
+    ttl_days: int | None = None,
+    memory_key: str | None = None,
+) -> dict:
+    if category not in _VALID_CATEGORIES:
+        raise ValueError(f"invalid category: {category}")
+    if scope not in _VALID_SCOPES:
+        raise ValueError(f"invalid scope: {scope}")
+    if not user_id or not insight.strip():
+        raise ValueError("user_id and insight are required")
+    confidence = max(0.0, min(float(confidence), 1.0))
+    key = memory_key.strip().lower() if memory_key else canonical_memory_key(insight, category)
+    polarity = memory_polarity(insight)
+    now = datetime.now(timezone.utc)
+    expires_at = _expiry(now, scope, ttl_days)
+
     init_db()
     conn = _get_conn()
-    conn.execute(
-        "INSERT INTO user_insights (user_id, insight, category) VALUES (?, ?, ?)",
-        (user_id, insight, category),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        if memory_key:
+            exact = conn.execute(
+                "SELECT id FROM user_insights WHERE user_id=? AND normalized_key=? "
+                "AND category=? AND lower(trim(insight))=lower(trim(?)) AND active=1 "
+                "ORDER BY id DESC LIMIT 1",
+                (user_id, key, category, insight),
+            ).fetchone()
+        else:
+            exact = conn.execute(
+                "SELECT id FROM user_insights WHERE user_id=? AND normalized_key=? "
+                "AND category=? AND polarity=? AND active=1 ORDER BY id DESC LIMIT 1",
+                (user_id, key, category, polarity),
+            ).fetchone()
+        if exact:
+            conn.execute(
+                "UPDATE user_insights SET insight=?, confidence=MAX(confidence, ?), "
+                "source=?, scope=?, expires_at=?, updated_at=? WHERE id=?",
+                (insight.strip(), confidence, source, scope, expires_at, now.isoformat(), exact["id"]),
+            )
+            conn.commit()
+            return {"status": "deduplicated", "insight_id": exact["id"], "superseded": []}
+
+        cursor = conn.execute(
+            "INSERT INTO user_insights "
+            "(user_id, insight, category, normalized_key, polarity, confidence, source, "
+            "scope, expires_at, updated_at, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            (
+                user_id, insight.strip(), category, key, polarity, confidence, source,
+                scope, expires_at, now.isoformat(),
+            ),
+        )
+        insight_id = int(cursor.lastrowid)
+        superseded: list[int] = []
+        if key:
+            rows = conn.execute(
+                "SELECT id FROM user_insights WHERE user_id=? AND normalized_key=? "
+                "AND category=? AND active=1 AND id<>?",
+                (user_id, key, category, insight_id),
+            ).fetchall()
+            superseded = [int(row["id"]) for row in rows]
+            if superseded:
+                placeholders = ",".join("?" for _ in superseded)
+                conn.execute(
+                    f"UPDATE user_insights SET active=0, superseded_by=?, updated_at=? "
+                    f"WHERE id IN ({placeholders})",
+                    (insight_id, now.isoformat(), *superseded),
+                )
+        conn.commit()
+        return {
+            "status": "superseded" if superseded else "inserted",
+            "insight_id": insight_id,
+            "superseded": superseded,
+        }
+    finally:
+        conn.close()
 
 
-def remove_insight(user_id: str, insight: str):
+def remove_insight(user_id: str, insight: str) -> None:
     init_db()
     conn = _get_conn()
     conn.execute(
@@ -52,14 +162,44 @@ def remove_insight(user_id: str, insight: str):
     conn.close()
 
 
-def get_insights(user_id: str) -> list[dict]:
+def get_insights(user_id: str, limit: int = 50) -> list[dict]:
     init_db()
+    now = datetime.now(timezone.utc).isoformat()
     conn = _get_conn()
-    cursor = conn.execute(
-        "SELECT insight, category, created_at FROM user_insights WHERE user_id = ? "
-        "ORDER BY created_at DESC",
-        (user_id,),
-    )
-    rows = cursor.fetchall()
+    rows = conn.execute(
+        "SELECT id, insight, category, normalized_key, polarity, confidence, source, "
+        "scope, expires_at, created_at, updated_at FROM user_insights "
+        "WHERE user_id=? AND active=1 AND (expires_at IS NULL OR expires_at>?) "
+        "ORDER BY confidence DESC, COALESCE(NULLIF(updated_at, ''), created_at) DESC LIMIT ?",
+        (user_id, now, limit),
+    ).fetchall()
     conn.close()
-    return [{"insight": r[0], "category": r[1], "created_at": r[2]} for r in rows]
+    return [dict(row) for row in rows]
+
+
+def canonical_memory_key(insight: str, category: str) -> str:
+    text = insight.lower().strip()
+    text = re.sub(
+        r"用户|我|现在|以后|一直|非常|很|开始|不再排斥|不排斥|不再喜欢|不喜欢|讨厌|喜欢|偏好|爱玩|只玩|想玩|预算|不超过|最多|限制",
+        "",
+        text,
+    )
+    text = re.sub(r"[^\w\u4e00-\u9fff]+", "", text)
+    return f"{category}:{text[:80]}"
+
+
+def memory_polarity(insight: str) -> int:
+    text = insight.lower()
+    if any(term in text for term in ("不再排斥", "不排斥", "开始喜欢")):
+        return 1
+    if any(term in text for term in ("不再喜欢", "不喜欢", "讨厌", "排斥")):
+        return -1
+    if any(term in text for term in ("喜欢", "偏好", "爱玩")):
+        return 1
+    return 0
+
+
+def _expiry(now: datetime, scope: MemoryScope, ttl_days: int | None) -> str | None:
+    if ttl_days is None:
+        ttl_days = 7 if scope == "session" else 30 if scope == "temporary" else None
+    return (now + timedelta(days=ttl_days)).isoformat() if ttl_days is not None else None

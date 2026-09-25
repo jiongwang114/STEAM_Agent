@@ -13,6 +13,7 @@ import time
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import urlencode
 
 from ..config import STEAM_API_KEY, STEAM_API_URL, SQLITE_DB_PATH
 
@@ -100,7 +101,7 @@ def _fetch_and_build(steam_id: str) -> str:
         "include_appinfo": "true",
         "include_played_free_games": "true",
     }
-    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    qs = urlencode(params)
     url = f"{STEAM_API_URL}/IPlayerService/GetOwnedGames/v0001/?{qs}"
 
     with urllib.request.urlopen(url, timeout=15.0) as resp:
@@ -165,7 +166,7 @@ def _fetch_and_build(steam_id: str) -> str:
 
 def _get_recently_played(steam_id: str) -> dict[int, int]:
     params = {"key": STEAM_API_KEY, "steamid": steam_id, "format": "json"}
-    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    qs = urlencode(params)
     url = f"{STEAM_API_URL}/IPlayerService/GetRecentlyPlayedGames/v0001/?{qs}"
     try:
         with urllib.request.urlopen(url, timeout=10.0) as resp:

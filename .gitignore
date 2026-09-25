@@ -1,1 +1,3 @@
 steam_agent/tests/
+__pycache__/
+*.py[cod]

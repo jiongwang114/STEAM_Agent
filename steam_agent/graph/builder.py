@@ -5,7 +5,18 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
 
 from ..config import CHECKPOINT_DB_PATH
-from .nodes import agent_node, guard_node, should_continue, tool_node
+from .nodes import (
+    after_tools,
+    after_validation,
+    agent_node,
+    finalize_node,
+    guard_node,
+    repair_node,
+    safe_fallback_node,
+    should_continue,
+    tool_node,
+    validate_answer_node,
+)
 from .state import AgentState
 
 _graph = None
@@ -35,6 +46,10 @@ def _compile(checkpointer):
     workflow.add_node("guard", guard_node)
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", tool_node)
+    workflow.add_node("finalize", finalize_node)
+    workflow.add_node("validate", validate_answer_node)
+    workflow.add_node("repair", repair_node)
+    workflow.add_node("safe_fallback", safe_fallback_node)
 
     workflow.set_entry_point("guard")
 
@@ -46,9 +61,21 @@ def _compile(checkpointer):
     workflow.add_conditional_edges(
         "agent",
         should_continue,
-        {"tools": "tools", "__end__": END},
+        {"tools": "tools", "validate": "validate"},
     )
-    workflow.add_edge("tools", "agent")
+    workflow.add_conditional_edges(
+        "tools",
+        after_tools,
+        {"agent": "agent", "finalize": "finalize"},
+    )
+    workflow.add_edge("finalize", "validate")
+    workflow.add_conditional_edges(
+        "validate",
+        after_validation,
+        {"__end__": END, "repair": "repair", "safe_fallback": "safe_fallback"},
+    )
+    workflow.add_edge("repair", "validate")
+    workflow.add_edge("safe_fallback", END)
 
     return workflow.compile(checkpointer=checkpointer)
 

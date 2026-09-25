@@ -1,0 +1,20 @@
+{"id":"agreement-001","query":"roguelike deckbuilder","item":"Slay the Spire","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-002","query":"roguelike deckbuilder","item":"Balatro","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-003","query":"roguelike deckbuilder","item":"The Binding of Isaac","reviewer_a":1,"reviewer_b":0,"notes":"roguelike but not a deckbuilder","provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-004","query":"cozy farming life sim","item":"Stardew Valley","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-005","query":"cozy farming life sim","item":"The Sims 4","reviewer_a":1,"reviewer_b":1,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-006","query":"cozy farming life sim","item":"Counter-Strike 2","reviewer_a":0,"reviewer_b":0,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-007","query":"competitive multiplayer FPS","item":"Counter-Strike 2","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-008","query":"competitive multiplayer FPS","item":"Apex Legends","reviewer_a":2,"reviewer_b":1,"notes":"FPS but battle royale emphasis","provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-009","query":"competitive multiplayer FPS","item":"Stardew Valley","reviewer_a":0,"reviewer_b":0,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-010","query":"base building colony sim","item":"RimWorld","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-011","query":"base building colony sim","item":"7 Days to Die","reviewer_a":1,"reviewer_b":1,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-012","query":"base building colony sim","item":"Hades","reviewer_a":0,"reviewer_b":0,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-013","query":"dark fantasy action RPG","item":"ELDEN RING","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-014","query":"dark fantasy action RPG","item":"Darkest Dungeon","reviewer_a":1,"reviewer_b":1,"notes":"dark fantasy RPG but not real-time action","provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-015","query":"dark fantasy action RPG","item":"Farming Simulator 25","reviewer_a":0,"reviewer_b":0,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-016","query":"relaxing no combat","item":"VA-11 Hall-A","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-017","query":"relaxing no combat","item":"Stardew Valley","reviewer_a":2,"reviewer_b":1,"notes":"mostly relaxing but contains optional combat","provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-018","query":"relaxing no combat","item":"ELDEN RING","reviewer_a":0,"reviewer_b":0,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-019","query":"multiplayer survival crafting","item":"Valheim","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}
+{"id":"agreement-020","query":"multiplayer survival crafting","item":"Project Zomboid","reviewer_a":2,"reviewer_b":2,"provenance":"two-pass-rubric-review","review_status":"reviewed"}

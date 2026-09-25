@@ -991,7 +991,7 @@ function filterSessions(val) {
 async function loadThreads() {
   if (!state.isLoggedIn) return;
   try {
-    var data = await apiGet('/threads?user_id=' + encodeURIComponent(userId()));
+    var data = await apiGet('/threads');
     var threads = data.threads || [];
     var list = document.getElementById('session-list');
 
@@ -1049,7 +1049,7 @@ async function loadMessages(threadId) {
   for (var i = 0; i < msgs.length; i++) { msgs[i].remove(); }
 
   try {
-    var data = await apiGet('/messages?user_id=' + encodeURIComponent(userId()) + '&thread_id=' + encodeURIComponent(threadId));
+    var data = await apiGet('/messages?thread_id=' + encodeURIComponent(threadId));
     var messageList = data.messages || [];
     for (var m = 0; m < messageList.length; m++) {
       var msg = messageList[m];
@@ -1082,7 +1082,7 @@ function setTheme(mode) {
     document.getElementById('theme-light').classList.remove('active');
   }
   if (state.isLoggedIn) {
-    apiPost('/auth/theme?username=' + encodeURIComponent(state.username) + '&theme=' + encodeURIComponent(mode), null).catch(function() {});
+    apiPost('/auth/theme', { theme: mode }).catch(function() {});
   }
   localStorage.setItem('steam_play_theme', mode);
 }
@@ -1100,7 +1100,7 @@ async function bindSteamId() {
   btn.disabled = true;
 
   try {
-    var res = await apiPost('/bind-steam?user_id=' + encodeURIComponent(userId()) + '&steam_id=' + encodeURIComponent(val), null);
+    var res = await apiPost('/bind-steam', { steam_id: val });
     if (res.status === 'ok') {
       state.steamId = val;
       document.getElementById('steam-id-input').value = maskSteamId(val);
@@ -1130,7 +1130,7 @@ async function bindSteamId() {
 async function loadSteamId() {
   if (!state.isLoggedIn) return;
   try {
-    var res = await apiGet('/steam-id?user_id=' + encodeURIComponent(userId()));
+    var res = await apiGet('/steam-id');
     if (res.steam_id) {
       state.steamId = res.steam_id;
       document.getElementById('steam-id-input').value = maskSteamId(res.steam_id);
@@ -1144,6 +1144,7 @@ async function loadSteamId() {
 }
 
 function logout() {
+  apiPost('/auth/logout', null).catch(function() {});
   state.username = '';
   state.steamId = '';
   state.isLoggedIn = false;
@@ -1201,7 +1202,7 @@ async function doDeleteThread() {
   btn.disabled = true;
 
   try {
-    var res = await fetch('/threads?user_id=' + encodeURIComponent(userId()) + '&thread_id=' + encodeURIComponent(tid), { method: 'DELETE' });
+    var res = await fetch('/threads?thread_id=' + encodeURIComponent(tid), { method: 'DELETE' });
     var data = await res.json();
 
     if (res.ok && data.status === 'ok') {
@@ -1292,10 +1293,7 @@ async function doAuth() {
   btn.disabled = true;
 
   try {
-    var res = await apiPost(
-      endpoint + '?username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
-      null
-    );
+    var res = await apiPost(endpoint, { username: username, password: password });
 
     if (res.status === 'ok') {
       state.username = username;

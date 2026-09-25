@@ -9,6 +9,10 @@ def recall_user_memory(
     """
     Retrieve relevant historical conversation snippets from the user's memory.
     """
+    top_k = max(1, min(int(top_k), 20))
+    query = str(query or "").strip()[:1000]
+    if not query:
+        return {"memories": []}
     collection = get_user_memory_collection()
 
     raw = collection.query(

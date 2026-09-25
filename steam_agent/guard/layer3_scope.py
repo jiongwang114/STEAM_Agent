@@ -11,7 +11,13 @@ pulling the conversation back to game recommendations.
 Cost: ~100 input tokens + 1-8 output tokens. Latency: ~0.5s.
 """
 
-from ..config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+from ..config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    LLM_MAX_RETRIES,
+    LLM_REQUEST_TIMEOUT_SECONDS,
+)
+from ..model_routing import select_model
 
 LAYER3_PROMPT = """\
 你是一个底线安全分类器。只拦截以下两类内容，其余全部放行：
@@ -40,11 +46,13 @@ def check(text: str) -> tuple[bool, str]:
         from langchain_openai import ChatOpenAI
 
         llm = ChatOpenAI(
-            model="deepseek-chat",
+            model=select_model("guard").model,
             temperature=0.0,
             max_tokens=8,
             api_key=DEEPSEEK_API_KEY,
             base_url=DEEPSEEK_BASE_URL,
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
         )
         try:
             resp = llm.invoke(prompt)
@@ -57,4 +65,6 @@ def check(text: str) -> tuple[bool, str]:
 
     if result.startswith("BLOCK"):
         return True, "layer3_red_line"
+    if result not in {"SAFE", "PASS"}:
+        return True, "layer3_classifier_unavailable"
     return False, ""

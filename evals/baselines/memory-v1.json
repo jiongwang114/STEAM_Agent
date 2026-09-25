@@ -1,0 +1,24 @@
+{
+  "source_report": "memory-v1.json",
+  "manifest": {
+    "run_id": "memory-20260715T081156Z",
+    "created_at": "2026-07-15T08:11:56.057827+00:00",
+    "git_sha": "507fffab314c1a6b4b0b6405eb61844a2cc9c88e",
+    "model": "deterministic-memory",
+    "model_parameters": {},
+    "prompt_hash": "20f2159d6524c50f5c484e4b1ae7ff06485a7c6a08288021c772a8dca8037cc3",
+    "dataset_hashes": {
+      "memory.v1.jsonl": "d2f1ec5b66e1def004a6f5d962f98ac3dfa417bb208c596183b3d134af246541"
+    },
+    "index_manifest_hash": "",
+    "repeats": 1,
+    "candidate_label": "memory"
+  },
+  "summary": {
+    "cases": 20,
+    "task_success": 1.0,
+    "memory_precision": 1.0,
+    "memory_recall": 1.0,
+    "contradiction_rate": 0.0
+  }
+}

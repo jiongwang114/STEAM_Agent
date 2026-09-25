@@ -1,5 +1,6 @@
 import json
 import urllib.request
+from urllib.parse import urlencode
 
 from ..config import STEAM_API_KEY, STEAM_API_URL
 
@@ -8,6 +9,9 @@ def get_user_playtime(steam_id: str = "", count: int = 10) -> dict:
     """
     Get a Steam user's owned games with playtime, sorted by total playtime descending.
     """
+    if not steam_id or not steam_id.isdigit() or len(steam_id) != 17:
+        return {"error": "invalid_steam_id"}
+    count = max(1, min(int(count), 50))
     params = {
         "key": STEAM_API_KEY,
         "steamid": steam_id,
@@ -15,14 +19,11 @@ def get_user_playtime(steam_id: str = "", count: int = 10) -> dict:
         "include_appinfo": "true",
         "include_played_free_games": "true",
     }
-    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    qs = urlencode(params)
     url = f"{STEAM_API_URL}/IPlayerService/GetOwnedGames/v0001/?{qs}"
 
-    try:
-        with urllib.request.urlopen(url, timeout=15.0) as resp:
-            data = json.loads(resp.read())
-    except Exception as exc:
-        return {"error": str(exc)}
+    with urllib.request.urlopen(url, timeout=8.0) as resp:
+        data = json.loads(resp.read())
 
     games_raw = data.get("response", {}).get("games", [])
     if not games_raw:
@@ -57,11 +58,11 @@ def _get_recently_played(steam_id: str) -> dict[int, int]:
         "steamid": steam_id,
         "format": "json",
     }
-    qs = "&".join(f"{k}={v}" for k, v in params.items())
+    qs = urlencode(params)
     url = f"{STEAM_API_URL}/IPlayerService/GetRecentlyPlayedGames/v0001/?{qs}"
 
     try:
-        with urllib.request.urlopen(url, timeout=10.0) as resp:
+        with urllib.request.urlopen(url, timeout=5.0) as resp:
             data = json.loads(resp.read())
     except Exception:
         return {}

@@ -1,6 +1,13 @@
+from functools import lru_cache
+
 from langchain_openai import ChatOpenAI
 
-from ..config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+from ..config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    LLM_MAX_RETRIES,
+    LLM_REQUEST_TIMEOUT_SECONDS,
+)
 
 _translate_llm = ChatOpenAI(
     model="deepseek-chat",
@@ -8,9 +15,12 @@ _translate_llm = ChatOpenAI(
     max_tokens=128,
     api_key=DEEPSEEK_API_KEY,
     base_url=DEEPSEEK_BASE_URL,
+    timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+    max_retries=LLM_MAX_RETRIES,
 )
 
 
+@lru_cache(maxsize=512)
 def translate_to_english(query: str) -> str:
     """
     Translate a Chinese game-related query to English.

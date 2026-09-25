@@ -6,23 +6,12 @@ HEADERS = {
 
 
 def search_steam_store(query: str, max_results: int = 10) -> dict:
-    """
-    Search the official Steam store by game name or simple keywords.
-    Uses Steam's /storesearch endpoint which does TEXT-BASED name matching only —
-    NOT semantic/embedding search.
-
-    IMPORTANT query rules:
-    - Use short, specific terms: a game title ("Elden Ring"), a genre tag ("roguelike"),
-      or a simple keyword combo ("open world survival").
-    - Do NOT pass long natural-language descriptions like "games similar to Dark Souls
-      with crafting mechanics" — Steam's text search cannot understand these.
-    - If a query returns no results, try a single broader keyword instead of a sentence.
-    - For discovering games by vibe/theme/feel, use rag_search_similar_games instead.
-    """
-    try:
-        search_data = _search_store(query)
-    except Exception as exc:
-        return {"error": str(exc)}
+    """Look up current Steam store facts using a short title or category query."""
+    query = str(query or "").strip()[:120]
+    max_results = max(1, min(int(max_results), 20))
+    if not query:
+        return {"error": "query_required"}
+    search_data = _search_store(query)
 
     items = search_data.get("items", [])
     if not items:
@@ -58,7 +47,8 @@ def _search_store(query: str) -> dict:
     import urllib.request
     import json
 
-    url = f"{STEAM_STORE_URL}/storesearch/?term={urllib.request.quote(query)}&cc=cn&l=schinese"
+    from urllib.parse import urlencode
+    url = f"{STEAM_STORE_URL}/storesearch/?{urlencode({'term': query, 'cc': 'cn', 'l': 'schinese'})}"
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=10.0) as resp:
         return json.loads(resp.read())
@@ -80,10 +70,10 @@ def _fetch_app_detail_sync(appid: int) -> dict | None:
 
 
 def _fetch_app_details_sync(appids: list[int]) -> list[dict | None]:
-    results = []
-    for appid in appids:
-        results.append(_fetch_app_detail_sync(appid))
-    return results
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(5, len(appids) or 1)) as pool:
+        return list(pool.map(_fetch_app_detail_sync, appids))
 
 
 def _extract_price(detail: dict) -> dict:
