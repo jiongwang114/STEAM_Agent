@@ -1,8 +1,12 @@
-from ..memory.message_store import get_messages_by_turn
+from typing import Annotated
+
+from langchain_core.tools import InjectedToolArg
+
+from ..memory.message_store import get_messages_by_turn, thread_belongs_to_user
 
 
 def recall_message_detail(
-    user_id: str,
+    user_id: Annotated[str, InjectedToolArg],
     thread_id: str,
     turn_number: int | None = None,
     role: str | None = None,
@@ -15,6 +19,9 @@ def recall_message_detail(
     valid_roles = {None, "user", "assistant"}
     if role not in valid_roles:
         return {"error": f"role 必须为 'user'、'assistant' 或省略，收到: '{role}'"}
+
+    if not thread_belongs_to_user(user_id, thread_id):
+        return {"error": "thread_id 不存在或无权访问"}
 
     messages = get_messages_by_turn(user_id, thread_id, turn_number, role)
     return {"messages": messages}

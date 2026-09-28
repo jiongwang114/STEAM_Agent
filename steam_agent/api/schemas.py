@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     thread_id: str = Field(min_length=1, max_length=128)
-    user_id: str = Field(min_length=1, max_length=128)
+    user_id: str | None = Field(default=None, min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=6000)
     steam_id: str | None = Field(default=None, max_length=32)
 
@@ -26,15 +26,30 @@ class ThreadTitleRequest(BaseModel):
     title: str = Field(min_length=1, max_length=50)
 
 
+class ExecutionStep(BaseModel):
+    name: str
+    status: str
+    duration_ms: int = Field(default=0, ge=0)
+    round: int | None = Field(default=None, ge=0)
+
+
+class ExecutionSummary(BaseModel):
+    status: str = "success"
+    duration_ms: int = Field(default=0, ge=0)
+    steps: list[ExecutionStep] = Field(default_factory=list)
+
+
 class ChatResponse(BaseModel):
+    status: str = "success"
     thread_id: str
     reply: str
     tool_calls_made: list[str] = Field(default_factory=list)
     tool_rounds: int = 0
     token_usage: dict = Field(default_factory=dict)
+    execution: ExecutionSummary = Field(default_factory=ExecutionSummary)
     run_metadata: dict = Field(default_factory=dict)
 
 
 class StreamEvent(BaseModel):
-    event: str  # "token" | "tool_call" | "done"
-    data: str
+    event: str  # "snapshot" | "status" | "token" | "done" | "error" | "cancelled"
+    data: str | dict

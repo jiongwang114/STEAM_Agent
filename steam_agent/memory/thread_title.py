@@ -19,6 +19,8 @@ def init_threads_table():
             thread_id TEXT NOT NULL,
             user_id TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '新会话',
+            title_source TEXT NOT NULL DEFAULT 'auto',
+            auto_title_status TEXT NOT NULL DEFAULT 'pending',
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now')),
             PRIMARY KEY (thread_id, user_id)
@@ -28,18 +30,34 @@ def init_threads_table():
         CREATE INDEX IF NOT EXISTS idx_threads_user_time
         ON threads_meta(user_id, updated_at DESC)
     """)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(threads_meta)")}
+    if "title_source" not in columns:
+        conn.execute(
+            "ALTER TABLE threads_meta ADD COLUMN title_source TEXT NOT NULL DEFAULT 'auto'"
+        )
+        conn.execute(
+            "UPDATE threads_meta SET title_source='manual' WHERE title != '新会话'"
+        )
+    if "auto_title_status" not in columns:
+        conn.execute(
+            "ALTER TABLE threads_meta ADD COLUMN auto_title_status TEXT NOT NULL DEFAULT 'pending'"
+        )
+        conn.execute(
+            "UPDATE threads_meta SET auto_title_status='done' WHERE title_source='manual' OR title != '新会话'"
+        )
     conn.commit()
     conn.close()
 
 
 def set_thread_title(user_id: str, thread_id: str, title: str):
-    """Insert or update thread title."""
+    """Set a manual title that automatic generation can never overwrite."""
     init_threads_table()
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO threads_meta (thread_id, user_id, title, updated_at) "
-        "VALUES (?, ?, ?, datetime('now')) "
-        "ON CONFLICT(thread_id, user_id) DO UPDATE SET title = excluded.title, updated_at = datetime('now')",
+        "INSERT INTO threads_meta (thread_id, user_id, title, title_source, auto_title_status, updated_at) "
+        "VALUES (?, ?, ?, 'manual', 'done', datetime('now')) "
+        "ON CONFLICT(thread_id, user_id) DO UPDATE SET title = excluded.title, "
+        "title_source='manual', auto_title_status='done', updated_at=datetime('now')",
         (thread_id, user_id, title[:50]),
     )
     conn.commit()
@@ -69,6 +87,64 @@ def delete_thread_title(user_id: str, thread_id: str) -> None:
     conn.close()
 
 
+def claim_auto_title_generation(user_id: str, thread_id: str) -> bool:
+    """Create or atomically claim the one automatic title task for a thread."""
+    init_threads_table()
+    conn = _get_conn()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "INSERT OR IGNORE INTO threads_meta "
+            "(thread_id, user_id, title, title_source, auto_title_status) "
+            "VALUES (?, ?, '新会话', 'auto', 'pending')",
+            (thread_id, user_id),
+        )
+        updated = conn.execute(
+            "UPDATE threads_meta SET auto_title_status='running', updated_at=datetime('now') "
+            "WHERE user_id=? AND thread_id=? AND title_source='auto' "
+            "AND title='新会话' AND (auto_title_status='pending' OR "
+            "(auto_title_status='running' AND updated_at < datetime('now', '-10 minutes')))",
+            (user_id, thread_id),
+        ).rowcount
+        conn.commit()
+        return updated == 1
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _finish_auto_title(user_id: str, thread_id: str, title: str) -> bool:
+    init_threads_table()
+    conn = _get_conn()
+    try:
+        updated = conn.execute(
+            "UPDATE threads_meta SET title=?, auto_title_status='done', updated_at=datetime('now') "
+            "WHERE user_id=? AND thread_id=? AND title_source='auto' "
+            "AND auto_title_status='running'",
+            (title[:50], user_id, thread_id),
+        ).rowcount
+        conn.commit()
+        return updated == 1
+    finally:
+        conn.close()
+
+
+def _auto_title_is_running(user_id: str, thread_id: str) -> bool:
+    init_threads_table()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM threads_meta WHERE user_id=? AND thread_id=? "
+            "AND title_source='auto' AND auto_title_status='running'",
+            (user_id, thread_id),
+        ).fetchone()
+        return row is not None
+    finally:
+        conn.close()
+
+
 def get_thread_list_with_titles(user_id: str) -> list[dict]:
     """Get thread list with titles, fallback to message count from messages table."""
     init_threads_table()
@@ -86,6 +162,8 @@ def get_thread_list_with_titles(user_id: str) -> list[dict]:
 def auto_generate_title(user_id: str, thread_id: str, user_message: str) -> str:
     """Use LLM to generate a short title from the first user message.
     Falls back to first 20 chars of the message."""
+    if not _auto_title_is_running(user_id, thread_id) and not claim_auto_title_generation(user_id, thread_id):
+        return get_thread_title(user_id, thread_id)
     try:
         from langchain_openai import ChatOpenAI
         from ..config import (
@@ -109,9 +187,9 @@ def auto_generate_title(user_id: str, thread_id: str, user_message: str) -> str:
         title = resp.content.strip().replace('"','').replace('"','').replace('《','').replace('》','')
         if not title or len(title) > 20:
             title = user_message[:15]
-        set_thread_title(user_id, thread_id, title)
+        _finish_auto_title(user_id, thread_id, title)
         return title
     except Exception:
         title = user_message[:15] + ("..." if len(user_message) > 15 else "")
-        set_thread_title(user_id, thread_id, title)
+        _finish_auto_title(user_id, thread_id, title)
         return title

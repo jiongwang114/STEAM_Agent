@@ -32,7 +32,7 @@ def assign_experiment(user_id: str, thread_id: str) -> dict[str, str | int]:
 
 def select_model(role: str, experiment: dict | None = None) -> ModelSelection:
     variant = str((experiment or {}).get("variant", "control"))
-    if role in {"finalize", "repair", "title", "guard"}:
+    if role in {"finalize", "repair", "summary", "title", "guard", "memory"}:
         model = LLM_FAST_MODEL
     elif variant == "candidate":
         model = LLM_CANDIDATE_MODEL

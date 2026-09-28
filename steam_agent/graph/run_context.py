@@ -130,16 +130,7 @@ def merge_unique_evidence(existing: Sequence[dict], additions: Sequence[dict]) -
 
 
 def compact_messages(messages: Sequence[Any], max_tokens: int) -> tuple[list[Any], dict[str, int]]:
-    groups: list[list[Any]] = []
-    current: list[Any] = []
-    for message in messages:
-        if getattr(message, "type", "") == "human" and current:
-            groups.append(current)
-            current = [message]
-        else:
-            current.append(message)
-    if current:
-        groups.append(current)
+    groups = message_groups(messages)
 
     selected: list[list[Any]] = []
     estimated = 0
@@ -155,6 +146,21 @@ def compact_messages(messages: Sequence[Any], max_tokens: int) -> tuple[list[Any
         "dropped_turns": max(0, len(groups) - len(selected)),
         "estimated_tokens": estimated,
     }
+
+
+def message_groups(messages: Sequence[Any]) -> list[list[Any]]:
+    """Group a user turn with every following tool call and result."""
+    groups: list[list[Any]] = []
+    current: list[Any] = []
+    for message in messages:
+        if getattr(message, "type", "") == "human" and current:
+            groups.append(current)
+            current = [message]
+        else:
+            current.append(message)
+    if current:
+        groups.append(current)
+    return groups
 
 
 def _message_tokens(message: Any) -> int:

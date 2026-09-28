@@ -11,6 +11,7 @@ from .nodes import (
     agent_node,
     finalize_node,
     guard_node,
+    initialize_context_node,
     repair_node,
     safe_fallback_node,
     should_continue,
@@ -44,6 +45,7 @@ def _compile(checkpointer):
     workflow = StateGraph(AgentState)
 
     workflow.add_node("guard", guard_node)
+    workflow.add_node("initialize_context", initialize_context_node)
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", tool_node)
     workflow.add_node("finalize", finalize_node)
@@ -51,7 +53,8 @@ def _compile(checkpointer):
     workflow.add_node("repair", repair_node)
     workflow.add_node("safe_fallback", safe_fallback_node)
 
-    workflow.set_entry_point("guard")
+    workflow.set_entry_point("initialize_context")
+    workflow.add_edge("initialize_context", "guard")
 
     workflow.add_conditional_edges(
         "guard",

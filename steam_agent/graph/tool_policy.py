@@ -15,9 +15,8 @@ from ..config import AGENT_MAX_TOOL_CALLS_PER_ROUND, AGENT_MAX_TOOL_ROUNDS
 
 TOOL_CALL_LIMITS: dict[str, int] = {
     "get_user_playtime": 1,
-    "rag_search_similar_games": 1,
+    "rag_search_similar_games": 2,
     "search_steam_store": 2,
-    "recall_user_memory": 1,
     "recall_message_detail": 1,
     # Multiple distinct preferences may legitimately be saved in one turn.
     "save_user_insight": 5,

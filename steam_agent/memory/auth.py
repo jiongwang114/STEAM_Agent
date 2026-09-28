@@ -319,6 +319,9 @@ def bind_steam_id(username: str, steam_id: str) -> tuple[bool, str]:
     except ValueError as exc:
         return False, str(exc)
     init_auth_table()
+    from .insight_store import init_db as init_insight_db, sync_bound_steam_id
+
+    init_insight_db()
     try:
         with _transaction() as conn:
             rate_key = f"bind:{username.lower()}"
@@ -338,6 +341,7 @@ def bind_steam_id(username: str, steam_id: str) -> tuple[bool, str]:
                 "UPDATE users SET bound_steam_id=? WHERE username=?",
                 (steam_id, username),
             )
+            sync_bound_steam_id(conn, username, steam_id)
             conn.execute(
                 "INSERT INTO auth_audit(username, action, success) VALUES(?,?,1)",
                 (username, "bind_steam"),

@@ -8,8 +8,17 @@
 
 - 支持注册登录、Steam 账号绑定和多轮对话
 - 使用混合 RAG 检索游戏，并可查询 Steam 商店信息和用户游玩记录
-- 将用户偏好与对话记录保存到 SQLite 和 Chroma，供后续会话检索
+- 将结构化用户偏好、会话摘要和原始对话保存到 SQLite；Chroma 主要服务于游戏知识库
 - 提供流式回复、输入防护和工具调用预算控制
+
+## 文档
+
+当前实现文档以 [`steam_agent/docs/README.md`](steam_agent/docs/README.md) 为准，
+包括 API 契约、后端部署、前端设计、记忆架构和实施进度。评测路线见
+[`EVAL_ROADMAP.md`](EVAL_ROADMAP.md)。
+
+根目录 `docs/` 仅保留工程化说明和 AI Agent 面试训练材料；历史设计、旧任务
+清单和旧测试记录不再作为当前实现依据。
 
 ## 技术栈
 
@@ -66,5 +75,5 @@ docker compose exec steam-agent python -m steam_agent.rag.ingest --from-cache
 运行测试：
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v
+pytest -q steam_agent/tests
 ```

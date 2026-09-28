@@ -2,10 +2,9 @@ from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
 
-from ..config import EMBEDDING_MODEL, MEMORY_EMBEDDING_MODEL
+from ..config import EMBEDDING_MODEL
 
 _embedder: SentenceTransformer | None = None
-_memory_embedder: SentenceTransformer | None = None
 
 # BGE models use instruction prefixes to separate query vs document encoding.
 # Only applied to queries — documents are embedded as-is.
@@ -19,23 +18,10 @@ def get_embedder() -> SentenceTransformer:
     return _embedder
 
 
-def get_memory_embedder() -> SentenceTransformer:
-    global _memory_embedder
-    if _memory_embedder is None:
-        _memory_embedder = SentenceTransformer(MEMORY_EMBEDDING_MODEL)
-    return _memory_embedder
-
-
 def embed(texts: list[str]) -> list[list[float]]:
     """Embed documents/passages (no instruction prefix)."""
     model = get_embedder()
     embeddings = model.encode(texts, normalize_embeddings=True)
-    return embeddings.tolist()
-
-
-def embed_memory(texts: list[str]) -> list[list[float]]:
-    """Embed multilingual user conversation memories."""
-    embeddings = get_memory_embedder().encode(texts, normalize_embeddings=True)
     return embeddings.tolist()
 
 

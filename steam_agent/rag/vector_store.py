@@ -6,8 +6,13 @@ from pathlib import Path
 import chromadb
 from chromadb.config import Settings
 
-from ..config import CHROMA_PERSIST_DIR, EMBEDDING_MODEL, MEMORY_COLLECTION_NAME, RERANKER_MODEL
-from .embedder import get_embedder, get_memory_embedder
+from ..config import (
+    CHROMA_PERSIST_DIR,
+    EMBEDDING_MODEL,
+    LEGACY_MEMORY_COLLECTION_NAME,
+    RERANKER_MODEL,
+)
+from .embedder import get_embedder
 
 _client: chromadb.PersistentClient | None = None
 _DATA_DIR = Path(CHROMA_PERSIST_DIR)
@@ -35,15 +40,17 @@ def get_games_collection():
     )
 
 
-def get_user_memory_collection():
-    """Get or create the user memory collection."""
+def get_legacy_user_memory_collection():
+    """Open the old conversation-vector collection only for user-requested cleanup."""
     client = _get_client()
-    embedder = get_memory_embedder()
-    return client.get_or_create_collection(
-        name=MEMORY_COLLECTION_NAME,
-        embedding_function=_chroma_embedding_wrapper(embedder),
-        metadata={"hnsw:space": "cosine"},
-    )
+    collections = client.list_collections()
+    names = {
+        str(getattr(collection, "name", collection))
+        for collection in collections
+    }
+    if LEGACY_MEMORY_COLLECTION_NAME not in names:
+        return None
+    return client.get_collection(name=LEGACY_MEMORY_COLLECTION_NAME)
 
 
 def current_games_collection_name() -> str:
@@ -89,15 +96,6 @@ def index_compatibility() -> dict:
         "mismatches": mismatches,
         "index_version": manifest.get("index_version", ""),
     }
-
-
-def reset_user_memory_collection():
-    client = _get_client()
-    try:
-        client.delete_collection(MEMORY_COLLECTION_NAME)
-    except Exception:
-        pass
-    return get_user_memory_collection()
 
 
 def _chroma_embedding_wrapper(model):

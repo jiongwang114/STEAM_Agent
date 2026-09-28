@@ -1,16 +1,20 @@
-import json
 import inspect
+import logging
 import re
 import time
 
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, RemoveMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from ..config import (
     DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL,
+    AGENT_CONTEXT_WINDOW_TOKENS,
     AGENT_FINALIZE_MAX_TOKENS,
     AGENT_HISTORY_TOKEN_BUDGET,
+    AGENT_HISTORY_COMPRESSION_THRESHOLD,
+    AGENT_SUMMARY_MAX_TOKENS,
+    AGENT_TOOL_CONTEXT_RESERVE_TOKENS,
     AGENT_MAX_REPAIR_ATTEMPTS,
     LLM_MAX_TOKENS,
     LLM_MAX_RETRIES,
@@ -19,6 +23,8 @@ from ..config import (
 )
 from ..observability import record_tool_execution
 from ..model_routing import select_model
+from ..memory.insight_store import get_insights
+from ..memory.session_summary import get_latest_session_summary, save_session_summary
 from ..prompts.system import build_system_prompt
 from ..tools.contracts import (
     ToolError,
@@ -27,7 +33,12 @@ from ..tools.contracts import (
     policy_blocked_result,
 )
 from ..tools.executor import execute_tool, execute_tool_batch
-from .run_context import add_usage, budget_reason, compact_messages, merge_unique_evidence
+from .run_context import (
+    add_usage,
+    budget_reason,
+    merge_unique_evidence,
+    message_groups,
+)
 from .state import AgentState
 from .tool_policy import (
     collect_tool_calls,
@@ -35,6 +46,259 @@ from .tool_policy import (
     evaluate_tool_call,
     tool_budget_exhausted,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def initialize_context_node(state: AgentState) -> dict:
+    """Load per-thread snapshots once; subsequent requests use checkpoint state."""
+    update: dict = {}
+    user_id = state.get("user_id", "")
+    thread_id = state.get("thread_id", "")
+
+    if "memory_snapshot" not in state:
+        rows = get_insights(user_id, limit=12) if user_id else []
+        update["memory_snapshot"] = rows
+
+    if "steam_profile_snapshot" not in state:
+        profile = ""
+        steam_id = state.get("steam_id_snapshot", state.get("steam_id")) or ""
+        update["steam_id_snapshot"] = steam_id
+        if steam_id:
+            try:
+                from ..memory.game_profile import get_game_profile
+                profile = get_game_profile(steam_id) or ""
+            except Exception:
+                logger.warning("steam_profile_snapshot_failed", exc_info=True)
+        update["steam_profile_snapshot"] = profile
+
+    if "conversation_summary" not in state:
+        saved = get_latest_session_summary(user_id, thread_id) if user_id and thread_id else None
+        update["conversation_summary"] = saved["summary"] if saved else ""
+        update["summary_version"] = int(saved["version"]) if saved else 0
+        update["summary_covered_to_turn"] = int(saved["covered_to_turn"]) if saved else 0
+
+    return update
+
+
+_SUMMARY_PROMPT = SystemMessage(content=(
+    "你是会话摘要器。把给定的旧摘要和完整历史轮次压缩成一份准确、简洁的中文摘要。"
+    "保留用户明确的偏好、限制、事实、已确认的决定、工具结果及仍待解决的问题；"
+    "不要臆测，不要写与当前会话无关的内容，只输出摘要正文。"
+))
+
+
+def _system_prompt_for_state(state: AgentState) -> SystemMessage:
+    return build_system_prompt(
+        user_id=state.get("user_id", ""),
+        steam_id=state.get("steam_id_snapshot", state.get("steam_id", "")),
+        thread_id=state.get("thread_id", ""),
+        insights=state.get("memory_snapshot"),
+        steam_profile=state.get("steam_profile_snapshot"),
+    )
+
+
+def _prepare_model_context(
+    state: AgentState,
+    max_tokens: int,
+) -> tuple[list, list[RemoveMessage], dict]:
+    """Prepare dynamic history and synchronously persist a summary before inference."""
+    messages = list(state.get("messages") or [])
+    groups = message_groups(messages)
+    summary = str(state.get("conversation_summary") or "").strip()
+    summary_tokens = _estimate_text_tokens(summary)
+    all_tokens = summary_tokens + sum(
+        _message_tokens(message) for group in groups for message in group
+    )
+    stats = {
+        "dropped_turns": 0,
+        "estimated_tokens": all_tokens,
+        "compression_triggered": False,
+        "summary_version": int(state.get("summary_version", 0) or 0),
+    }
+    update: dict = {}
+    selected_groups = groups
+    summary_response = None
+
+    threshold = max_tokens * AGENT_HISTORY_COMPRESSION_THRESHOLD
+    compression_attempted = all_tokens >= threshold and len(groups) > 1
+    if compression_attempted:
+        # Keep the newest complete turns and summarize only whole user turns.
+        keep_budget = max(_message_tokens(message) for message in groups[-1])
+        keep_budget = max(keep_budget, int(max_tokens * 0.65))
+        selected_reversed: list[list] = []
+        selected_tokens = summary_tokens
+        for group in reversed(groups):
+            group_tokens = sum(_message_tokens(message) for message in group)
+            if selected_reversed and selected_tokens + group_tokens > keep_budget:
+                break
+            selected_reversed.append(group)
+            selected_tokens += group_tokens
+        selected_groups = list(reversed(selected_reversed))
+        dropped_groups = groups[: len(groups) - len(selected_groups)]
+        if not dropped_groups:
+            stats["compression_skipped"] = "no_complete_turns_to_compact"
+            update["context_stats"] = stats
+            return _dynamic_messages(summary, groups), [], update
+        dropped_messages = [message for group in dropped_groups for message in group]
+
+        source = []
+        if summary:
+            source.append(SystemMessage(content="旧摘要：\n" + summary))
+        source.extend(dropped_messages)
+        try:
+            summary_response = build_llm(
+                max_tokens=AGENT_SUMMARY_MAX_TOKENS,
+                role="summary",
+                experiment=state.get("experiment"),
+            ).invoke([_SUMMARY_PROMPT, *source])
+            new_summary = str(getattr(summary_response, "content", "") or "").strip()
+        except Exception as exc:
+            logger.warning("conversation_summary_failed", extra={"error_type": type(exc).__name__})
+            new_summary = ""
+
+        if new_summary:
+            version = int(state.get("summary_version", 0) or 0) + 1
+            covered_from = int(state.get("summary_covered_to_turn", 0) or 0) + 1
+            covered_to = covered_from + len(dropped_groups) - 1
+            thread_id = state.get("thread_id", "")
+            message_ids = [getattr(message, "id", None) for message in dropped_messages]
+            persisted = False
+            if all(message_ids) and thread_id:
+                try:
+                    save_session_summary(
+                        state.get("user_id", ""),
+                        thread_id,
+                        version,
+                        covered_from,
+                        covered_to,
+                        new_summary,
+                    )
+                    persisted = True
+                except Exception as exc:
+                    logger.warning("conversation_summary_persist_failed", extra={"error_type": type(exc).__name__})
+
+            if persisted and all(message_ids):
+                update.update({
+                    "conversation_summary": new_summary,
+                    "summary_version": version,
+                    "summary_covered_to_turn": covered_to,
+                    "summary_persisted": bool(thread_id),
+                })
+                removals = [RemoveMessage(id=message_id) for message_id in message_ids]
+                update["context_stats"] = {
+                    **stats,
+                    "dropped_turns": len(dropped_groups),
+                    "estimated_tokens": _estimate_text_tokens(new_summary) + sum(
+                        _message_tokens(message)
+                        for group in selected_groups
+                        for message in group
+                    ),
+                    "compression_triggered": True,
+                    "summary_version": version,
+                }
+                stats = update["context_stats"]
+                update["usage"] = add_usage(state.get("usage"), summary_response)
+                update["model_history"] = [
+                    *list(state.get("model_history") or []),
+                    {
+                        "role": "summary",
+                        "model": select_model("summary", state.get("experiment")).model,
+                        "variant": select_model("summary", state.get("experiment")).variant,
+                    },
+                ]
+                return _dynamic_messages(new_summary, selected_groups), removals, update
+
+        logger.warning(
+            "conversation_compression_deferred",
+            extra={
+                "reason": (
+                    "summary_not_persisted_or_messages_unidentified"
+                    if new_summary else "summary_unavailable"
+                )
+            },
+        )
+        selected_groups = _select_recent_groups(
+            groups, max(1, max_tokens - summary_tokens)
+        )
+        stats.update({
+            "dropped_turns": max(0, len(groups) - len(selected_groups)),
+            "compression_deferred": True,
+        })
+        if summary_response is not None:
+            update["usage"] = add_usage(state.get("usage"), summary_response)
+            selection = select_model("summary", state.get("experiment"))
+            update["model_history"] = [
+                *list(state.get("model_history") or []),
+                {"role": "summary", "model": selection.model, "variant": selection.variant},
+            ]
+    elif all_tokens >= threshold and len(groups) <= 1:
+        selected_groups = _select_recent_groups(
+            groups, max(1, max_tokens - summary_tokens)
+        )
+        stats.update({
+            "dropped_turns": max(0, len(groups) - len(selected_groups)),
+            "compression_deferred": True,
+        })
+
+    stats["estimated_tokens"] = summary_tokens + sum(
+        _message_tokens(message) for group in selected_groups for message in group
+    )
+    update["context_stats"] = stats
+    return _dynamic_messages(summary, selected_groups), [], update
+
+
+def _dynamic_messages(summary: str, groups: list[list]) -> list:
+    dynamic = []
+    if summary:
+        dynamic.append(SystemMessage(content="## 当前会话摘要\n" + summary))
+    dynamic.extend(message for group in groups for message in group)
+    return dynamic
+
+
+def _select_recent_groups(groups: list[list], max_tokens: int) -> list[list]:
+    selected: list[list] = []
+    estimated = 0
+    for group in reversed(groups):
+        group_tokens = sum(_message_tokens(message) for message in group)
+        if selected and estimated + group_tokens > max_tokens:
+            break
+        selected.append(group)
+        estimated += group_tokens
+    return list(reversed(selected))
+
+
+def _message_tokens(message) -> int:
+    content = str(getattr(message, "content", "") or "")
+    tool_calls = getattr(message, "tool_calls", None) or []
+    payload = content
+    if tool_calls:
+        import json
+        payload += json.dumps(tool_calls, ensure_ascii=False, default=str)
+    ascii_count = sum(ord(character) < 128 for character in payload)
+    return max(1, round(ascii_count / 4 + (len(payload) - ascii_count) / 1.5))
+
+
+def _history_budget(
+    system_prompt: SystemMessage,
+    tools: list | None,
+    output_tokens: int,
+) -> int:
+    fixed_tokens = _estimate_text_tokens(str(system_prompt.content or ""))
+    for tool in tools or []:
+        fixed_tokens += _estimate_text_tokens(
+            f"{getattr(tool, '__name__', type(tool).__name__)}"
+            f"{inspect.signature(tool)}{getattr(tool, '__doc__', '') or ''}"
+        )
+    reserved_tools = AGENT_TOOL_CONTEXT_RESERVE_TOKENS if tools else 0
+    available = (
+        AGENT_CONTEXT_WINDOW_TOKENS
+        - fixed_tokens
+        - max(0, output_tokens)
+        - reserved_tools
+    )
+    return max(512, min(AGENT_HISTORY_TOKEN_BUDGET, available))
 
 
 def guard_node(state: AgentState) -> dict:
@@ -123,12 +387,12 @@ def agent_node(state: AgentState) -> dict:
     llm_with_tools = llm.bind_tools(tools)
 
     user_id = state.get("user_id", "")
-    steam_id = state.get("steam_id", "")
+    steam_id = state.get("steam_id_snapshot", state.get("steam_id", ""))
 
-    system_prompt = build_system_prompt(user_id=user_id, steam_id=steam_id)
-
-    messages, context_stats = compact_messages(
-        state["messages"], AGENT_HISTORY_TOKEN_BUDGET
+    system_prompt = _system_prompt_for_state(state)
+    history_budget = _history_budget(system_prompt, tools, LLM_MAX_TOKENS)
+    messages, removals, context_update = _prepare_model_context(
+        state, history_budget
     )
     if not messages:
         return {"messages": []}
@@ -136,16 +400,18 @@ def agent_node(state: AgentState) -> dict:
     full_messages = [system_prompt, *messages]
 
     response = llm_with_tools.invoke(full_messages)
+    usage_state = context_update.get("usage", state.get("usage"))
+    model_history = list(context_update.get("model_history", state.get("model_history") or []))
     return {
-        "messages": [response],
+        "messages": [*removals, response],
+        **context_update,
         "usage": add_usage(
-            state.get("usage"),
+            usage_state,
             response,
             _estimate_input_components(full_messages, tools),
         ),
-        "context_stats": context_stats,
         "model_history": [
-            *list(state.get("model_history") or []),
+            *model_history,
             {"role": "agent", "model": selection.model, "variant": selection.variant},
         ],
     }
@@ -190,7 +456,7 @@ def tool_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
                 f"Agent run budget exhausted: {exhausted}. Use existing evidence.",
             )
             decision_allowed = False
-        elif empty_result_seen:
+        elif empty_result_seen and tool_name != "rag_search_similar_games":
             result = policy_blocked_result(
                 "empty_result_no_retry",
                 f"{tool_name} already returned empty; ask for clarification instead of retrying.",
@@ -261,10 +527,11 @@ def _inject_tool_context(tool_name: str, tool_args: dict, state: AgentState) -> 
     """Replace model-supplied context fields with authoritative graph state."""
     args = dict(tool_args)
     if tool_name == "get_user_playtime":
-        args["steam_id"] = state.get("steam_id", "") or ""
+        args["steam_id"] = state.get(
+            "steam_id_snapshot", state.get("steam_id", "")
+        ) or ""
     if tool_name in {
         "save_user_insight",
-        "recall_user_memory",
         "recall_message_detail",
     }:
         args["user_id"] = state.get("user_id", "")
@@ -309,7 +576,7 @@ def _parallel_tool_node(state: AgentState, config: RunnableConfig | None) -> dic
                 "run_budget_exhausted",
                 f"Agent run budget exhausted: {exhausted}. Use existing evidence.",
             )
-        elif empty_seen:
+        elif empty_seen and name != "rag_search_similar_games":
             results[position] = policy_blocked_result(
                 "empty_result_no_retry",
                 f"{name} already returned empty; ask for clarification instead of retrying.",
@@ -407,16 +674,17 @@ def finalize_node(state: AgentState) -> dict:
             "termination_reason": "token_budget",
         }
     user_id = state.get("user_id", "")
-    steam_id = state.get("steam_id", "")
-    base_prompt = build_system_prompt(user_id=user_id, steam_id=steam_id)
+    steam_id = state.get("steam_id_snapshot", state.get("steam_id", ""))
+    base_prompt = _system_prompt_for_state(state)
     final_instruction = (
         "\n\n## 工具预算已用完\n"
         "你不能再调用工具。请严格依据当前消息中的工具结果直接给出最终答复。"
         "如果证据不足，明确说明缺少什么并向用户提出一个具体澄清问题；不要编造游戏、价格或评分。"
     )
     system_prompt = SystemMessage(content=base_prompt.content + final_instruction)
-    messages, context_stats = compact_messages(
-        state["messages"], AGENT_HISTORY_TOKEN_BUDGET
+    history_budget = _history_budget(system_prompt, None, AGENT_FINALIZE_MAX_TOKENS)
+    messages, removals, context_update = _prepare_model_context(
+        state, history_budget
     )
     selection = select_model("finalize", state.get("experiment"))
     response = build_llm(
@@ -427,17 +695,19 @@ def finalize_node(state: AgentState) -> dict:
         [system_prompt, *messages]
     )
     reason = budget_reason(state) or "tool_budget"
+    usage_state = context_update.get("usage", state.get("usage"))
+    model_history = list(context_update.get("model_history", state.get("model_history") or []))
     return {
-        "messages": [response],
+        "messages": [*removals, response],
+        **context_update,
         "usage": add_usage(
-            state.get("usage"),
+            usage_state,
             response,
             _estimate_input_components([system_prompt, *messages], []),
         ),
         "termination_reason": reason,
-        "context_stats": context_stats,
         "model_history": [
-            *list(state.get("model_history") or []),
+            *model_history,
             {"role": "finalize", "model": selection.model, "variant": selection.variant},
         ],
     }
@@ -525,10 +795,7 @@ def repair_node(state: AgentState) -> dict:
     protocol_leak = state.get("validation", {}).get("protocol_leak", False)
     violations = state.get("validation", {}).get("violations", [])
     evidence_ids = [item.get("appid") for item in state.get("evidence", []) if item.get("appid")]
-    base_prompt = build_system_prompt(
-        user_id=state.get("user_id", ""),
-        steam_id=state.get("steam_id", ""),
-    )
+    base_prompt = _system_prompt_for_state(state)
     instruction = (
         "\n\n## Grounding repair\n"
         f"上一版回答引用了无证据 appid: {unsupported}。"
@@ -540,8 +807,9 @@ def repair_node(state: AgentState) -> dict:
         "请重新输出完整最终答复，删除无证据推荐，不调用工具；如果证据不足，只提出一个具体澄清问题。"
     )
     repair_prompt = SystemMessage(content=base_prompt.content + instruction)
-    messages, context_stats = compact_messages(
-        state["messages"], AGENT_HISTORY_TOKEN_BUDGET
+    history_budget = _history_budget(repair_prompt, None, AGENT_FINALIZE_MAX_TOKENS)
+    messages, removals, context_update = _prepare_model_context(
+        state, history_budget
     )
     selection = select_model("repair", state.get("experiment"))
     response = build_llm(
@@ -551,10 +819,13 @@ def repair_node(state: AgentState) -> dict:
     ).invoke(
         [repair_prompt, *messages]
     )
+    usage_state = context_update.get("usage", state.get("usage"))
+    model_history = list(context_update.get("model_history", state.get("model_history") or []))
     return {
-        "messages": [response],
+        "messages": [*removals, response],
+        **context_update,
         "usage": add_usage(
-            state.get("usage"),
+            usage_state,
             response,
             _estimate_input_components(
                 [repair_prompt, *messages],
@@ -562,9 +833,8 @@ def repair_node(state: AgentState) -> dict:
             ),
         ),
         "repair_attempts": int(state.get("repair_attempts", 0)) + 1,
-        "context_stats": context_stats,
         "model_history": [
-            *list(state.get("model_history") or []),
+            *model_history,
             {"role": "repair", "model": selection.model, "variant": selection.variant},
         ],
     }
@@ -721,7 +991,6 @@ def get_all_tools():
     from ..tools.rag_search import rag_search_similar_games
     from ..tools.store_search import search_steam_store
     from ..tools.user_insight import save_user_insight
-    from ..tools.user_memory import recall_user_memory
     from ..tools.recall_message_detail import recall_message_detail
 
     return [
@@ -729,7 +998,6 @@ def get_all_tools():
         search_steam_store,
         rag_search_similar_games,
         save_user_insight,
-        recall_user_memory,
         recall_message_detail,
     ]
 
@@ -739,7 +1007,6 @@ def get_tool_map() -> dict:
     from ..tools.rag_search import rag_search_similar_games
     from ..tools.store_search import search_steam_store
     from ..tools.user_insight import save_user_insight
-    from ..tools.user_memory import recall_user_memory
     from ..tools.recall_message_detail import recall_message_detail
 
     return {
@@ -747,7 +1014,6 @@ def get_tool_map() -> dict:
         "search_steam_store": search_steam_store,
         "rag_search_similar_games": rag_search_similar_games,
         "save_user_insight": save_user_insight,
-        "recall_user_memory": recall_user_memory,
         "recall_message_detail": recall_message_detail,
     }
 

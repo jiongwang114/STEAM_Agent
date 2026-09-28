@@ -41,8 +41,48 @@ AGENT_MAX_REPAIR_ATTEMPTS: int = int(os.environ.get("AGENT_MAX_REPAIR_ATTEMPTS",
 AGENT_HISTORY_TOKEN_BUDGET: int = int(
     os.environ.get("AGENT_HISTORY_TOKEN_BUDGET", "6000")
 )
+AGENT_CONTEXT_WINDOW_TOKENS: int = int(
+    os.environ.get("AGENT_CONTEXT_WINDOW_TOKENS", "64000")
+)
+AGENT_TOOL_CONTEXT_RESERVE_TOKENS: int = int(
+    os.environ.get("AGENT_TOOL_CONTEXT_RESERVE_TOKENS", "4096")
+)
+AGENT_HISTORY_COMPRESSION_THRESHOLD: float = float(
+    os.environ.get("AGENT_HISTORY_COMPRESSION_THRESHOLD", "0.90")
+)
+AGENT_SUMMARY_MAX_TOKENS: int = int(
+    os.environ.get("AGENT_SUMMARY_MAX_TOKENS", "512")
+)
+MEMORY_SNAPSHOT_MAX_ITEMS: int = int(
+    os.environ.get("MEMORY_SNAPSHOT_MAX_ITEMS", "12")
+)
+MEMORY_SNAPSHOT_MAX_CHARS: int = int(
+    os.environ.get("MEMORY_SNAPSHOT_MAX_CHARS", "1800")
+)
+MEMORY_AGENT_ENABLED: bool = (
+    os.environ.get("MEMORY_AGENT_ENABLED", "true").lower() == "true"
+)
+MEMORY_AGENT_POLL_SECONDS: float = float(
+    os.environ.get("MEMORY_AGENT_POLL_SECONDS", "15")
+)
+MEMORY_AGENT_BATCH_SIZE: int = int(os.environ.get("MEMORY_AGENT_BATCH_SIZE", "5"))
+MEMORY_AGENT_MAX_ATTEMPTS: int = int(
+    os.environ.get("MEMORY_AGENT_MAX_ATTEMPTS", "5")
+)
+MEMORY_AGENT_LEASE_SECONDS: float = float(
+    os.environ.get("MEMORY_AGENT_LEASE_SECONDS", "300")
+)
+MEMORY_AGENT_RETRY_BASE_SECONDS: float = float(
+    os.environ.get("MEMORY_AGENT_RETRY_BASE_SECONDS", "30")
+)
+MEMORY_AGENT_MIN_CONFIDENCE: float = float(
+    os.environ.get("MEMORY_AGENT_MIN_CONFIDENCE", "0.85")
+)
 TOOL_TIMEOUT_SECONDS: float = float(os.environ.get("TOOL_TIMEOUT_SECONDS", "12"))
 TOOL_MAX_RETRIES: int = int(os.environ.get("TOOL_MAX_RETRIES", "1"))
+STEAM_PROFILE_WARMUP_TIMEOUT_SECONDS: float = float(
+    os.environ.get("STEAM_PROFILE_WARMUP_TIMEOUT_SECONDS", "5")
+)
 TOOL_CIRCUIT_FAILURE_THRESHOLD: int = int(
     os.environ.get("TOOL_CIRCUIT_FAILURE_THRESHOLD", "3")
 )
@@ -56,8 +96,28 @@ if AGENT_MAX_TOTAL_TOKENS < 1 or AGENT_MAX_WALL_SECONDS <= 0:
     raise ValueError("Agent token and wall-clock budgets must be positive")
 if AGENT_HISTORY_TOKEN_BUDGET < 512 or TOOL_RESULT_MAX_CHARS < 1000:
     raise ValueError("Agent history and tool result budgets are too small")
+if AGENT_CONTEXT_WINDOW_TOKENS < 4096 or AGENT_TOOL_CONTEXT_RESERVE_TOKENS < 0:
+    raise ValueError("Agent context window or tool reserve is invalid")
+if not 0 < AGENT_HISTORY_COMPRESSION_THRESHOLD <= 1:
+    raise ValueError("AGENT_HISTORY_COMPRESSION_THRESHOLD must be between 0 and 1")
+if AGENT_SUMMARY_MAX_TOKENS < 64:
+    raise ValueError("AGENT_SUMMARY_MAX_TOKENS is too small")
+if MEMORY_SNAPSHOT_MAX_ITEMS < 1 or MEMORY_SNAPSHOT_MAX_CHARS < 200:
+    raise ValueError("Memory snapshot limits are too small")
+if (
+    MEMORY_AGENT_POLL_SECONDS <= 0
+    or MEMORY_AGENT_BATCH_SIZE < 1
+    or MEMORY_AGENT_MAX_ATTEMPTS < 1
+    or MEMORY_AGENT_LEASE_SECONDS <= 0
+    or MEMORY_AGENT_RETRY_BASE_SECONDS <= 0
+):
+    raise ValueError("Memory agent queue settings are invalid")
+if not 0 < MEMORY_AGENT_MIN_CONFIDENCE <= 1:
+    raise ValueError("MEMORY_AGENT_MIN_CONFIDENCE must be between 0 and 1")
 if TOOL_TIMEOUT_SECONDS <= 0 or TOOL_MAX_RETRIES < 0:
     raise ValueError("Tool timeout must be positive and retries cannot be negative")
+if STEAM_PROFILE_WARMUP_TIMEOUT_SECONDS <= 0:
+    raise ValueError("Steam profile warmup timeout must be positive")
 if TOOL_CIRCUIT_FAILURE_THRESHOLD < 1 or TOOL_CIRCUIT_COOLDOWN_SECONDS <= 0:
     raise ValueError("Tool circuit-breaker settings must be positive")
 if LLM_REQUEST_TIMEOUT_SECONDS <= 0 or LLM_MAX_RETRIES < 0:
@@ -74,11 +134,10 @@ STEAM_STORE_URL: str = "https://store.steampowered.com/api"
 
 # --- Embedding ---
 EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
-MEMORY_EMBEDDING_MODEL: str = os.environ.get(
-    "MEMORY_EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+# Read-only cleanup target for existing user-memory vectors; no new vectors are written.
+LEGACY_MEMORY_COLLECTION_NAME: str = os.environ.get(
+    "MEMORY_COLLECTION_NAME", "user_memory_v2"
 )
-MEMORY_COLLECTION_NAME: str = os.environ.get("MEMORY_COLLECTION_NAME", "user_memory_v2")
 RERANKER_MODEL: str = os.environ.get(
     "RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
 )

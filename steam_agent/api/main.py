@@ -2,12 +2,15 @@ import logging
 import os
 import sqlite3
 import time
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import (
     CHROMA_PERSIST_DIR,
@@ -22,6 +25,7 @@ from ..config import (
 )
 from ..observability import (
     configure_logging,
+    get_request_id,
     metrics,
     reset_request_id,
     set_request_id,
@@ -54,6 +58,10 @@ async def lifespan(app: FastAPI):
     init_auth_table()
     from ..memory.message_store import init_messages_table
     init_messages_table()
+    from ..memory.session_summary import init_session_summaries_table
+    init_session_summaries_table()
+    from ..memory.async_memory import init_memory_tasks_table
+    init_memory_tasks_table()
     from ..memory.thread_title import init_threads_table
     init_threads_table()
     from ..rag.vector_store import index_compatibility
@@ -68,10 +76,154 @@ async def lifespan(app: FastAPI):
             }},
         )
     logging.info("Steam Agent API ready.")
-    yield
+
+    from ..memory.message_store import retry_pending_thread_deletions
+    from ..config import (
+        MEMORY_AGENT_BATCH_SIZE,
+        MEMORY_AGENT_ENABLED,
+        MEMORY_AGENT_POLL_SECONDS,
+    )
+    from ..memory.async_memory import run_pending_memory_tasks
+
+    try:
+        outcomes = await asyncio.to_thread(retry_pending_thread_deletions)
+        failed = sum(item["status"] == "partial" for item in outcomes)
+        if failed:
+            logging.warning("thread_cleanup_retry_incomplete", extra={"fields": {"failed": failed}})
+    except Exception as exc:
+        logging.warning(
+            "thread_cleanup_retry_failed",
+            extra={"fields": {"error_type": type(exc).__name__}},
+        )
+
+    if MEMORY_AGENT_ENABLED:
+        try:
+            await asyncio.to_thread(run_pending_memory_tasks, MEMORY_AGENT_BATCH_SIZE)
+        except Exception as exc:
+            logging.warning(
+                "memory_agent_startup_retry_failed",
+                extra={"fields": {"error_type": type(exc).__name__}},
+            )
+
+    async def cleanup_retry_worker():
+        while True:
+            await asyncio.sleep(30)
+            try:
+                outcomes = await asyncio.to_thread(retry_pending_thread_deletions)
+                failed = sum(item["status"] == "partial" for item in outcomes)
+                if failed:
+                    logging.warning(
+                        "thread_cleanup_retry_incomplete",
+                        extra={"fields": {"failed": failed}},
+                    )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logging.warning(
+                    "thread_cleanup_retry_failed",
+                    extra={"fields": {"error_type": type(exc).__name__}},
+                )
+
+    async def memory_agent_worker():
+        while True:
+            await asyncio.sleep(MEMORY_AGENT_POLL_SECONDS)
+            try:
+                outcomes = await asyncio.to_thread(
+                    run_pending_memory_tasks, MEMORY_AGENT_BATCH_SIZE
+                )
+                failed = sum(item["status"] in {"retry", "failed"} for item in outcomes)
+                if failed:
+                    logging.warning(
+                        "memory_agent_retry_incomplete",
+                        extra={"fields": {"failed": failed}},
+                    )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logging.warning(
+                    "memory_agent_worker_failed",
+                    extra={"fields": {"error_type": type(exc).__name__}},
+                )
+
+    cleanup_task = asyncio.create_task(cleanup_retry_worker())
+    memory_task = asyncio.create_task(memory_agent_worker()) if MEMORY_AGENT_ENABLED else None
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        if memory_task:
+            memory_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+        if memory_task:
+            try:
+                await memory_task
+            except asyncio.CancelledError:
+                pass
 
 
 app = FastAPI(title="Steam Game Recommendation Agent", version="0.1.0", lifespan=lifespan)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(request: Request, exc: StarletteHTTPException):
+    detail = exc.detail
+    if isinstance(detail, dict):
+        code = str(detail.get("code", "http_error"))
+        message = str(detail.get("message", "请求失败"))
+        extra = detail.get("details")
+    else:
+        code = "http_error"
+        message = str(detail)
+        extra = None
+    error = {"code": code, "message": message}
+    if extra is not None:
+        error["details"] = extra
+    return JSONResponse(
+        status_code=exc.status_code,
+        headers=exc.headers,
+        content={"error": error, "request_id": get_request_id()},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    errors = [
+        {
+            "location": item.get("loc", []),
+            "message": item.get("msg", "invalid value"),
+            "type": item.get("type", ""),
+        }
+        for item in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "invalid_request",
+                "message": "请求参数无效",
+                "details": errors,
+            },
+            "request_id": get_request_id(),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception):
+    logger.exception(
+        "unhandled_request_error",
+        extra={"fields": {"error_type": type(exc).__name__}},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {"code": "internal_error", "message": "服务器内部错误"},
+            "request_id": get_request_id(),
+        },
+    )
 
 
 @app.middleware("http")
@@ -89,7 +241,13 @@ async def observe_request(request: Request, call_next):
             if oversized:
                 response = JSONResponse(
                     status_code=413,
-                    content={"code": "request_too_large", "message": "请求体超过大小限制"},
+                    content={
+                        "error": {
+                            "code": "request_too_large",
+                            "message": "请求体超过大小限制",
+                        },
+                        "request_id": request_id,
+                    },
                 )
                 response.headers["X-Request-ID"] = request_id
                 status_code = response.status_code
@@ -158,8 +316,12 @@ def ready():
     except Exception:
         pass
     try:
-        from chromadb import PersistentClient
-        client = PersistentClient(path=CHROMA_PERSIST_DIR)
+        from ..rag.vector_store import _get_client
+
+        # Reuse the process-wide client. Opening a second PersistentClient for
+        # the same Chroma SQLite file can fail after agent requests initialize
+        # the vector store in this process.
+        client = _get_client()
         client.list_collections()
         checks["chroma"] = True
     except Exception:
@@ -183,9 +345,9 @@ def ready():
 def runtime_metrics(request: Request):
     """Return a dependency-free operational snapshot for demos and monitoring."""
     if METRICS_TOKEN and request.headers.get("X-Metrics-Token") != METRICS_TOKEN:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={"code": "metrics_auth_required", "message": "metrics access denied"},
+            detail={"code": "metrics_auth_required", "message": "metrics access denied"},
         )
     return metrics.snapshot()
 
@@ -193,7 +355,9 @@ def runtime_metrics(request: Request):
 def main():
     import uvicorn
 
-    uvicorn.run("steam_agent.api.main:app", host=HOST, port=PORT, reload=True)
+    # SQLite, Chroma and checkpoint files live below the watched project tree.
+    # Auto-reload would restart the service on normal runtime writes.
+    uvicorn.run("steam_agent.api.main:app", host=HOST, port=PORT, reload=False)
 
 
 if __name__ == "__main__":

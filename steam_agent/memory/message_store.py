@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 import sqlite3
+import json
+import logging
 from contextlib import contextmanager
+from threading import Lock
 
 from ..config import SQLITE_DB_PATH
+
+
+logger = logging.getLogger(__name__)
+
+
+# The API request and the background retry worker can observe the same task.
+# Serialize cleanup so legacy Chroma deletion is not run concurrently.
+_THREAD_CLEANUP_LOCK = Lock()
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -66,32 +77,44 @@ def init_messages_table() -> None:
         )
         conn.execute(
             """
-            CREATE TABLE IF NOT EXISTS archive_tasks (
-                task_id TEXT PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS thread_cleanup_tasks (
                 user_id TEXT NOT NULL,
                 thread_id TEXT NOT NULL,
-                turn_number INTEGER NOT NULL,
-                user_message TEXT NOT NULL,
-                assistant_reply TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
+                pending_layers_json TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0,
                 last_error TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                UNIQUE(user_id, thread_id, turn_number)
+                PRIMARY KEY(user_id, thread_id)
             )
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_archive_tasks_status "
-            "ON archive_tasks(status, updated_at)"
+            """
+            CREATE TABLE IF NOT EXISTS execution_summaries (
+                user_id TEXT NOT NULL,
+                thread_id TEXT NOT NULL,
+                turn_number INTEGER NOT NULL,
+                summary_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY(user_id, thread_id, turn_number)
+            )
+            """
         )
+        from .async_memory import create_memory_tasks_table
+
+        create_memory_tasks_table(conn)
 
 
 def reserve_turn_number(user_id: str, thread_id: str) -> int:
     """Allocate the next turn atomically across processes."""
     init_messages_table()
     with _transaction() as conn:
+        pending_cleanup = conn.execute(
+            "SELECT 1 FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone()
+        if pending_cleanup:
+            raise RuntimeError("thread deletion cleanup is pending")
         row = conn.execute(
             "SELECT next_turn FROM thread_counters WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
@@ -121,11 +144,17 @@ def archive_sqlite_turn(
     thread_id: str,
     user_message: str,
     assistant_reply: str,
-    timestamp: str,
+    execution: dict | None = None,
 ) -> dict:
-    """Write both messages and a pending Chroma task in one SQLite transaction."""
+    """Write the authoritative raw turn to SQLite in one transaction."""
     init_messages_table()
     with _transaction() as conn:
+        pending_cleanup = conn.execute(
+            "SELECT 1 FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone()
+        if pending_cleanup:
+            raise RuntimeError("thread deletion cleanup is pending")
         row = conn.execute(
             "SELECT next_turn FROM thread_counters WHERE user_id=? AND thread_id=?",
             (user_id, thread_id),
@@ -144,17 +173,6 @@ def archive_sqlite_turn(
             "ON CONFLICT(user_id, thread_id) DO UPDATE SET next_turn=excluded.next_turn",
             (user_id, thread_id, turn_number + 1),
         )
-        task_id = f"{user_id}:{thread_id}:{turn_number}"
-        existing = conn.execute(
-            "SELECT task_id, turn_number, status FROM archive_tasks WHERE task_id=?",
-            (task_id,),
-        ).fetchone()
-        if existing:
-            return {
-                "task_id": existing["task_id"],
-                "turn_number": int(existing["turn_number"]),
-                "status": existing["status"],
-            }
         conn.executemany(
             "INSERT INTO messages(user_id, thread_id, turn_number, role, content) VALUES(?,?,?,?,?)",
             [
@@ -162,48 +180,55 @@ def archive_sqlite_turn(
                 (user_id, thread_id, turn_number, "assistant", assistant_reply),
             ],
         )
-        conn.execute(
-            """
-            INSERT INTO archive_tasks(
-                task_id, user_id, thread_id, turn_number,
-                user_message, assistant_reply, timestamp
-            ) VALUES(?,?,?,?,?,?,?)
-            """,
-            (
-                task_id,
-                user_id,
-                thread_id,
-                turn_number,
-                user_message,
-                assistant_reply,
-                timestamp,
-            ),
-        )
-        return {"task_id": task_id, "turn_number": turn_number, "status": "pending"}
+        if execution:
+            conn.execute(
+                "INSERT INTO execution_summaries(user_id, thread_id, turn_number, summary_json) "
+                "VALUES(?,?,?,?)",
+                (user_id, thread_id, turn_number, json.dumps(_public_execution(execution), ensure_ascii=False)),
+            )
+        from .async_memory import enqueue_memory_extraction
+
+        enqueue_memory_extraction(conn, user_id, thread_id, turn_number)
+        return {"turn_number": turn_number, "status": "complete"}
 
 
-def update_archive_task(task_id: str, status: str, error: str = "") -> None:
-    init_messages_table()
-    with _transaction() as conn:
-        conn.execute(
-            "UPDATE archive_tasks SET status=?, attempts=attempts+1, last_error=?, "
-            "updated_at=datetime('now') WHERE task_id=?",
-            (status, error[:1000], task_id),
-        )
-
-
-def get_pending_archive_tasks(limit: int = 100) -> list[dict]:
+def thread_belongs_to_user(user_id: str, thread_id: str) -> bool:
+    """Check thread ownership against archived messages and thread metadata."""
+    if not user_id or not thread_id:
+        return False
     init_messages_table()
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT task_id, user_id, thread_id, turn_number, user_message, "
-        "assistant_reply, timestamp, status, attempts, last_error "
-        "FROM archive_tasks WHERE status IN ('pending','failed') "
-        "ORDER BY turn_number LIMIT ?",
-        (limit,),
-    ).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM messages WHERE user_id=? AND thread_id=? LIMIT 1",
+            (user_id, thread_id),
+        ).fetchone()
+        if row:
+            return True
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM threads_meta WHERE user_id=? AND thread_id=? LIMIT 1",
+                (user_id, thread_id),
+            ).fetchone()
+            return row is not None
+        except sqlite3.OperationalError:
+            return False
+    finally:
+        conn.close()
+
+
+def thread_cleanup_is_pending(user_id: str, thread_id: str) -> bool:
+    if not user_id or not thread_id:
+        return False
+    init_messages_table()
+    conn = _get_conn()
+    try:
+        return conn.execute(
+            "SELECT 1 FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone() is not None
+    finally:
+        conn.close()
 
 
 def add_message(user_id: str, thread_id: str, turn_number: int, role: str, content: str):
@@ -218,19 +243,57 @@ def add_message(user_id: str, thread_id: str, turn_number: int, role: str, conte
         )
 
 
+def _public_execution(execution: dict) -> dict:
+    """Keep only the user-facing execution fields in durable history."""
+    if not isinstance(execution, dict):
+        return {}
+    steps = []
+    for item in execution.get("steps") or []:
+        if not isinstance(item, dict):
+            continue
+        step = {
+            "name": str(item.get("name", ""))[:100],
+            "status": str(item.get("status", "unknown"))[:32],
+            "duration_ms": max(0, int(item.get("duration_ms", 0) or 0)),
+        }
+        if item.get("round") is not None:
+            step["round"] = max(0, int(item["round"]))
+        if step["name"]:
+            steps.append(step)
+    return {
+        "status": str(execution.get("status", "success"))[:32],
+        "duration_ms": max(0, int(execution.get("duration_ms", 0) or 0)),
+        "steps": steps,
+    }
+
+
+def _message_payload(row: sqlite3.Row) -> dict:
+    payload = {
+        "turn": row["turn_number"],
+        "role": row["role"],
+        "content": row["content"],
+        "time": row["created_at"],
+    }
+    if row["role"] == "assistant" and row["summary_json"]:
+        try:
+            payload["execution"] = _public_execution(json.loads(row["summary_json"]))
+        except (TypeError, json.JSONDecodeError):
+            pass
+    return payload
+
+
 def get_thread_messages(user_id: str, thread_id: str) -> list[dict]:
     init_messages_table()
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT turn_number, role, content, created_at FROM messages "
-        "WHERE user_id=? AND thread_id=? ORDER BY turn_number, id",
+        "SELECT m.turn_number, m.role, m.content, m.created_at, e.summary_json "
+        "FROM messages m LEFT JOIN execution_summaries e "
+        "ON e.user_id=m.user_id AND e.thread_id=m.thread_id AND e.turn_number=m.turn_number "
+        "WHERE m.user_id=? AND m.thread_id=? ORDER BY m.turn_number, m.id",
         (user_id, thread_id),
     ).fetchall()
     conn.close()
-    return [
-        {"turn": row["turn_number"], "role": row["role"], "content": row["content"], "time": row["created_at"]}
-        for row in rows
-    ]
+    return [_message_payload(row) for row in rows]
 
 
 def get_thread_list(user_id: str) -> list[dict]:
@@ -257,112 +320,270 @@ def get_messages_by_turn(
     init_messages_table()
     conn = _get_conn()
     query = (
-        "SELECT turn_number, role, content, created_at FROM messages "
-        "WHERE user_id=? AND thread_id=?"
+        "SELECT m.turn_number, m.role, m.content, m.created_at, e.summary_json "
+        "FROM messages m LEFT JOIN execution_summaries e "
+        "ON e.user_id=m.user_id AND e.thread_id=m.thread_id AND e.turn_number=m.turn_number "
+        "WHERE m.user_id=? AND m.thread_id=?"
     )
     params: list = [user_id, thread_id]
     if turn_number is not None:
-        query += " AND turn_number=?"
+        query += " AND m.turn_number=?"
         params.append(turn_number)
     if role is not None:
-        query += " AND role=?"
+        query += " AND m.role=?"
         params.append(role)
-    query += " ORDER BY turn_number, id"
+    query += " ORDER BY m.turn_number, m.id"
     rows = conn.execute(query, params).fetchall()
     conn.close()
-    return [
-        {"turn": row["turn_number"], "role": row["role"], "content": row["content"], "time": row["created_at"]}
-        for row in rows
-    ]
+    return [_message_payload(row) for row in rows]
 
 
-def get_all_conversation_turns() -> list[dict]:
-    init_messages_table()
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT user_id, thread_id, turn_number, "
-        "MAX(CASE WHEN role='user' THEN content END) AS user_message, "
-        "MAX(CASE WHEN role='assistant' THEN content END) AS assistant_reply, "
-        "MAX(created_at) AS created_at FROM messages "
-        "GROUP BY user_id, thread_id, turn_number "
-        "HAVING user_message IS NOT NULL AND assistant_reply IS NOT NULL "
-        "ORDER BY user_id, thread_id, turn_number"
-    ).fetchall()
-    conn.close()
-    return [
-        {
-            "user_id": row["user_id"],
-            "thread_id": row["thread_id"],
-            "turn_number": row["turn_number"],
-            "user_message": row["user_message"],
-            "assistant_reply": row["assistant_reply"],
-            "timestamp": row["created_at"],
-        }
-        for row in rows
+_THREAD_CLEANUP_LAYERS = (
+    "sqlite",
+    "session_summaries",
+    "thread_title",
+    "legacy_vector_cleanup",
+    "checkpoints",
+)
+
+
+def _delete_legacy_thread_vectors(collection, user_id: str, thread_id: str) -> None:
+    """Delete only matching legacy records without relying on Chroma `$and` syntax."""
+    try:
+        payload = collection.get(where={"user_id": user_id}, include=["metadatas"])
+    except ValueError:
+        payload = collection.get(where={"thread_id": thread_id}, include=["metadatas"])
+
+    ids = payload.get("ids", [])
+    metadatas = payload.get("metadatas", [])
+    matching_ids = [
+        record_id
+        for record_id, metadata in zip(ids, metadatas)
+        if isinstance(metadata, dict)
+        and str(metadata.get("user_id", "")) == user_id
+        and str(metadata.get("thread_id", "")) == thread_id
     ]
+    if matching_ids:
+        collection.delete(ids=matching_ids)
+
+
+def _store_pending_cleanup(user_id: str, thread_id: str, pending: list[str], error: str = "") -> None:
+    with _transaction() as conn:
+        if pending:
+            conn.execute(
+                "UPDATE thread_cleanup_tasks SET pending_layers_json=?, attempts=attempts+1, "
+                "last_error=?, updated_at=datetime('now') WHERE user_id=? AND thread_id=?",
+                (json.dumps(pending), error[:1000], user_id, thread_id),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+                (user_id, thread_id),
+            )
+
+
+def _run_thread_cleanup(user_id: str, thread_id: str, pending: list[str]) -> dict:
+    with _THREAD_CLEANUP_LOCK:
+        # A worker may have read a task just before an API request finished it.
+        # Re-read the durable task while holding the lock so stale work cannot
+        # recreate a cleanup task after the request has completed.
+        current_pending = _pending_for_thread(user_id, thread_id)
+        if not current_pending:
+            return {"status": "deleted", "layers": {}, "pending_layers": []}
+        return _run_thread_cleanup_locked(user_id, thread_id, current_pending)
+
+
+def _run_thread_cleanup_locked(user_id: str, thread_id: str, pending: list[str]) -> dict:
+    from ..api.security import qualified_thread_id
+    from ..config import CHECKPOINT_DB_PATH
+
+    result = {"status": "partial", "layers": {}}
+    failures: list[str] = []
+    remaining = list(pending)
+    for layer in pending:
+        try:
+            if layer == "sqlite":
+                with _transaction() as conn:
+                    conn.execute(
+                        "DELETE FROM messages WHERE user_id=? AND thread_id=?",
+                        (user_id, thread_id),
+                    )
+                    conn.execute(
+                        "DELETE FROM execution_summaries WHERE user_id=? AND thread_id=?",
+                        (user_id, thread_id),
+                    )
+                    conn.execute(
+                        "DELETE FROM memory_tasks WHERE user_id=? AND thread_id=?",
+                        (user_id, thread_id),
+                    )
+                    conn.execute(
+                        "DELETE FROM thread_counters WHERE user_id=? AND thread_id=?",
+                        (user_id, thread_id),
+                    )
+                    legacy_tasks = conn.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='archive_tasks'"
+                    ).fetchone()
+                    if legacy_tasks:
+                        conn.execute(
+                            "DELETE FROM archive_tasks WHERE user_id=? AND thread_id=?",
+                            (user_id, thread_id),
+                        )
+            elif layer == "session_summaries":
+                from .session_summary import delete_session_summaries
+
+                delete_session_summaries(user_id, thread_id)
+            elif layer == "thread_title":
+                from .thread_title import delete_thread_title
+
+                delete_thread_title(user_id, thread_id)
+            elif layer == "legacy_vector_cleanup":
+                from ..rag.vector_store import get_legacy_user_memory_collection
+
+                collection = get_legacy_user_memory_collection()
+                if collection is not None:
+                    _delete_legacy_thread_vectors(collection, user_id, thread_id)
+            elif layer == "checkpoints":
+                from pathlib import Path
+
+                checkpoint_path = Path(CHECKPOINT_DB_PATH)
+                if checkpoint_path.exists():
+                    cp_conn = sqlite3.connect(str(checkpoint_path), timeout=30.0)
+                    try:
+                        tables = {
+                            row[0]
+                            for row in cp_conn.execute(
+                                "SELECT name FROM sqlite_master WHERE type='table'"
+                            )
+                        }
+                        checkpoint_id = qualified_thread_id(user_id, thread_id)
+                        if "writes" in tables:
+                            cp_conn.execute(
+                                "DELETE FROM writes WHERE thread_id=?", (checkpoint_id,)
+                            )
+                        if "checkpoints" in tables:
+                            cp_conn.execute(
+                                "DELETE FROM checkpoints WHERE thread_id=?", (checkpoint_id,)
+                            )
+                        cp_conn.commit()
+                    finally:
+                        cp_conn.close()
+            else:
+                raise ValueError(f"unknown cleanup layer: {layer}")
+            result["layers"][layer] = "ok"
+            remaining.remove(layer)
+            _store_pending_cleanup(user_id, thread_id, remaining)
+        except Exception as exc:
+            result["layers"][layer] = f"error:{type(exc).__name__}"
+            detail = str(exc).strip().replace("\n", " ")[:300]
+            logger.warning(
+                "thread_cleanup_layer_failed",
+                extra={
+                    "fields": {
+                        "user_id": user_id,
+                        "thread_id": thread_id,
+                        "layer": layer,
+                        "error_type": type(exc).__name__,
+                        "error": detail,
+                    }
+                },
+            )
+            failures.append(f"{layer}:{type(exc).__name__}:{detail}")
+
+    for layer in set(_THREAD_CLEANUP_LAYERS) - set(pending):
+        result["layers"][layer] = "ok"
+    if remaining:
+        _store_pending_cleanup(user_id, thread_id, remaining, ",".join(failures))
+    else:
+        result["status"] = "deleted"
+    result["pending_layers"] = remaining
+    return result
 
 
 def delete_thread_detailed(user_id: str, thread_id: str) -> dict:
-    """Delete only the authenticated user's thread and report every layer."""
-    import sqlite3 as raw_sqlite
-
+    """Queue and perform idempotent cleanup, retaining failed layers for retry."""
     init_messages_table()
-    result = {"status": "not_found", "layers": {}}
-    conn = _get_conn()
-    try:
+    with _transaction() as conn:
+        task = conn.execute(
+            "SELECT pending_layers_json FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone()
         exists = conn.execute(
             "SELECT 1 FROM messages WHERE user_id=? AND thread_id=? LIMIT 1",
             (user_id, thread_id),
         ).fetchone()
         if not exists:
-            exists = conn.execute(
-                "SELECT 1 FROM archive_tasks WHERE user_id=? AND thread_id=? LIMIT 1",
-                (user_id, thread_id),
+            has_metadata = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='threads_meta'"
             ).fetchone()
-        result["status"] = "deleted" if exists else "not_found"
-        conn.execute("DELETE FROM messages WHERE user_id=? AND thread_id=?", (user_id, thread_id))
-        conn.execute("DELETE FROM archive_tasks WHERE user_id=? AND thread_id=?", (user_id, thread_id))
-        conn.execute("DELETE FROM thread_counters WHERE user_id=? AND thread_id=?", (user_id, thread_id))
-        conn.commit()
-        result["layers"]["sqlite"] = "ok"
-    except Exception as exc:
-        conn.rollback()
-        result["layers"]["sqlite"] = f"error:{type(exc).__name__}"
-        result["status"] = "partial"
+            if has_metadata:
+                exists = conn.execute(
+                    "SELECT 1 FROM threads_meta WHERE user_id=? AND thread_id=? LIMIT 1",
+                    (user_id, thread_id),
+                ).fetchone()
+        if not task and not exists:
+            return {"status": "not_found", "layers": {}, "pending_layers": []}
+        if task:
+            pending = json.loads(task["pending_layers_json"])
+        else:
+            pending = list(_THREAD_CLEANUP_LAYERS)
+            conn.execute(
+                "INSERT INTO thread_cleanup_tasks(user_id, thread_id, pending_layers_json) "
+                "VALUES(?,?,?)",
+                (user_id, thread_id, json.dumps(pending)),
+            )
+    return _run_thread_cleanup(user_id, thread_id, pending)
+
+
+def retry_thread_cleanup(user_id: str, thread_id: str) -> dict | None:
+    init_messages_table()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT pending_layers_json FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone()
     finally:
         conn.close()
+    if not row:
+        return None
+    return _run_thread_cleanup(user_id, thread_id, json.loads(row["pending_layers_json"]))
 
-    try:
-        from .thread_title import delete_thread_title
-        delete_thread_title(user_id, thread_id)
-        result["layers"]["thread_title"] = "ok"
-    except Exception as exc:
-        result["layers"]["thread_title"] = f"error:{type(exc).__name__}"
-        result["status"] = "partial"
 
+def retry_pending_thread_deletions(limit: int = 25) -> list[dict]:
+    init_messages_table()
+    conn = _get_conn()
     try:
-        from ..api.security import qualified_thread_id
-        from ..config import CHECKPOINT_DB_PATH
-        cp_conn = raw_sqlite.connect(CHECKPOINT_DB_PATH, timeout=30.0)
-        checkpoint_id = qualified_thread_id(user_id, thread_id)
-        cp_conn.execute("DELETE FROM writes WHERE thread_id=?", (checkpoint_id,))
-        cp_conn.execute("DELETE FROM checkpoints WHERE thread_id=?", (checkpoint_id,))
-        cp_conn.commit()
-        cp_conn.close()
-        result["layers"]["checkpoints"] = "ok"
-    except Exception as exc:
-        result["layers"]["checkpoints"] = f"error:{type(exc).__name__}"
-        result["status"] = "partial"
+        rows = conn.execute(
+            "SELECT user_id, thread_id FROM thread_cleanup_tasks "
+            "ORDER BY updated_at LIMIT ?",
+            (max(1, min(int(limit), 250)),),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "user_id": row["user_id"],
+            "thread_id": row["thread_id"],
+            **_run_thread_cleanup(
+                row["user_id"],
+                row["thread_id"],
+                _pending_for_thread(row["user_id"], row["thread_id"]),
+            ),
+        }
+        for row in rows
+    ]
 
+
+def _pending_for_thread(user_id: str, thread_id: str) -> list[str]:
+    conn = _get_conn()
     try:
-        from ..rag.vector_store import get_user_memory_collection
-        collection = get_user_memory_collection()
-        collection.delete(where={"$and": [{"user_id": user_id}, {"thread_id": thread_id}]})
-        result["layers"]["semantic_memory"] = "ok"
-    except Exception as exc:
-        result["layers"]["semantic_memory"] = f"error:{type(exc).__name__}"
-        result["status"] = "partial"
-    return result
+        row = conn.execute(
+            "SELECT pending_layers_json FROM thread_cleanup_tasks WHERE user_id=? AND thread_id=?",
+            (user_id, thread_id),
+        ).fetchone()
+        return json.loads(row["pending_layers_json"]) if row else []
+    finally:
+        conn.close()
 
 
 def delete_thread(user_id: str, thread_id: str) -> bool:

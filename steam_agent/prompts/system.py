@@ -1,5 +1,6 @@
 from langchain_core.messages import SystemMessage
 
+from ..config import MEMORY_SNAPSHOT_MAX_CHARS, MEMORY_SNAPSHOT_MAX_ITEMS
 from ..memory.insight_store import get_insights
 from .modules import (
     DECISION_POLICY,
@@ -12,21 +13,31 @@ from .modules import (
 )
 
 
-def build_system_prompt(user_id: str, steam_id: str | None = None) -> SystemMessage:
+def build_system_prompt(
+    user_id: str,
+    steam_id: str | None = None,
+    *,
+    thread_id: str = "",
+    insights: list[dict] | None = None,
+    steam_profile: str | None = None,
+) -> SystemMessage:
     context = [
         f"prompt_version: {PROMPT_VERSION}",
         f"user_id: {user_id or 'unknown'}",
         f"steam_id: {steam_id if steam_id else '未提供'}",
+        f"thread_id: {thread_id or '未提供'}",
     ]
-    insights = _format_insights(user_id)
-    if insights:
-        context.append("已确认用户画像：\n" + insights)
+    formatted_insights = _format_insights(user_id, insights)
+    if formatted_insights:
+        context.append("已确认用户画像：\n" + formatted_insights)
     if steam_id:
-        try:
-            from ..memory.game_profile import get_game_profile
-            profile = get_game_profile(steam_id)
-        except Exception:
-            profile = ""
+        profile = steam_profile
+        if profile is None:
+            try:
+                from ..memory.game_profile import get_game_profile
+                profile = get_game_profile(steam_id)
+            except Exception:
+                profile = ""
         if profile:
             context.append("Steam 游戏档案（缓存摘要，仅用于个性化线索）：\n" + profile[:1800])
     return SystemMessage(content="\n\n".join([
@@ -40,10 +51,19 @@ def build_system_prompt(user_id: str, steam_id: str | None = None) -> SystemMess
     ]))
 
 
-def _format_insights(user_id: str) -> str:
-    if not user_id:
+def _format_insights(user_id: str, insights: list[dict] | None = None) -> str:
+    if not user_id and insights is None:
         return ""
-    rows = get_insights(user_id)
-    return "\n".join(
-        f"- [{item['category']}] {item['insight']}" for item in rows[:12]
-    )
+    rows = insights if insights is not None else get_insights(user_id, limit=MEMORY_SNAPSHOT_MAX_ITEMS)
+    lines: list[str] = []
+    total_chars = 0
+    for item in rows[:MEMORY_SNAPSHOT_MAX_ITEMS]:
+        line = (
+            f"- [{item['category']}] [memory_key: {item['normalized_key']}] "
+            f"{item['insight']}"
+        )
+        if total_chars + len(line) > MEMORY_SNAPSHOT_MAX_CHARS:
+            break
+        lines.append(line)
+        total_chars += len(line) + 1
+    return "\n".join(lines)

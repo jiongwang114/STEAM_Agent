@@ -18,12 +18,7 @@ venv/
 Thumbs.db
 
 # Docs (don't need in container)
-DESIGN.md
-RAG评测总结.md
 EVAL_ROADMAP.md
-EVAL_STEPS.md
-FILE_STRUCTURE.md
-MEMORY_TEST_CASES.md
 
 # Test artifacts
 steam_agent/tests/test_logs/
