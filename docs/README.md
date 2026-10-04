@@ -1,11 +1,21 @@
-# 文档说明
+# Steam Agent 当前实现文档
 
-Steam Agent 当前实现文档位于 [`steam_agent/docs/`](../steam_agent/docs/README.md)，
-以该目录中的 API 契约、部署说明、前端设计、记忆架构和实施进度为准。
+本目录是当前代码的实现文档唯一来源。文档描述应以当前工作树代码、测试和
+本目录的最新记录为准；历史设计和旧任务清单不作为当前行为依据。
 
-本目录只保留两类辅助材料：
+## 阅读顺序
 
-- `AGENT_ENGINEERING.md` 和根目录工程化路线：Agent 工程设计、评测和演进方向。
-- `AI_AGENT_INTERVIEW_*.md` 及仓库根目录的面试指南 PDF：仅在明确进行面试训练时使用。
+1. [后端与前端实施技术文档](后端与前端实施技术文档.md)：总体边界和组件关系。
+2. [API 契约](API_CONTRACT.md)：前后端接口、错误结构和 SSE 事件。
+3. [后端开发与部署说明](BACKEND_DEPLOYMENT.md)：启动、备份、测试和后台任务。
+4. [前端页面与实施设计](FRONTEND_DESIGN.md)：页面结构、交互和验收状态。
+5. [记忆架构优化技术文档](MEMORY_ARCHITECTURE_OPTIMIZATION.md)：长期记忆、摘要和历史查询。
+6. [实施进度记录](IMPLEMENTATION_PROGRESS.md)：按时间追加的完成内容、测试结果和遗留问题。
 
-历史设计、旧实施计划和旧手工测试记录不再放在当前文档目录中。
+## 权威规则
+
+- API 字段、状态码和 SSE 事件以 `API_CONTRACT.md` 为准。
+- 部署命令、运行配置和恢复操作以 `BACKEND_DEPLOYMENT.md` 为准。
+- 当前完成状态以 `IMPLEMENTATION_PROGRESS.md` 和代码、测试结果共同判断。
+- 修改接口或用户可见行为时，必须同步更新对应文档和测试。
+- 根目录 `docs/` 中的训练材料不属于运行时实现文档。

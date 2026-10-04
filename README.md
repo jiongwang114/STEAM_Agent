@@ -1,79 +1,116 @@
 # STEAM Agent
 
-基于 LangGraph 的 Steam 游戏推荐助手。它会根据用户的自然语言需求，按需检索游戏资料、Steam 商店信息和已绑定账号的游玩记录，并结合历史对话提供个性化推荐。
+STEAM Agent 是面向 Steam 玩家的 AI 游戏发现助手。它把自然语言需求、Steam 档案、游戏知识库和历史记忆组合起来，输出带证据约束的个性化推荐，并通过 SSE 展示真实的 Agent 节点阶段。
 
-在线体验：[www.jiongplay.cn](http://www.jiongplay.cn)
+在线体验：**[https://jiongplay.cn](https://jiongplay.cn)**
 
-## 功能
+## 首页截图
 
-- 支持注册登录、Steam 账号绑定和多轮对话
-- 使用混合 RAG 检索游戏，并可查询 Steam 商店信息和用户游玩记录
-- 将结构化用户偏好、会话摘要和原始对话保存到 SQLite；Chroma 主要服务于游戏知识库
-- 提供流式回复、输入防护和工具调用预算控制
+当前正式前端入口是 `night-museum-frontend/index.html`，后端启动后会直接托管该页面。以下为未登录首页预览，登录和 Steam 绑定不是浏览首页的前置条件。
 
-## 文档
+首页截图尚未保存为仓库图片文件；可通过上方在线地址查看当前页面。
 
-当前实现文档以 [`steam_agent/docs/README.md`](steam_agent/docs/README.md) 为准，
-包括 API 契约、后端部署、前端设计、记忆架构和实施进度。评测路线见
-[`EVAL_ROADMAP.md`](EVAL_ROADMAP.md)。
+## 完整运行流程
 
-根目录 `docs/` 仅保留工程化说明和 AI Agent 面试训练材料；历史设计、旧任务
-清单和旧测试记录不再作为当前实现依据。
+```mermaid
+flowchart TD
+    A[用户问题] --> B[FastAPI /chat 或 /chat/stream]
+    B --> C[创建或恢复 AgentState]
+    C --> D[initialize_context]
+    D --> D1[读取用户记忆]
+    D --> D2[读取 Steam 档案]
+    D --> D3[读取会话摘要]
+    D --> D4[提取用户条件]
+    D --> E[guard 安全检查]
+    E -->|拦截| Z[直接结束并返回安全提示]
+    E -->|通过| F[agent 大模型判断]
+    F -->|直接回答| G[validate]
+    F -->|请求工具| H[tools]
+    H --> H1[查相似游戏]
+    H --> H2[查 Steam 商店]
+    H --> H3[查游戏时长]
+    H --> H4[查历史记忆]
+    H1 --> I[结果加入 messages 和 evidence]
+    H2 --> I
+    H3 --> I
+    H4 --> I
+    I --> F
+    I -->|工具预算终止| J[finalize 整理最终答案]
+    J --> G
+    G -->|通过| K[归档并返回前端]
+    G -->|失败| L[repair 修复]
+    L --> G
+    G -->|多次失败| M[safe_fallback]
+    M --> K
+```
 
-## 技术栈
+四类对外阶段由真实内部节点事件驱动：`analysis`、`retrieval`、`validation`、`response`。每个节点开始和完成时发送 `started` / `completed`，前端不再使用固定时间动画模拟进度。
 
-Python 3.11、FastAPI、LangGraph、DeepSeek、Chroma、SQLite。
+## 文件架构
+
+```text
+
+├─ 
+│  ├─ api/                  # FastAPI 接口、SSE、认证和静态前端挂载
+│  ├─ graph/                # LangGraph 节点、AgentState 和条件路由
+│  ├─ guard/                # 分层安全检查和范围控制
+│  ├─ memory/               # 用户记忆、会话摘要、消息归档和标题
+│  ├─ rag/                  # Steam 游戏缓存、向量检索、混合检索和重排
+│  ├─ tools/                # 相似游戏、商店、游玩时长和历史记忆工具
+│  ├─ prompts/              # 系统提示词、工具策略和 JSON 输出规范
+│  ├─ night-museum-frontend/
+│  │  ├─ index.html         # 当前正式首页
+│  │  ├─ app.js             # SSE 消费、对话状态和推荐卡片渲染
+│  │  ├─ styles.css         # 页面基础样式
+│  │  └─ generated-images/  # 推荐卡片视觉资源
+│  ├─ config.py             # 环境变量、模型和运行参数
+│  ├─ llm_client.py         # DeepSeek/custom OpenAI 兼容客户端
+│  ├─ model_routing.py      # 快速模型和候选模型选择
+│  ├─ requirements.txt      # Python 运行依赖
+│  └─ tests/                # 单元、接口和 RAG 测试
+├─ docs/                    # API、部署、前端和评测文档
+└─ README.md                # 项目总览和部署入口
+```
+
+## Agent 基础介绍与应用场景
+
+Agent 不是一次性调用模型，而是围绕 `AgentState` 进行可恢复的多轮决策：先读取上下文，再判断是否需要工具；工具结果会进入 `messages` 和 `evidence`，最后经过校验、修复或安全兜底后返回。
+
+- **模糊偏好探索**：从“像某款游戏但更短、更轻松”等描述中提取条件。
+- **Steam 档案推荐**：结合已拥有游戏、游玩时长和长期偏好减少重复推荐。
+- **相似游戏发现**：从知识库检索题材、玩法和氛围相近的候选。
+- **约束型选购**：按多人、价格、平台、时长、语言或发行状态筛选。
+- **连续对话**：在同一会话中逐步补充偏好，读取摘要后继续判断。
 
 ## 本地运行
 
-需要 Python 3.11+、[DeepSeek API Key](https://platform.deepseek.com/) 和 [Steam Web API Key](https://steamcommunity.com/dev/apikey)。
-
-```bash
-git clone https://github.com/jiongwang114/STEAM_Agent.git
+```powershell
+git clone https://github.com/jiongwang114/git
 cd STEAM_Agent
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
-pip install -r steam_agent/requirements.txt
-cp steam_agent/.env.example steam_agent/.env
+.venv\Scripts\activate
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python -m api.main
 ```
 
-在 `steam_agent/.env` 中填写 `DEEPSEEK_API_KEY` 和 `STEAM_API_KEY`，然后构建本地游戏向量索引并启动：
+后端默认监听 `http://localhost:8000`，并托管当前正式前端；健康检查为 `/health`，就绪检查为 `/ready`，交互式 API 文档为 `/docs`。首次使用 RAG 时可执行 `python -m rag.ingest --from-cache` 构建本地索引。
 
-```bash
-python -m steam_agent.rag.ingest --from-cache
-python -m steam_agent.api.main
-```
+## 模型配置
 
-访问 <http://localhost:8000>。首次构建索引或使用重排模型时会下载模型文件；仓库包含游戏缓存，但不包含生成后的 Chroma 索引。
+在 `.env` 中通过 `LLM_PROVIDER` 切换厂商：`custom` 使用 `CUSTOM_LLM_MODEL`、`CUSTOM_LLM_BASE_URL` 和 `CUSTOM_LLM_API_KEY`；`deepseek` 使用 `LLM_MODEL`、`DEEPSEEK_BASE_URL` 和 `DEEPSEEK_API_KEY`。修改后重启后端即可生效。
 
-PowerShell 下复制环境模板可使用：
+## 常用接口和测试
 
-```powershell
-Copy-Item steam_agent/.env.example steam_agent/.env
-```
-
-## Docker
-
-先复制并填写 `steam_agent/.env`，再启动容器：
-
-```bash
-docker compose up -d --build
-docker compose exec steam-agent python -m steam_agent.rag.ingest --from-cache
-```
-
-容器首次启动后生成索引；健康就绪状态可通过 `/ready` 查看。SQLite 和 Chroma 数据保存在宿主机挂载目录中。
-
-## 常用接口
-
-- `POST /chat`：对话
+- `POST /chat`：同步对话
 - `POST /chat/stream`：SSE 流式对话
-- `/auth/*`、`/bind-steam`：账号与 Steam 绑定
+- `GET /chat/runs/{thread_id}`：恢复运行中的流
+- `/auth/*`、`/bind-steam`：认证和 Steam 绑定
 - `/threads`、`/messages`：会话和消息记录
-- `/health`、`/ready`、`/metrics`：健康、就绪与运行指标
-- `/docs`：交互式 API 文档
-
-运行测试：
+- `/health`、`/ready`、`/metrics`：健康、就绪和指标
 
 ```bash
-pytest -q steam_agent/tests
+pytest -q tests
 ```
+
+更多说明见 [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)、[`docs/BACKEND_DEPLOYMENT.md`](docs/BACKEND_DEPLOYMENT.md) 和 [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md)。

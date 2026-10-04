@@ -1,0 +1,217 @@
+{
+  "game_count": 1000,
+  "vector_count": 2088,
+  "embedding_dimension": 768,
+  "compatibility": {
+    "status": "ok",
+    "compatible": true,
+    "mismatches": {},
+    "index_version": "games-20260930161408-21620"
+  },
+  "probes": [
+    {
+      "query": "single-player underwater survival exploration crafting submarine base building",
+      "expected_appid": "264710",
+      "expected_rank": 1,
+      "results": [
+        {
+          "appid": "264710",
+          "name": "Subnautica"
+        },
+        {
+          "appid": "1962700",
+          "name": "Subnautica 2"
+        },
+        {
+          "appid": "1284190",
+          "name": "The Planet Crafter"
+        },
+        {
+          "appid": "427410",
+          "name": "Abiotic Factor"
+        },
+        {
+          "appid": "1621690",
+          "name": "Core Keeper"
+        },
+        {
+          "appid": "648800",
+          "name": "Raft"
+        },
+        {
+          "appid": "1149460",
+          "name": "ICARUS"
+        },
+        {
+          "appid": "242760",
+          "name": "The Forest"
+        },
+        {
+          "appid": "2661300",
+          "name": "Grounded 2"
+        },
+        {
+          "appid": "526870",
+          "name": "Satisfactory"
+        }
+      ],
+      "retrieval": {
+        "dense_candidates": 50,
+        "lexical_candidates": 50,
+        "fused_candidates": 74,
+        "reranker_used": true,
+        "dense_error": "",
+        "mode": {
+          "dense": true,
+          "lexical": true,
+          "reranker": true,
+          "reranker_weight": 0.5
+        },
+        "timings": {
+          "index_load_ms": 592.599,
+          "dense_ms": 110.56,
+          "lexical_ms": 28.881,
+          "fusion_ms": 0.06,
+          "rerank_ms": 7926.603,
+          "total_ms": 8658.741
+        }
+      }
+    },
+    {
+      "query": "cooperative dwarves mining minerals fighting alien bugs in caves",
+      "expected_appid": "548430",
+      "expected_rank": 1,
+      "results": [
+        {
+          "appid": "548430",
+          "name": "Deep Rock Galactic"
+        },
+        {
+          "appid": "1621690",
+          "name": "Core Keeper"
+        },
+        {
+          "appid": "427520",
+          "name": "Factorio"
+        },
+        {
+          "appid": "632360",
+          "name": "Risk of Rain 2"
+        },
+        {
+          "appid": "2787320",
+          "name": "Revenge of the Savage Planet"
+        },
+        {
+          "appid": "427410",
+          "name": "Abiotic Factor"
+        },
+        {
+          "appid": "413150",
+          "name": "Stardew Valley"
+        },
+        {
+          "appid": "1284190",
+          "name": "The Planet Crafter"
+        },
+        {
+          "appid": "371970",
+          "name": "Barony"
+        },
+        {
+          "appid": "1962700",
+          "name": "Subnautica 2"
+        }
+      ],
+      "retrieval": {
+        "dense_candidates": 50,
+        "lexical_candidates": 50,
+        "fused_candidates": 85,
+        "reranker_used": true,
+        "dense_error": "",
+        "mode": {
+          "dense": true,
+          "lexical": true,
+          "reranker": true,
+          "reranker_weight": 0.5
+        },
+        "timings": {
+          "index_load_ms": 0.428,
+          "dense_ms": 64.532,
+          "lexical_ms": 10.873,
+          "fusion_ms": 0.059,
+          "rerank_ms": 1754.964,
+          "total_ms": 1830.889
+        }
+      }
+    },
+    {
+      "query": "relaxing farming growing crops fishing relationships village life",
+      "expected_appid": "413150",
+      "expected_rank": 1,
+      "results": [
+        {
+          "appid": "413150",
+          "name": "Stardew Valley"
+        },
+        {
+          "appid": "3195440",
+          "name": "Welcome to Elderfield"
+        },
+        {
+          "appid": "2300320",
+          "name": "Farming Simulator 25"
+        },
+        {
+          "appid": "2238470",
+          "name": "Grimshire"
+        },
+        {
+          "appid": "4258770",
+          "name": "Dread Fields"
+        },
+        {
+          "appid": "2142790",
+          "name": "Fields of Mistria"
+        },
+        {
+          "appid": "3115220",
+          "name": "Town to City"
+        },
+        {
+          "appid": "2707930",
+          "name": "Palia"
+        },
+        {
+          "appid": "1623730",
+          "name": "Palworld"
+        },
+        {
+          "appid": "4025700",
+          "name": "Heartopia"
+        }
+      ],
+      "retrieval": {
+        "dense_candidates": 50,
+        "lexical_candidates": 50,
+        "fused_candidates": 79,
+        "reranker_used": true,
+        "dense_error": "",
+        "mode": {
+          "dense": true,
+          "lexical": true,
+          "reranker": true,
+          "reranker_weight": 0.5
+        },
+        "timings": {
+          "index_load_ms": 0.55,
+          "dense_ms": 66.28,
+          "lexical_ms": 28.012,
+          "fusion_ms": 0.057,
+          "rerank_ms": 1479.265,
+          "total_ms": 1574.201
+        }
+      }
+    }
+  ]
+}
