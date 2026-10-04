@@ -12,7 +12,7 @@ CUSTOM_LLM_API_KEY: str = os.environ.get("CUSTOM_LLM_API_KEY", "")
 CUSTOM_LLM_BASE_URL: str = os.environ.get(
     "CUSTOM_LLM_BASE_URL", "https://codex.wlbclub.com"
 )
-CUSTOM_LLM_MODEL: str = os.environ.get("CUSTOM_LLM_MODEL", "gpt-5.6-sol")
+CUSTOM_LLM_MODEL: str = os.environ.get("CUSTOM_LLM_MODEL", "gpt-6-luna")
 CUSTOM_LLM_REASONING_EFFORT: str = os.environ.get(
     "CUSTOM_LLM_REASONING_EFFORT", "low"
 ).lower()

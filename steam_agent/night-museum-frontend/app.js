@@ -289,12 +289,21 @@ document.addEventListener('click', (event) => {
   });
 });
 const stages = ['正在分析偏好', '正在读取 Steam 信息', '正在比对游戏特征', '正在整理推荐理由'];
-function startStages(message) { let index = 0; clearInterval(message.stageTimer); message.stageTimer = setInterval(() => { if (!message.processing) return clearInterval(message.stageTimer); message.stage = stages[index++ % stages.length]; const label = $('#messages .assistant-block:last-child .status-stage'); if (label) label.textContent = message.stage; }, 2400); }
-function stopStages(message) { message.processing = false; clearInterval(message.stageTimer); }
+const stageLabels = { analysis: '正在分析偏好', retrieval: '正在读取 Steam 信息', validation: '正在比对游戏特征', response: '正在整理推荐理由' };
+function startStages(message) { message.stage = stages[0]; }
+function stopStages(message) { message.processing = false; }
 
 function handleStreamEvent(event, assistant, threadId) {
   if (threadId !== state.threadId) return;
   if (event.event === 'status') { assistant.stage = typeof event.data === 'string' ? event.data : stages[0]; renderMessages(); }
+  if (event.event === 'stage') {
+    const stage = event.data || {};
+    assistant.stageCategory = stage.category || assistant.stageCategory;
+    assistant.stageNode = stage.node || assistant.stageNode;
+    assistant.stageStatus = stage.status || assistant.stageStatus;
+    assistant.stage = stageLabels[assistant.stageCategory] || assistant.stage;
+    renderMessages();
+  }
   if (event.event === 'token') { assistant.rawContent = (assistant.rawContent || '') + String(event.data || ''); }
   if (event.event === 'snapshot') {
     const snapshot = event.data || {}; assistant.stage = snapshot.stream_status || assistant.stage;
@@ -321,7 +330,7 @@ async function runMessage(text, retry = false) {
     if (!finished) { stopStages(assistant); assistant.incomplete = true; assistant.error = '连接中断，回答尚未完成'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
   } catch (error) {
     stopStages(assistant); if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = !!assistant.content; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); if (error.status === 401) { $('#prompt').value = text; $('#charCount').textContent = `${text.length} / ${MAX_MESSAGE_LENGTH}`; expireLogin(); } renderMessages(); }
-  } finally { clearInterval(assistant.stageTimer); if (state.stream === controller) state.stream = null; state.busy = false; refreshSessions().catch(() => {}); }
+  } finally { if (state.stream === controller) state.stream = null; state.busy = false; refreshSessions().catch(() => {}); }
 }
 async function attachRun(threadId) {
   const assistant = { role: 'assistant', content: '', processing: true, stage: stages[0] }; state.messages.push(assistant); renderMessages(); startStages(assistant);

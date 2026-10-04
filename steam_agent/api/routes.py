@@ -243,6 +243,19 @@ _TOOL_STATUS: dict[str, str] = {
     "recall_message_detail": "翻翻之前的对话记录...",
 }
 
+# Internal LangGraph nodes are intentionally hidden behind a small public
+# vocabulary so the stream contract remains stable as the graph evolves.
+_STAGE_CATEGORIES: dict[str, str] = {
+    "guard": "analysis",
+    "initialize_context": "analysis",
+    "agent": "analysis",
+    "tools": "retrieval",
+    "validate": "validation",
+    "repair": "validation",
+    "finalize": "response",
+    "safe_fallback": "response",
+}
+
 _TOOL_DISPLAY_NAMES: dict[str, str] = {
     "get_user_playtime": "读取你的游戏库",
     "rag_search_similar_games": "查找相似游戏",
@@ -481,7 +494,7 @@ def _normalize_reply(raw_reply: str) -> tuple[str, dict]:
                 "name": str(item.get("name", "")),
                 "store_url": str(item.get("store_url", "")),
                 "image_url": str(item.get("image_url", "")),
-                "reason": str(item.get("reason", "")),
+                "reason": str(item.get("reason", ""))[:300],
             })
         envelope = {"summary": parsed["summary"], "games": games}
     else:
@@ -550,6 +563,17 @@ async def _execute_agent_events(
                 async for event in graph.astream_events(initial_state, config, version="v2"):
                     kind = event.get("event", "")
                     metadata = event.get("metadata", {})
+                    node_name = metadata.get("langgraph_node") or event.get("name", "")
+                    category = _STAGE_CATEGORIES.get(node_name)
+                    if category and kind in {"on_chain_start", "on_chain_end"}:
+                        yield {
+                            "event": "stage",
+                            "data": {
+                                "category": category,
+                                "node": node_name,
+                                "status": "started" if kind == "on_chain_start" else "completed",
+                            },
+                        }
                     if kind == "on_chat_model_stream":
                         if metadata.get("langgraph_node") == "guard":
                             continue

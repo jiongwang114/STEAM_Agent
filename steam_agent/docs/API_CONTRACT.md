@@ -71,6 +71,7 @@
 | 事件 | `data` 类型 | 含义 |
 |---|---|---|
 | `snapshot` | object | 订阅建立时的当前运行快照：`run_id`、`thread_id`、`message`、累计 `reply`、`status`、`stream_status`、`progress`、`error` 和可选完整 `result`。 |
+| `stage` | object | LangGraph 节点生命周期：`{ "category": "analysis" | "retrieval" | "validation" | "response", "node": string, "status": "started" | "completed" }`。 |
 | `status` | string | 工具执行状态 |
 | `token` | string | 模型增量输出；客户端应暂存，不将片段直接作为最终结构化回答渲染 |
 | `error` | object | 可恢复错误：`{ "code", "message" }`；之后仍会发送兜底文字和 `done` |

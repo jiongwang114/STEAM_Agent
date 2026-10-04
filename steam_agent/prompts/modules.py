@@ -138,7 +138,7 @@ OUTPUT_FORMAT = """## 最终输出格式
 
 推荐游戏时，将简短总结放入 `summary`，并在 `games` 中填写候选游戏。
 每个游戏必须包含：`appid`、`name`、`store_url`、`image_url`、`reason`。
-`reason` 简洁说明该游戏与用户条件的具体关系，不超过 100 个中文字符。
+`reason` 简洁说明该游戏与用户条件的具体关系，不超过 300 个字符。
 
 角色化表达只能出现在 `summary` 或 `reason` 中，不能增加字段或破坏 JSON 结构。"""
 
