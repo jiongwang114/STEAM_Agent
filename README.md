@@ -51,23 +51,23 @@ flowchart TD
 ```text
 
 ├─ 
-│  ├─ api/                  # FastAPI 接口、SSE、认证和静态前端挂载
-│  ├─ graph/                # LangGraph 节点、AgentState 和条件路由
-│  ├─ guard/                # 分层安全检查和范围控制
-│  ├─ memory/               # 用户记忆、会话摘要、消息归档和标题
-│  ├─ rag/                  # Steam 游戏缓存、向量检索、混合检索和重排
-│  ├─ tools/                # 相似游戏、商店、游玩时长和历史记忆工具
-│  ├─ prompts/              # 系统提示词、工具策略和 JSON 输出规范
-│  ├─ night-museum-frontend/
-│  │  ├─ index.html         # 当前正式首页
-│  │  ├─ app.js             # SSE 消费、对话状态和推荐卡片渲染
-│  │  ├─ styles.css         # 页面基础样式
-│  │  └─ generated-images/  # 推荐卡片视觉资源
-│  ├─ config.py             # 环境变量、模型和运行参数
-│  ├─ llm_client.py         # DeepSeek/custom OpenAI 兼容客户端
-│  ├─ model_routing.py      # 快速模型和候选模型选择
-│  ├─ requirements.txt      # Python 运行依赖
-│  └─ tests/                # 单元、接口和 RAG 测试
+├─ api/                  # FastAPI 接口、SSE、认证和静态前端挂载
+├─ graph/                # LangGraph 节点、AgentState 和条件路由
+├─ guard/                # 分层安全检查和范围控制
+├─ memory/               # 用户记忆、会话摘要、消息归档和标题
+├─ rag/                  # Steam 游戏缓存、向量检索、混合检索和重排
+├─ tools/                # 相似游戏、商店、游玩时长和历史记忆工具
+├─ prompts/              # 系统提示词、工具策略和 JSON 输出规范
+├─ night-museum-frontend/
+│  ├─ index.html         # 当前正式首页
+│  ├─ app.js             # SSE 消费、对话状态和推荐卡片渲染
+│  ├─ styles.css         # 页面基础样式
+│  ├─ generated-images/  # 推荐卡片视觉资源
+├─ config.py             # 环境变量、模型和运行参数
+├─ llm_client.py         # DeepSeek/custom OpenAI 兼容客户端
+├─ model_routing.py      # 快速模型和候选模型选择
+├─ requirements.txt      # Python 运行依赖
+├─ tests/                # 单元、接口和 RAG 测试
 ├─ docs/                    # API、部署、前端和评测文档
 └─ README.md                # 项目总览和部署入口
 ```
