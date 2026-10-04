@@ -129,6 +129,9 @@ html,body{height:100%;overflow:hidden}
 
 /* Hover is the visual state; avoid a persistent badge or stale empty image layer. */
 .curation-card.selected .paper-head:after{display:none !important;}
+
+/* Keep recommendation evidence in the expandable note and give cover art more room. */
+.curation-card .paper-copy{padding:12px 16px 10px}
 .ambient-game-image:not(.has-image){background-image:none !important;opacity:0 !important;}
 .curation-card.selected{border-color:rgba(241,217,130,.82) !important;box-shadow:0 0 0 2px rgba(241,217,130,.16),0 24px 48px rgba(0,0,0,.48),0 0 26px rgba(241,217,130,.1) !important;filter:saturate(1.06) brightness(1.04);}
 

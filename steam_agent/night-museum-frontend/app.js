@@ -201,8 +201,8 @@ function paperFor(game, index) {
   if (game.image) { const img = node('img'); img.src = game.image; img.alt = `${game.name} 游戏封面`; img.loading = 'lazy'; img.onerror = () => img.remove(); cover.append(img); }
   else cover.append(node('span', '', game.name));
   const copy = node('div', 'paper-copy');
-  const descriptor = [game.genre, game.mood].filter(Boolean).join(' · ');
-  copy.append(node('h3', '', inlineMarkdown(game.name)), node('p', 'paper-kicker', descriptor), node('p', '', inlineMarkdown(game.reason || '查看这件藏品的 Steam 页面。')));
+  // Keep the card focused on the title; the recommendation evidence lives in the expandable note below.
+  copy.append(node('h3', '', inlineMarkdown(game.name)));
   const link = node('a', 'text-btn', '在 Steam 查看 ↗'); link.href = game.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; copy.append(link); grid.append(cover, copy);
   const toggle = button('展开依据 ＋', 'reason-toggle', () => { reason.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(reason.classList.contains('open'))); toggle.textContent = reason.classList.contains('open') ? '收起依据 −' : '展开依据 ＋'; });
   toggle.setAttribute('aria-expanded', 'false');
