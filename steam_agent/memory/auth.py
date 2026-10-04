@@ -101,10 +101,8 @@ def init_auth_table() -> None:
             )
             """
         )
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_steam_unique "
-            "ON users(bound_steam_id) WHERE bound_steam_id IS NOT NULL"
-        )
+        # Migrate existing databases: a Steam profile may be shared by accounts.
+        conn.execute("DROP INDEX IF EXISTS idx_users_steam_unique")
 
 
 def validate_username(username: str) -> str:
@@ -299,7 +297,7 @@ def get_user_info(username: str) -> dict | None:
     init_auth_table()
     conn = _get_conn()
     row = conn.execute(
-        "SELECT username, bound_steam_id, theme, created_at FROM users WHERE username=?",
+        "SELECT username, bound_steam_id, created_at FROM users WHERE username=?",
         (username,),
     ).fetchone()
     conn.close()
@@ -308,7 +306,6 @@ def get_user_info(username: str) -> dict | None:
     return {
         "username": row["username"],
         "bound_steam_id": row["bound_steam_id"] or "",
-        "theme": row["theme"] or "dark",
         "created_at": row["created_at"],
     }
 
@@ -322,42 +319,24 @@ def bind_steam_id(username: str, steam_id: str) -> tuple[bool, str]:
     from .insight_store import init_db as init_insight_db, sync_bound_steam_id
 
     init_insight_db()
-    try:
-        with _transaction() as conn:
-            rate_key = f"bind:{username.lower()}"
-            if not _record_attempt(conn, rate_key, success=False):
-                return False, "绑定尝试过于频繁，请稍后再试"
-            if not conn.execute(
-                "SELECT 1 FROM users WHERE username=?", (username,)
-            ).fetchone():
-                return False, "用户不存在"
-            existing = conn.execute(
-                "SELECT username FROM users WHERE bound_steam_id=? AND username<>?",
-                (steam_id, username),
-            ).fetchone()
-            if existing:
-                return False, "此 Steam ID 已被其他用户绑定"
-            conn.execute(
-                "UPDATE users SET bound_steam_id=? WHERE username=?",
-                (steam_id, username),
-            )
-            sync_bound_steam_id(conn, username, steam_id)
-            conn.execute(
-                "INSERT INTO auth_audit(username, action, success) VALUES(?,?,1)",
-                (username, "bind_steam"),
-            )
-            _record_attempt(conn, rate_key, success=True)
-    except sqlite3.IntegrityError:
-        return False, "此 Steam ID 已被其他用户绑定"
+    with _transaction() as conn:
+        rate_key = f"bind:{username.lower()}"
+        if not _record_attempt(conn, rate_key, success=False):
+            return False, "绑定尝试过于频繁，请稍后再试"
+        if not conn.execute(
+            "SELECT 1 FROM users WHERE username=?", (username,)
+        ).fetchone():
+            return False, "用户不存在"
+        conn.execute(
+            "UPDATE users SET bound_steam_id=? WHERE username=?",
+            (steam_id, username),
+        )
+        sync_bound_steam_id(conn, username, steam_id)
+        conn.execute(
+            "INSERT INTO auth_audit(username, action, success) VALUES(?,?,1)",
+            (username, "bind_steam"),
+        )
+        _record_attempt(conn, rate_key, success=True)
     return True, "Steam ID 绑定成功"
 
 
-def update_theme(username: str, theme: str) -> bool:
-    if theme not in {"dark", "light"}:
-        return False
-    init_auth_table()
-    with _transaction() as conn:
-        cursor = conn.execute(
-            "UPDATE users SET theme=? WHERE username=?", (theme, username)
-        )
-        return cursor.rowcount == 1

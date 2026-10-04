@@ -2,7 +2,7 @@ from functools import lru_cache
 
 from sentence_transformers import SentenceTransformer
 
-from ..config import EMBEDDING_MODEL
+from ..config import EMBEDDING_MODEL, EMBEDDING_REVISION
 
 _embedder: SentenceTransformer | None = None
 
@@ -14,7 +14,7 @@ BGE_QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages
 def get_embedder() -> SentenceTransformer:
     global _embedder
     if _embedder is None:
-        _embedder = SentenceTransformer(EMBEDDING_MODEL)
+        _embedder = SentenceTransformer(EMBEDDING_MODEL, revision=EMBEDDING_REVISION or None)
     return _embedder
 
 

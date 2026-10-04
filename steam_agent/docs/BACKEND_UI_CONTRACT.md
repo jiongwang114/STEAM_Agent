@@ -37,7 +37,7 @@
 - 独立的游戏库浏览接口或游戏库页面数据接口。
 - 游戏详情、游戏封面、截图、视频、评分图表或价格编辑接口。
 - 收藏、点赞、评分、购物车、愿望单、下载或购买操作。
-- 推荐结果的结构化游戏卡片接口；聊天回答字段是纯文本 `reply`。
+- 推荐结果和普通聊天统一使用 `summary + games` 结构化 `reply`；前端根据 `games` 是否为空决定是否渲染游戏卡片。
 - 文件上传、图片生成、语音输入、语音播放或多模态消息。
 - 修改密码、找回密码、第三方登录、邮箱验证或个人资料编辑接口。
 - 用户可见的长期记忆列表、记忆编辑/删除接口。
@@ -185,7 +185,7 @@
 }
 ```
 
-- 已被其他用户绑定：HTTP `409`，错误码 `steam_id_in_use`。
+- 同一个 Steam ID 可以绑定多个账号；每个账号仍只绑定一个 Steam ID，重新绑定只更新当前账号。
 - 绑定操作限流：HTTP `429`，错误码 `rate_limited`。
 - 用户不存在：HTTP `404`，错误码 `user_not_found`。
 
@@ -318,7 +318,7 @@
 {
   "status": "success",
   "thread_id": "thread-1",
-  "reply": "回答文本",
+  "reply": "{\"summary\":\"回答文本\",\"games\":[]}",
   "tool_calls_made": ["rag_search_similar_games"],
   "tool_rounds": 1,
   "token_usage": {
@@ -347,7 +347,7 @@
 
 字段说明：
 
-- `reply` 是纯文本回答；后端没有单独的游戏数组、卡片、封面 URL 或价格字段。
+- `reply` 是 JSON 字符串，固定包含 `summary` 和 `games` 两个字段。普通回答使用空的 `games` 数组；推荐回答在 `games` 中包含游戏卡片字段。
 - `status` 通常为 `success`；超时、模型不可用、预算终止、主动取消或归档失败时为 `degraded`。
 - `run_metadata.termination_reason` 用来解释降级原因，可能是 `deadline`、`model_error`、`cancelled` 或 `archive_failed` 等。
 - `execution` 是可持久化、可回放的安全摘要。
@@ -367,7 +367,7 @@ data: {"event":"事件名","data":...}
 | `event` | `data` | 发生时机和 UI 可用含义 |
 |---|---|---|
 | `status` | string | 后端开始工具步骤时的友好状态文本，可显示为处理中提示 |
-| `token` | string | 增量回答文本，应追加到当前助手回答 |
+| `token` | string | 模型增量输出，应暂存；不能将半截 JSON 直接渲染为最终回答 |
 | `error` | `{ "code", "message" }` | 可恢复错误；后端仍可能继续发送兜底文本和 `done` |
 | `done` | 完整 `ChatResponse` 对象 | 本轮归档和指标记录后发送，表示正常收尾 |
 | `snapshot` | object | 重连时的运行快照，包含累计回答、当前状态、步骤、错误和可选最终响应 |

@@ -36,19 +36,29 @@ def hybrid_search(
     use_lexical: bool = True,
     use_reranker: bool = True,
     reranker_weight: float = RAG_RERANK_WEIGHT,
+    required_genre: str | None = None,
 ) -> dict:
     timings = {}
     started = time.perf_counter()
     index, documents = _get_lexical_index()
+    # Some evaluation tags are Steam user tags and are not present in every
+    # cached record. Only enforce a tag filter when the current index can
+    # actually represent it; otherwise retain semantic retrieval.
+    if required_genre and not any(
+        _genre_matches(document.metadata, required_genre)
+        for document in documents.values()
+    ):
+        required_genre = None
     timings["index_load_ms"] = _ms(started)
 
     dense_started = time.perf_counter()
     dense_error = ""
     if use_dense:
         try:
-            dense_raw = get_games_collection().query(
+            collection = get_games_collection()
+            dense_raw = collection.query(
                 query_embeddings=embed_query([query]),
-                n_results=RAG_DENSE_CANDIDATES,
+                n_results=RAG_DENSE_CANDIDATES * 3,
                 **({"where": where} if where else {}),
             )
         except Exception as exc:
@@ -56,17 +66,21 @@ def hybrid_search(
             dense_error = type(exc).__name__
     else:
         dense_raw = {"ids": [[]], "distances": [[]]}
-    dense_ids = list(dense_raw.get("ids", [[]])[0])
+    chunk_ids = list(dense_raw.get("ids", [[]])[0])
     dense_distances = list(dense_raw.get("distances", [[]])[0])
-    dense_scores = {
-        doc_id: 1 - float(dense_distances[index])
-        for index, doc_id in enumerate(dense_ids)
-        if index < len(dense_distances)
-    }
+    dense_ids = []
+    dense_scores = {}
+    for position, chunk_id in enumerate(chunk_ids):
+        doc_id = chunk_id.split(":", 1)[0]
+        if doc_id not in dense_scores:
+            dense_ids.append(doc_id)
+            dense_scores[doc_id] = 1 - float(dense_distances[position])
+        if len(dense_ids) >= RAG_DENSE_CANDIDATES:
+            break
     timings["dense_ms"] = _ms(dense_started)
 
     lexical_started = time.perf_counter()
-    predicate = _metadata_predicate(where)
+    predicate = _metadata_predicate(where, required_genre=required_genre)
     lexical_rows = (
         index.search(query, RAG_LEXICAL_CANDIDATES, predicate=predicate)
         if use_lexical else []
@@ -83,7 +97,10 @@ def hybrid_search(
     timings["fusion_ms"] = _ms(fusion_started)
 
     rerank_started = time.perf_counter()
-    candidate_docs = [documents[doc_id] for doc_id in candidates if doc_id in documents]
+    candidate_docs = [
+        documents[doc_id] for doc_id in candidates
+        if doc_id in documents and _genre_matches(documents[doc_id].metadata, required_genre)
+    ]
     if use_reranker:
         rerank_scores, reranker_used = rerank(
             query, [document.text for document in candidate_docs]
@@ -160,14 +177,24 @@ def _get_lexical_index() -> tuple[BM25Index, dict[str, LexicalDocument]]:
     return _index, _documents
 
 
-def _metadata_predicate(where: dict | None):
+def _metadata_predicate(where: dict | None, *, required_genre: str | None = None):
     if not where:
         return None
 
     def predicate(metadata: dict) -> bool:
-        return _matches(metadata, where)
+        return _matches(metadata, where) and _genre_matches(metadata, required_genre)
 
     return predicate
+
+
+def _genre_matches(metadata: dict, required_genre: str | None) -> bool:
+    if not required_genre:
+        return True
+    genres = ", ".join(
+        str(metadata.get(key, ""))
+        for key in ("genres", "categories", "gameplay_modes")
+    ).casefold()
+    return required_genre.casefold() in genres
 
 
 def _matches(metadata: dict, expression: dict) -> bool:

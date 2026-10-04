@@ -7,7 +7,32 @@ from ..config import STEAM_API_KEY, STEAM_API_URL
 
 def get_user_playtime(steam_id: str = "", count: int = 10) -> dict:
     """
-    Get a Steam user's owned games with playtime, sorted by total playtime descending.
+    读取指定 Steam 用户的游戏库和游玩时长。
+
+    适用场景：
+    - 用户明确要求根据自己的 Steam 游戏库进行推荐；
+    - 用户要求参考已拥有、最常玩或最近游玩的游戏；
+    - 需要先了解用户游戏库，再进行个性化相似游戏检索。
+
+    不适用场景：
+    - 普通游戏推荐；
+    - 查询某款游戏的当前价格、折扣或商店评分；
+    - 查询游戏类型、标签或相似度；
+    - 用户没有提供有效 Steam ID 的情况。
+
+    参数说明：
+    - steam_id：当前用户已绑定的 17 位数字 Steam ID。不得猜测、替换或使用其他用户的 ID。
+    - count：返回的主要游戏数量，范围为 1 到 50，默认返回 10 个。
+
+    返回内容：
+    - games：按累计游玩时长从高到低排列的游戏列表；
+    - total_game_count：Steam 返回的游戏总数；
+    - 每个游戏通常包含 appid、name、playtime_forever、playtime_2weeks 和图标字段。
+
+    重要限制：
+    - 游玩时长以 Steam 返回的分钟数为准，不要自行换算或推断用户喜好。
+    - 最近游玩数据可能为空；这不代表用户从未游玩过这些游戏。
+    - 本工具只提供游戏库和游玩数据，不直接产生推荐结论。
     """
     if not steam_id or not steam_id.isdigit() or len(steam_id) != 17:
         return {"error": "invalid_steam_id"}

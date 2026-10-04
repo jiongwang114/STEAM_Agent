@@ -2,6 +2,7 @@ from pathlib import Path
 import time
 from ..rag.translate import translate_to_english
 from ..rag.hybrid import hybrid_search
+from .search_plan import SearchPlan, ValidationError, validate_search_plan
 
 CACHE_PATH = Path(__file__).resolve().parent.parent / "rag" / "chroma_data" / "game_cache.json"
 _cache_images: dict[str, str] | None = None
@@ -25,18 +26,63 @@ def _load_cache_images() -> dict[str, str]:
 
 
 def rag_search_similar_games(
-    query: str,
-    top_k: int = 10,
-    free_only: bool = False,
-    min_year: int | None = None,
-    has_multiplayer: bool | None = None,
-    min_metacritic: int | None = None,
-    min_similarity: float = 0.3,
+    plan: SearchPlan | dict,
 ) -> dict:
-    """Find games by semantic similarity with optional objective metadata filters."""
-    top_k = max(1, min(int(top_k), 20))
-    min_similarity = max(0.0, min(float(min_similarity), 1.0))
-    query = str(query or "").strip()[:1000]
+    """
+    从本地 Steam 游戏索引中检索与用户需求相似的游戏候选。
+
+    适用场景：
+    - 用户要求推荐、寻找、挑选或比较 Steam 游戏；
+    - 用户按玩法、类型、氛围、主题或相似游戏进行发现；
+    - 用户要求根据 Steam 游戏库或游玩记录寻找相似游戏。
+
+    不适用场景：
+    - 查询当前价格、折扣、商店评分或商店页面详情；
+    - 查询用户的 Steam 游戏库或游玩时长；
+    - 查询历史对话原文；
+    - 用户只是在询问游戏概念、玩法机制或一般知识。
+
+    参数说明：
+    - plan：符合 SearchPlan 结构的检索计划。query 用简洁自然语言描述用户想寻找的游戏体验；
+      应包含核心玩法、类型、氛围、主题和明确的排斥条件。
+      不要加入价格、折扣或未经用户提出的偏好。
+      计划中的结构化字段只用于明确、可验证的硬约束。
+
+    调用要求：
+    - 未明确提出的结构化筛选条件不要自行猜测。
+    - 将用户的正向偏好和明确排斥条件写入 query。
+    - 不要把多个无关请求拼成一个模糊查询。
+    - 查询结果为空时，可以根据原请求改写 query 后再次检索。
+    - 不要因为结果中包含商店链接或评分字段，就把本工具当作实时商店查询工具。
+
+    返回内容：
+    - results：候选游戏列表；
+    - 每个候选通常包含 appid、name、description、相似度、
+      发行年份、多人属性、Metacritic 评分、header_image 和 store_url；
+    - retrieval：本次检索的状态和检索元数据。
+
+    重要限制：
+    - 结果是推荐候选和索引证据，不代表当前价格、折扣或实时商店状态。
+    - 只能使用返回结果中实际出现的游戏和字段组织后续回答。
+    """
+    try:
+        parsed = validate_search_plan(plan)
+    except (ValidationError, TypeError, ValueError) as exc:
+        return {
+            "results": [],
+            "retrieval": {
+                "status": "invalid_input",
+                "validation_error": str(exc),
+            },
+        }
+    query = parsed.query
+    top_k = parsed.top_k
+    free_only = parsed.free_only
+    min_year = parsed.min_year
+    has_multiplayer = parsed.has_multiplayer
+    genre = parsed.genre
+    min_metacritic = parsed.min_metacritic
+    min_similarity = parsed.min_similarity
     if not query:
         return {"results": [], "retrieval": {"status": "invalid_input"}}
     started = time.perf_counter()
@@ -70,7 +116,7 @@ def rag_search_similar_games(
     elif len(conditions) > 1:
         where = {"$and": conditions}
 
-    raw = hybrid_search(search_query, top_k=top_k, where=where)
+    raw = hybrid_search(search_query, top_k=top_k, where=where, required_genre=genre)
 
     results = []
     for row in raw.get("results", []):

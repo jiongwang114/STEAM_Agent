@@ -12,7 +12,7 @@ from ..config import (
 _translate_llm = ChatOpenAI(
     model="deepseek-chat",
     temperature=0.0,
-    max_tokens=128,
+    max_tokens=512,
     api_key=DEEPSEEK_API_KEY,
     base_url=DEEPSEEK_BASE_URL,
     timeout=LLM_REQUEST_TIMEOUT_SECONDS,
@@ -29,13 +29,14 @@ def translate_to_english(query: str) -> str:
     messages = [{
         "role": "system",
         "content": (
-            "You are a game search query translator. "
-            "Convert the user's Chinese game-related query into English keywords for a vector search engine. "
+            "You are a constrained game search query translator. "
+            "Convert the user's Chinese game-related query into English search terms without losing constraints. "
             "Rules:\n"
-            "- Output ONLY keywords and key phrases, separated by spaces. No full sentences.\n"
+            "- Output ONLY the translated search query. Use sentences where necessary to preserve relationships and exclusions.\n"
             "- Preserve game titles in their official English names (e.g. 黑帝斯 -> Hades, 艾尔登法环 -> Elden Ring).\n"
-            "- Include: genres, themes, gameplay mechanics, art style, platform, and similar game titles mentioned.\n"
-            "- Keep it concise, at most 10 words.\n"
+            "- Preserve every qualifier, including free, single-player, multiplayer, co-op, beginner-friendly, highly rated, release period, mood, and exclusions.\n"
+            "- Include the canonical English genre/tag plus all preserved qualifiers and game titles.\n"
+            "- Keep it concise without a word limit; never drop a qualifier or detach negation from its target.\n"
             "- Never add explanations or extra text."
         ),
     }, {
@@ -44,3 +45,4 @@ def translate_to_english(query: str) -> str:
     }]
     response = _translate_llm.invoke(messages)
     return response.content.strip()
+

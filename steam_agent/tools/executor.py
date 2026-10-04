@@ -112,6 +112,13 @@ def execute_tool(
 
         if not _should_retry(result, attempt, max_retries, deadline_at):
             break
+        # Back off transient upstream failures so retries do not amplify an outage.
+        backoff = min(2.0 ** attempt, 8.0)
+        remaining = _remaining_seconds(deadline_at)
+        if remaining is not None:
+            backoff = min(backoff, remaining)
+        if backoff > 0:
+            time.sleep(backoff)
 
     assert result is not None
     result = _limit_result(result, TOOL_RESULT_MAX_CHARS)

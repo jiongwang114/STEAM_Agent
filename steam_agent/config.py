@@ -15,9 +15,9 @@ LLM_CANDIDATE_MODEL: str = os.environ.get("LLM_CANDIDATE_MODEL", LLM_MODEL)
 LLM_TEMPERATURE: float = float(os.environ.get("LLM_TEMPERATURE", "0.3"))
 LLM_MAX_TOKENS: int = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
 LLM_REQUEST_TIMEOUT_SECONDS: float = float(
-    os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "20")
+    os.environ.get("LLM_REQUEST_TIMEOUT_SECONDS", "45")
 )
-LLM_MAX_RETRIES: int = int(os.environ.get("LLM_MAX_RETRIES", "1"))
+LLM_MAX_RETRIES: int = int(os.environ.get("LLM_MAX_RETRIES", "2"))
 LLM_INPUT_CNY_PER_MILLION: float = float(
     os.environ.get("LLM_INPUT_CNY_PER_MILLION", "0")
 )
@@ -30,14 +30,14 @@ AGENT_EXPERIMENT_CANDIDATE_PERCENT: int = int(
 )
 
 # --- Agent execution budget ---
-AGENT_MAX_TOOL_ROUNDS: int = int(os.environ.get("AGENT_MAX_TOOL_ROUNDS", "4"))
+AGENT_MAX_TOOL_ROUNDS: int = int(os.environ.get("AGENT_MAX_TOOL_ROUNDS", "8"))
 AGENT_MAX_TOOL_CALLS_PER_ROUND: int = int(
-    os.environ.get("AGENT_MAX_TOOL_CALLS_PER_ROUND", "3")
+    os.environ.get("AGENT_MAX_TOOL_CALLS_PER_ROUND", "5")
 )
-AGENT_MAX_TOTAL_TOKENS: int = int(os.environ.get("AGENT_MAX_TOTAL_TOKENS", "16000"))
-AGENT_MAX_WALL_SECONDS: float = float(os.environ.get("AGENT_MAX_WALL_SECONDS", "60"))
+AGENT_MAX_TOTAL_TOKENS: int = int(os.environ.get("AGENT_MAX_TOTAL_TOKENS", "24000"))
+AGENT_MAX_WALL_SECONDS: float = float(os.environ.get("AGENT_MAX_WALL_SECONDS", "120"))
 AGENT_FINALIZE_MAX_TOKENS: int = int(os.environ.get("AGENT_FINALIZE_MAX_TOKENS", "512"))
-AGENT_MAX_REPAIR_ATTEMPTS: int = int(os.environ.get("AGENT_MAX_REPAIR_ATTEMPTS", "1"))
+AGENT_MAX_REPAIR_ATTEMPTS: int = int(os.environ.get("AGENT_MAX_REPAIR_ATTEMPTS", "2"))
 AGENT_HISTORY_TOKEN_BUDGET: int = int(
     os.environ.get("AGENT_HISTORY_TOKEN_BUDGET", "6000")
 )
@@ -78,8 +78,8 @@ MEMORY_AGENT_RETRY_BASE_SECONDS: float = float(
 MEMORY_AGENT_MIN_CONFIDENCE: float = float(
     os.environ.get("MEMORY_AGENT_MIN_CONFIDENCE", "0.85")
 )
-TOOL_TIMEOUT_SECONDS: float = float(os.environ.get("TOOL_TIMEOUT_SECONDS", "12"))
-TOOL_MAX_RETRIES: int = int(os.environ.get("TOOL_MAX_RETRIES", "1"))
+TOOL_TIMEOUT_SECONDS: float = float(os.environ.get("TOOL_TIMEOUT_SECONDS", "20"))
+TOOL_MAX_RETRIES: int = int(os.environ.get("TOOL_MAX_RETRIES", "2"))
 STEAM_PROFILE_WARMUP_TIMEOUT_SECONDS: float = float(
     os.environ.get("STEAM_PROFILE_WARMUP_TIMEOUT_SECONDS", "5")
 )
@@ -134,6 +134,7 @@ STEAM_STORE_URL: str = "https://store.steampowered.com/api"
 
 # --- Embedding ---
 EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
+EMBEDDING_REVISION: str = os.environ.get("EMBEDDING_REVISION", "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a" if EMBEDDING_MODEL == "BAAI/bge-base-en-v1.5" else "")
 # Read-only cleanup target for existing user-memory vectors; no new vectors are written.
 LEGACY_MEMORY_COLLECTION_NAME: str = os.environ.get(
     "MEMORY_COLLECTION_NAME", "user_memory_v2"
@@ -142,9 +143,10 @@ RERANKER_MODEL: str = os.environ.get(
     "RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
 )
 RERANKER_ENABLED: bool = os.environ.get("RERANKER_ENABLED", "true").lower() == "true"
-RAG_DENSE_CANDIDATES: int = int(os.environ.get("RAG_DENSE_CANDIDATES", "50"))
-RAG_LEXICAL_CANDIDATES: int = int(os.environ.get("RAG_LEXICAL_CANDIDATES", "50"))
-RAG_RERANK_CANDIDATES: int = int(os.environ.get("RAG_RERANK_CANDIDATES", "20"))
+RERANKER_REVISION: str = os.environ.get("RERANKER_REVISION", "233902d25c440f23af6f7d6e94d2946bac0bee0a" if RERANKER_MODEL == "cross-encoder/ms-marco-MiniLM-L-6-v2" else "")
+RAG_DENSE_CANDIDATES: int = int(os.environ.get("RAG_DENSE_CANDIDATES", "100"))
+RAG_LEXICAL_CANDIDATES: int = int(os.environ.get("RAG_LEXICAL_CANDIDATES", "100"))
+RAG_RERANK_CANDIDATES: int = int(os.environ.get("RAG_RERANK_CANDIDATES", "50"))
 RAG_RERANK_WEIGHT: float = float(os.environ.get("RAG_RERANK_WEIGHT", "0.50"))
 if not 0 <= RAG_RERANK_WEIGHT <= 1:
     raise ValueError("RAG_RERANK_WEIGHT must be between 0 and 1")
@@ -186,7 +188,7 @@ AUTH_RATE_LIMIT_MAX_FAILURES: int = int(
     os.environ.get("AUTH_RATE_LIMIT_MAX_FAILURES", "10")
 )
 MAX_REQUEST_BODY_BYTES: int = int(os.environ.get("MAX_REQUEST_BODY_BYTES", "65536"))
-RAG_DEFAULT_GAME_COUNT: int = int(os.environ.get("RAG_DEFAULT_GAME_COUNT", "418"))
+RAG_DEFAULT_GAME_COUNT: int = int(os.environ.get("RAG_DEFAULT_GAME_COUNT", "1000"))
 METRICS_TOKEN: str = os.environ.get("METRICS_TOKEN", "")
 MODEL_WARMUP_ON_STARTUP: bool = (
     os.environ.get("MODEL_WARMUP_ON_STARTUP", "false").lower() == "true"

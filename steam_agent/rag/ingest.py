@@ -19,13 +19,15 @@ import httpx
 
 from ..config import (
     EMBEDDING_MODEL,
+    EMBEDDING_REVISION,
     CHROMA_PERSIST_DIR,
     RAG_DEFAULT_GAME_COUNT,
     RERANKER_MODEL,
+    RERANKER_REVISION,
     STEAM_API_KEY,
     STEAM_STORE_URL,
 )
-from .embedder import embed
+from .embedder import embed, get_embedder
 from .vector_store import _get_client, current_games_collection_name
 
 STEAM_TOP_GAMES_URL = "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/"
@@ -35,7 +37,7 @@ DATA_DIR = Path(CHROMA_PERSIST_DIR)
 CACHE_PATH = DATA_DIR / "game_cache.json"
 INDEX_MANIFEST_PATH = DATA_DIR / "index_manifest.json"
 CURRENT_INDEX_PATH = DATA_DIR / "current_index.json"
-CHUNK_SCHEMA_VERSION = "game-document-v2"
+CHUNK_SCHEMA_VERSION = "game-document-v3-token-chunks"
 
 
 def fetch_top_appids(count: int = RAG_DEFAULT_GAME_COUNT) -> list[int]:
@@ -52,6 +54,14 @@ def fetch_top_appids(count: int = RAG_DEFAULT_GAME_COUNT) -> list[int]:
         data = response.json()
         ranks = data.get("response", {}).get("ranks", [])
         appids = [r["appid"] for r in ranks[:count]]
+        if len(appids) < count:
+            # Charts usually returns fewer than 1000 entries. Fill the remainder
+            # from the official app list, then fetch details and retain only games.
+            for appid in _load_fallback_appids(count * 3):
+                if appid not in appids:
+                    appids.append(appid)
+                if len(appids) >= count:
+                    break
     except httpx.HTTPError:
         pass
     return appids
@@ -71,8 +81,20 @@ def fetch_app_details(appid: int) -> dict | None:
 
 
 def _strip_html(text: str) -> str:
-    import re
-    return re.sub(r"<[^>]+>", " ", text).strip()
+    from html import unescape
+    from html.parser import HTMLParser
+
+    class TextParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.parts = []
+
+        def handle_data(self, data):
+            self.parts.append(data)
+
+    parser = TextParser()
+    parser.feed(text or "")
+    return " ".join(unescape(" ".join(parser.parts)).split())
 
 
 # Categories that describe HOW you play — high signal for search intent.
@@ -85,7 +107,10 @@ GAMEPLAY_CATEGORIES = {
 
 def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) -> tuple[str, dict, str]:
     name = detail.get("name", f"Game {appid}")
-    description = detail.get("short_description", "")
+    description = _strip_html(detail.get("short_description_en") or detail.get("short_description", ""))
+    detailed_description = _strip_html(
+        detail.get("about_the_game_en") or detail.get("about_the_game", "") or detail.get("detailed_description", "")
+    )
     genres = [g["description"] for g in detail.get("genres", [])]
     all_categories = [c["description"] for c in detail.get("categories", [])]
     gameplay_modes = [c for c in all_categories if c in GAMEPLAY_CATEGORIES]
@@ -94,32 +119,44 @@ def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) ->
     release_year = detail.get("release_date", {}).get("date", "Unknown")[-4:]
     is_free = detail.get("is_free", False)
 
-    # Prefer user_tags for filtering (much finer). Fall back to genres.
-    filter_tags = (user_tags if user_tags else None) or genres or ["none"]
-
     # Text for embedding: everything semantic goes here.
-    parts = [f"{name}. {description}"]
+    parts = [
+        f"Game: {name}.",
+        f"Overview: {description}.",
+    ]
     if genres:
         parts.append(f"Genres: {', '.join(genres)}.")
     if user_tags:
         parts.append(f"User Tags: {', '.join(user_tags[:15])}.")
     if developers:
         parts.append(f"Developer: {developers}.")
+    if gameplay_modes:
+        parts.append(f"Play modes: {', '.join(gameplay_modes)}.")
+    if detail.get("supported_languages"):
+        parts.append(f"Supported languages: {_strip_html(detail['supported_languages'])}.")
+    if detailed_description:
+        parts.append(f"Detailed gameplay and theme description: {detailed_description}.")
     text = " ".join(parts)
 
-    # Metadata: ONLY hard constraints (no genres, no user_tags).
-    # Soft/semantic concepts ("horror", "pixel", "roguelike") belong in embedding, not filters.
+    # Retrieval filters use hard constraints; genres also remain in semantic text.
     has_multiplayer = any(
         c in {"Multi-player", "Co-op", "Online Co-op", "PvP", "Online PvP", "MMO"}
         for c in all_categories
     )
 
     metadata = {
+        "appid": str(appid),
         "name": name,
         "developers": developers,
         "is_free": is_free,
         "release_year": int(release_year) if release_year.isdigit() else 0,
         "has_multiplayer": has_multiplayer,
+        "gameplay_modes": ", ".join(gameplay_modes) or "Unknown",
+        "has_singleplayer": "Single-player" in all_categories,
+        "has_coop": any("Co-op" in c for c in gameplay_modes),
+        "genres": ", ".join(genres),
+        "categories": ", ".join(all_categories),
+        "supported_languages": _strip_html(detail.get("supported_languages", "")),
         "metacritic": metacritic if isinstance(metacritic, int) else 0,
     }
 
@@ -154,6 +191,7 @@ def write_index_manifest(
     failures: int = 0,
     started_at: str | None = None,
     duration_seconds: float = 0.0,
+    vector_count: int = 0,
 ) -> dict:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     index_version = index_version or "legacy"
@@ -170,10 +208,17 @@ def write_index_manifest(
         "parent_version": parent_version,
         "collection": collection_name,
         "game_count": len(records),
+        "vector_count": vector_count,
         "failure_count": failures,
         "chunk_schema_version": CHUNK_SCHEMA_VERSION,
         "embedding_model": EMBEDDING_MODEL,
+        "embedding_revision": EMBEDDING_REVISION,
+        "embedding_dimension": get_embedder().get_sentence_embedding_dimension(),
+        "normalize_embeddings": True,
+        "chroma_version": __import__('chromadb').__version__,
+        "sentence_transformers_version": __import__('sentence_transformers').__version__,
         "reranker_model": RERANKER_MODEL,
+        "reranker_revision": RERANKER_REVISION,
         "code_version": os.environ.get("GIT_SHA", "working-tree"),
         "cache_sha256": hashlib.sha256(CACHE_PATH.read_bytes()).hexdigest()
         if CACHE_PATH.exists() else "",
@@ -208,6 +253,8 @@ def _build_collection(
     failures: int = 0,
 ) -> tuple[str, str, int]:
     """Build a new collection and return (version, name, failure_count)."""
+    if not records:
+        raise ValueError("Refusing to build an empty index")
     started = time.perf_counter()
     started_at = datetime.now(timezone.utc).isoformat()
     parent = {}
@@ -220,6 +267,7 @@ def _build_collection(
     collection_name = f"games_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{os.getpid()}"
     collection = _get_client().get_or_create_collection(
         name=collection_name,
+        embedding_function=None,
         metadata={"hnsw:space": "cosine"},
     )
     ids_list: list[str] = []
@@ -233,16 +281,24 @@ def _build_collection(
         if doc_id in seen:
             continue
         seen.add(doc_id)
-        ids_list.append(doc_id)
-        metadatas_list.append(metadata)
-        documents_list.append(text)
+        tokenizer = get_embedder().tokenizer
+        tokens = tokenizer.encode(text, add_special_tokens=False)
+        prefix = tokenizer.encode(f"Game: {metadata['name']}. ", add_special_tokens=False)[:64]
+        chunk_size = min(384, get_embedder().max_seq_length - 2) - len(prefix)
+        for chunk_index, start in enumerate(range(0, len(tokens), chunk_size - 48)):
+            ids_list.append(f"{doc_id}:{chunk_index}")
+            metadatas_list.append({**metadata, "chunk_index": chunk_index})
+            documents_list.append(tokenizer.decode(prefix + tokens[start:start + chunk_size], skip_special_tokens=True))
     if ids_list:
-        collection.add(
-            ids=ids_list,
-            embeddings=embed(documents_list),
-            metadatas=metadatas_list,
-            documents=documents_list,
-        )
+        for start in range(0, len(ids_list), 32):
+            end = start + 32
+            collection.add(
+                ids=ids_list[start:end],
+                embeddings=embed(documents_list[start:end]),
+                metadatas=metadatas_list[start:end],
+                documents=documents_list[start:end],
+            )
+            print(f"Indexed {min(end, len(ids_list))}/{len(ids_list)} chunks", flush=True)
     if collection.count() != len(ids_list):
         raise RuntimeError(f"index validation failed: expected {len(ids_list)}, got {collection.count()}")
     save_cache(records)
@@ -254,6 +310,7 @@ def _build_collection(
         failures=failures,
         started_at=started_at,
         duration_seconds=time.perf_counter() - started,
+        vector_count=len(ids_list),
     )
     _switch_current_index(index_version, collection_name)
     return index_version, collection_name, 0
@@ -261,9 +318,9 @@ def _build_collection(
 
 # ── ingest modes ──────────────────────────────────────────────────────
 
-def ingest_from_cache():
+def ingest_from_cache(cache_file: Path | None = None):
     """Rebuild collection from local JSON cache — no API calls needed."""
-    records = load_cache()
+    records = json.loads(cache_file.read_text(encoding="utf-8")) if cache_file else load_cache()
     if not records:
         return
 
@@ -339,11 +396,27 @@ def main():
         help="Rebuild from local cache instead of calling Steam API. "
              "Use this when switching embedding models — no API calls, just re-embed.",
     )
+    parser.add_argument(
+        "--games-only", action="store_true",
+        help="Delete all non-game Chroma collections before ingestion.",
+    )
+    parser.add_argument("--cache-file", type=Path, help="Validated local JSON input for --from-cache")
     args = parser.parse_args()
+
+    if args.games_only:
+        client = _get_client()
+        keep = {"games", current_games_collection_name()}
+        deleted = []
+        for collection in client.list_collections():
+            name = str(getattr(collection, "name", collection))
+            if name not in keep:
+                client.delete_collection(name)
+                deleted.append(name)
+        print(f"Deleted non-game collections: {', '.join(deleted) if deleted else 'none'}")
 
     if args.from_cache:
         print("Rebuilding from local cache (no API calls)...")
-        ingest_from_cache()
+        ingest_from_cache(args.cache_file)
         return
 
     print(f"Fetching top {args.count} games from Steam Charts...")
@@ -353,6 +426,9 @@ def main():
         appids = _load_fallback_appids(args.count)
 
     print(f"Starting ingestion (mode={args.mode}) for {len(appids)} games...")
+
+    if not appids:
+        raise RuntimeError("No Steam appids available; refusing to replace the existing index.")
 
     if args.mode == "full":
         ingest_full(appids)

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from steam_agent.memory import auth
+from steam_agent.memory import auth, insight_store
 
 
 class AuthSecurityTests(unittest.TestCase):
@@ -14,8 +14,11 @@ class AuthSecurityTests(unittest.TestCase):
         self.db_path = str(Path(self.directory.name) / "auth.db")
         self.path_patch = patch.object(auth, "SQLITE_DB_PATH", self.db_path)
         self.path_patch.start()
+        self.insight_path_patch = patch.object(insight_store, "SQLITE_DB_PATH", self.db_path)
+        self.insight_path_patch.start()
 
     def tearDown(self):
+        self.insight_path_patch.stop()
         self.path_patch.stop()
         self.directory.cleanup()
 
@@ -61,11 +64,11 @@ class AuthSecurityTests(unittest.TestCase):
         conn.close()
         self.assertTrue(password_hash.startswith("$argon2"))
 
-    def test_users_cannot_bind_the_same_steam_id(self):
+    def test_users_can_bind_the_same_steam_id(self):
         auth.register("alice", "correct horse battery staple")
         auth.register("bob", "correct horse battery staple")
         self.assertTrue(auth.bind_steam_id("alice", "76561198000000001")[0])
-        self.assertFalse(auth.bind_steam_id("bob", "76561198000000001")[0])
+        self.assertTrue(auth.bind_steam_id("bob", "76561198000000001")[0])
 
 
 if __name__ == "__main__":

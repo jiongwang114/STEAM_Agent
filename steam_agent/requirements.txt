@@ -11,10 +11,10 @@ uvicorn[standard]>=0.32.0
 sse-starlette>=2.0.0
 
 # Vector DB
-chromadb>=0.5.0
+chromadb==1.5.9
 
 # Embedding
-sentence-transformers>=3.0.0
+sentence-transformers==5.5.1
 
 # Steam API
 httpx>=0.27.0

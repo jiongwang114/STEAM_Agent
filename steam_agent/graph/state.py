@@ -26,3 +26,5 @@ class AgentState(TypedDict):
     context_stats: NotRequired[dict[str, Any]]
     experiment: NotRequired[dict[str, Any]]
     model_history: NotRequired[list[dict[str, str]]]
+    no_progress_rounds: NotRequired[int]
+    constraints: NotRequired[list[dict[str, Any]]]

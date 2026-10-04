@@ -32,6 +32,8 @@ def new_run_context() -> dict[str, Any]:
         "evidence": [],
         "termination_reason": "",
         "repair_attempts": 0,
+        "no_progress_rounds": 0,
+        "constraints": [],
         "validation": {
             "passed": True,
             "unsupported_appids": [],

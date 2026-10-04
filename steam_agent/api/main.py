@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,7 +35,7 @@ from ..observability import (
 configure_logging()
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR = Path(__file__).resolve().parent.parent / "night-museum-frontend"
 
 
 @asynccontextmanager
@@ -165,6 +166,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Steam Game Recommendation Agent", version="0.1.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "null",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:4174",
+        "http://127.0.0.1:4174",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -285,12 +299,6 @@ async def observe_request(request: Request, call_next):
 from .routes import router
 
 app.include_router(router)
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-
-@app.get("/")
-def index():
-    return FileResponse(str(STATIC_DIR / "index.html"))
 
 
 @app.get("/health")
@@ -316,24 +324,22 @@ def ready():
     except Exception:
         pass
     try:
-        from ..rag.vector_store import _get_client
+        from ..rag.vector_store import _get_client, current_games_collection_name, index_manifest
 
         # Reuse the process-wide client. Opening a second PersistentClient for
         # the same Chroma SQLite file can fail after agent requests initialize
         # the vector store in this process.
         client = _get_client()
-        client.list_collections()
-        checks["chroma"] = True
+        manifest = index_manifest()
+        collection = client.get_collection(current_games_collection_name(), embedding_function=None)
+        checks["chroma"] = collection.count() == manifest.get("vector_count", manifest.get("game_count", 0)) and collection.count() > 0
     except Exception:
         pass
     manifest_path = Path(CHROMA_PERSIST_DIR) / "index_manifest.json"
     if manifest_path.exists():
         try:
-            manifest = __import__("json").loads(manifest_path.read_text(encoding="utf-8"))
-            checks["index_manifest"] = (
-                manifest.get("embedding_model") == EMBEDDING_MODEL
-                and manifest.get("reranker_model") == RERANKER_MODEL
-            )
+            from ..rag.vector_store import index_compatibility
+            checks["index_manifest"] = index_compatibility()["compatible"]
         except Exception:
             pass
     ready_status = all(bool(value) for value in checks.values())
@@ -350,6 +356,10 @@ def runtime_metrics(request: Request):
             detail={"code": "metrics_auth_required", "message": "metrics access denied"},
         )
     return metrics.snapshot()
+
+
+# Keep API routes ahead of the catch-all static mount.
+app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="frontend")
 
 
 def main():

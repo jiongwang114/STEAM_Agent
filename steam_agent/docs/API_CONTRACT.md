@@ -44,7 +44,7 @@
 {
   "status": "success",
   "thread_id": "thread-1",
-  "reply": "回答文本",
+  "reply": "{\"summary\":\"回答文本\",\"games\":[]}",
   "tool_calls_made": [],
   "tool_rounds": 0,
   "token_usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
@@ -72,12 +72,12 @@
 |---|---|---|
 | `snapshot` | object | 订阅建立时的当前运行快照：`run_id`、`thread_id`、`message`、累计 `reply`、`status`、`stream_status`、`progress`、`error` 和可选完整 `result`。 |
 | `status` | string | 工具执行状态 |
-| `token` | string | 增量回答文本 |
+| `token` | string | 模型增量输出；客户端应暂存，不将片段直接作为最终结构化回答渲染 |
 | `error` | object | 可恢复错误：`{ "code", "message" }`；之后仍会发送兜底文字和 `done` |
 | `done` | object | 与 `/chat` 相同结构的完整 `ChatResponse` |
 | `cancelled` | object | 用户主动停止后发送，含已生成的部分回答 |
 
-成功、错误和兜底处理共用同一 LangGraph 执行器。Agent 在服务端独立于 SSE 连接运行；客户端断开只会结束订阅，不会中止 Agent。运行期间会在内存中保留当前快照，供同一进程内的页面刷新和会话切换恢复。`GET /chat/runs/{thread_id}` 的重连流以 `snapshot` 开始；最初的 `POST /chat/stream` 直接发送增量事件。`done` 在归档和指标记录后发送，已完成快照保留 10 分钟。
+成功、错误和兜底处理共用同一 LangGraph 执行器。Agent 在服务端独立于 SSE 连接运行；客户端断开只会结束订阅，不会中止 Agent。运行期间会在内存中保留当前快照，供同一进程内的页面刷新和会话切换恢复。`GET /chat/runs/{thread_id}` 的重连流以 `snapshot` 开始；最初的 `POST /chat/stream` 直接发送增量事件。`done` 在归档和指标记录后发送，`reply` 始终是可解析的 `summary + games` JSON 字符串，已完成快照保留 10 分钟。
 
 | 方法与路径 | 行为 |
 |---|---|

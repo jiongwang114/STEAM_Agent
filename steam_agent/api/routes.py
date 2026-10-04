@@ -29,7 +29,6 @@ from ..memory.auth import (
     revoke_all_sessions,
     revoke_session,
     register,
-    update_theme,
 )
 from ..model_routing import assign_experiment
 from ..memory.message_store import get_thread_list, get_thread_messages
@@ -43,7 +42,6 @@ from .schemas import (
     ChatRequest,
     ChatResponse,
     SteamBindRequest,
-    ThemeRequest,
     ThreadTitleRequest,
 )
 
@@ -451,6 +449,46 @@ def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
+def _normalize_reply(raw_reply: str) -> tuple[str, dict]:
+    """Return the canonical summary/games envelope used by API and SSE clients."""
+    raw = str(raw_reply or "").strip()
+    if raw.startswith("```"):
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    parsed = None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        # Tool-call turns can contribute text before the final answer. Recover
+        # the last complete envelope instead of exposing that protocol text.
+        decoder = json.JSONDecoder()
+        for index, char in enumerate(raw):
+            if char != "{":
+                continue
+            try:
+                candidate, _ = decoder.raw_decode(raw[index:])
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if isinstance(candidate, dict) and isinstance(candidate.get("summary"), str) and isinstance(candidate.get("games"), list):
+                parsed = candidate
+
+    if isinstance(parsed, dict) and isinstance(parsed.get("summary"), str) and isinstance(parsed.get("games"), list):
+        games = []
+        for item in parsed["games"]:
+            if not isinstance(item, dict) or not item.get("appid") or not item.get("name") or not item.get("store_url"):
+                continue
+            games.append({
+                "appid": str(item.get("appid", "")),
+                "name": str(item.get("name", "")),
+                "store_url": str(item.get("store_url", "")),
+                "image_url": str(item.get("image_url", "")),
+                "reason": str(item.get("reason", "")),
+            })
+        envelope = {"summary": parsed["summary"], "games": games}
+    else:
+        envelope = {"summary": raw, "games": []}
+    return json.dumps(envelope, ensure_ascii=False, separators=(",", ":")), envelope
+
+
 async def _execute_agent_events(
     req: ChatRequest,
     *,
@@ -544,7 +582,7 @@ async def _execute_agent_events(
                 pass
     except TimeoutError:
         termination_reason = "deadline"
-        reply += _DEADLINE_REPLY
+        reply = _DEADLINE_REPLY
         yield {"event": "error", "data": {"code": "agent_timeout", "message": _DEADLINE_REPLY}}
         yield {"event": "token", "data": _DEADLINE_REPLY}
     except asyncio.CancelledError:
@@ -560,7 +598,7 @@ async def _execute_agent_events(
                 user_id=user_id,
                 thread_id=req.thread_id,
                 user_message=req.message,
-                assistant_reply=reply,
+                assistant_reply=_normalize_reply(reply)[0],
                 execution=execution,
             )
         record("cancelled", tool_calls_seen)
@@ -577,7 +615,7 @@ async def _execute_agent_events(
                 user_id=user_id,
                 thread_id=req.thread_id,
                 user_message=req.message,
-                assistant_reply=reply,
+                assistant_reply=_normalize_reply(reply)[0],
                 execution=execution,
             )
         record("cancelled", tool_calls_seen)
@@ -585,7 +623,7 @@ async def _execute_agent_events(
     except Exception as exc:
         termination_reason = "model_error"
         logger.warning("agent_model_error", extra={"error_type": type(exc).__name__})
-        reply += _MODEL_ERROR_REPLY
+        reply = _MODEL_ERROR_REPLY
         yield {"event": "error", "data": {"code": "agent_unavailable", "message": _MODEL_ERROR_REPLY}}
         yield {"event": "token", "data": _MODEL_ERROR_REPLY}
 
@@ -596,6 +634,8 @@ async def _execute_agent_events(
             if isinstance(content, str) and content and not getattr(message, "tool_calls", None):
                 reply = content
                 break
+
+    reply, _reply_payload = _normalize_reply(reply)
 
     history = list(final_state.get("tool_history") or [])
     tool_calls = [
@@ -883,15 +923,13 @@ async def bind_steam(
     """绑定 Steam ID：auth 表 + user_insights 表 + 预热画像。"""
     from ..memory.game_profile import get_game_profile
 
-    # Bind in auth table (one steam_id per user, check uniqueness)
+    # Each account has one Steam ID; multiple accounts may share that ID.
     user_id = current_user
     steam_id = payload.steam_id
     ok, msg = bind_steam_id(user_id, steam_id)
     if not ok:
         if "频繁" in msg:
             code, http_status = "rate_limited", status.HTTP_429_TOO_MANY_REQUESTS
-        elif "已被其他用户" in msg:
-            code, http_status = "steam_id_in_use", status.HTTP_409_CONFLICT
         elif "用户不存在" in msg:
             code, http_status = "user_not_found", status.HTTP_404_NOT_FOUND
         else:
@@ -996,20 +1034,6 @@ async def auth_user_info(current_user: str = Depends(require_user)):
         status_code=status.HTTP_404_NOT_FOUND,
         detail={"code": "user_not_found", "message": "用户不存在"},
     )
-
-
-@router.post("/auth/theme")
-async def auth_set_theme(
-    payload: ThemeRequest,
-    current_user: str = Depends(require_user),
-):
-    ok = update_theme(current_user, payload.theme)
-    if not ok:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "user_not_found", "message": "用户不存在"},
-        )
-    return {"status": "ok"}
 
 
 def _maybe_generate_title(user_id: str, thread_id: str, message: str):

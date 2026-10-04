@@ -1,0 +1,65 @@
+/* Shared archive surfaces. Hover changes only the border. */
+.rail-head { position: relative; padding-right: 34px; }
+.rail-head .mobile-close { display: grid; place-items: center; position: absolute; right: 0; top: 0; width: 28px; height: 28px; padding: 0; margin: 0; font-size: 22px; }
+.rail-head .seal { flex-shrink: 0; }
+.topbar .menu-toggle { width: 32px; height: 32px; padding: 0; flex-shrink: 0; }
+@media (min-width: 801px) {
+  .app-shell.rail-hidden { grid-template-columns: minmax(0, 1fr); }
+  .app-shell.rail-hidden .museum-rail { display: none; }
+  .app-shell.rail-hidden .menu-toggle { display: grid; place-items: center; }
+  .app-shell.rail-hidden .topbar { gap: 12px; }
+  .app-shell.rail-hidden .topbar .crumb { margin-right: auto; }
+}
+:root {
+  --archive-surface: linear-gradient(115deg, rgba(105,108,83,.08), transparent 65%), #191815;
+  --archive-border: rgba(143,123,76,.4);
+  --archive-border-hover: rgba(143,123,76,.8);
+  --archive-inset: inset 0 1px 7px rgba(0,0,0,.28);
+}
+body button,
+body .steam-row #steamProfile,
+body .curation-card .text-btn {
+  background: var(--archive-surface) !important;
+  color: #eee7da !important;
+  border: 1px solid var(--archive-border) !important;
+  border-radius: 12px;
+  box-shadow: var(--archive-inset) !important;
+  transition: border-color .18s ease !important;
+  transform: none !important;
+  animation: none !important;
+  opacity: 1;
+}
+body button:hover,
+body .steam-row #steamProfile:hover,
+body .curation-card .text-btn:hover {
+  border-color: var(--archive-border-hover) !important;
+}
+body button::after,
+body .steam-row #steamProfile::after { display: none !important; }
+body button:focus-visible,
+body .steam-row #steamProfile:focus-visible {
+  outline: 2px solid #cbb77c;
+  outline-offset: 3px;
+}
+body button:disabled { opacity: .45; cursor: not-allowed; }
+body .session.active { border-color: #cbb77c !important; }
+.steam-row .steam-card-action { border-radius: 12px; }
+.steam-row { border: 0; }
+/* The inline copy icon retains the ID's font size and compact placement. */
+body .copy-steam { border-radius: 4px; }
+body .account-menu,
+body .session-actions,
+body .museum-dialog {
+  background: var(--archive-surface);
+  border: 1px solid var(--archive-border);
+  border-radius: 12px;
+  box-shadow: var(--archive-inset);
+  color: #eee7da;
+}
+body .account-menu,
+body .session-actions { padding: 6px; }
+body .account-menu > button,
+body .session-actions > button { margin-block: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  body button, body .steam-row #steamProfile, body .curation-card .text-btn { transition: none !important; }
+}

@@ -54,6 +54,14 @@ logger = logging.getLogger(__name__)
 def initialize_context_node(state: AgentState) -> dict:
     """Load per-thread snapshots once; subsequent requests use checkpoint state."""
     update: dict = {}
+    if "constraints" not in state:
+        from .constraints import extract_constraints
+        human_text = ""
+        for message in reversed(state.get("messages") or []):
+            if getattr(message, "type", "") == "human":
+                human_text = str(getattr(message, "content", ""))
+                break
+        update["constraints"] = extract_constraints(human_text)
     user_id = state.get("user_id", "")
     thread_id = state.get("thread_id", "")
 
@@ -515,11 +523,17 @@ def tool_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
         )
         usage["tool_calls"] = int(usage.get("tool_calls", 0)) + 1
 
+    from .constraints import update_constraint_status
     return {
         "messages": tool_messages,
         "tool_history": tool_history,
         "evidence": evidence,
         "usage": usage,
+        "no_progress_rounds": _progress_rounds(
+            tool_history, tool_history, list(state.get("evidence") or []), evidence,
+            int(state.get("no_progress_rounds", 0)),
+        ),
+        "constraints": update_constraint_status(list(state.get("constraints") or []), evidence),
     }
 
 
@@ -551,6 +565,7 @@ def _parallel_tool_node(state: AgentState, config: RunnableConfig | None) -> dic
     tool_map = configured.get("tool_map") or get_tool_map()
     history = list(state.get("tool_history") or [])
     evidence = list(state.get("evidence") or [])
+    previous_evidence = list(evidence)
     usage = dict(state.get("usage") or {})
     prior_calls = [
         {"name": call["name"], "args": _inject_tool_context(call["name"], call["args"], state)}
@@ -632,11 +647,17 @@ def _parallel_tool_node(state: AgentState, config: RunnableConfig | None) -> dic
         )
         if result.status != ToolStatus.POLICY_BLOCKED:
             usage["tool_calls"] = int(usage.get("tool_calls", 0)) + 1
+    from .constraints import update_constraint_status
     return {
         "messages": tool_messages,
         "tool_history": history,
         "evidence": evidence,
         "usage": usage,
+        "no_progress_rounds": _progress_rounds(
+            history, history, previous_evidence, evidence,
+            int(state.get("no_progress_rounds", 0)),
+        ),
+        "constraints": update_constraint_status(list(state.get("constraints") or []), evidence),
     }
 
 
@@ -660,6 +681,20 @@ def _execution_record(
         "evidence_ids": [item.evidence_id for item in result.evidence],
         "parallel": parallel,
     }
+
+
+def _progress_rounds(previous_history: list[dict], history: list[dict],
+                     previous_evidence: list[dict], evidence: list[dict],
+                     previous_rounds: int) -> int:
+    """Count consecutive tool rounds that add no evidence or successful result."""
+    latest_round = max((int(item.get("round", 0)) for item in history), default=0)
+    if latest_round <= 0:
+        return previous_rounds
+    latest = [item for item in history if int(item.get("round", 0)) == latest_round]
+    old_ids = {item.get("evidence_id") for item in previous_evidence}
+    new_ids = {item.get("evidence_id") for item in evidence} - old_ids
+    made_progress = bool(new_ids) or any(item.get("status") == ToolStatus.SUCCESS.value for item in latest)
+    return 0 if made_progress else previous_rounds + 1
 
 
 def finalize_node(state: AgentState) -> dict:
@@ -1028,5 +1063,7 @@ def should_continue(state: AgentState) -> str:
 
 def after_tools(state: AgentState) -> str:
     if tool_budget_exhausted(state["messages"]) or budget_reason(state):
+        return "finalize"
+    if int(state.get("no_progress_rounds", 0)) >= 2:
         return "finalize"
     return "agent"

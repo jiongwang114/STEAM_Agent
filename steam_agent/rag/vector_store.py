@@ -9,8 +9,10 @@ from chromadb.config import Settings
 from ..config import (
     CHROMA_PERSIST_DIR,
     EMBEDDING_MODEL,
+    EMBEDDING_REVISION,
     LEGACY_MEMORY_COLLECTION_NAME,
     RERANKER_MODEL,
+    RERANKER_REVISION,
 )
 from .embedder import get_embedder
 
@@ -30,13 +32,11 @@ def _get_client() -> chromadb.PersistentClient:
 
 
 def get_games_collection():
-    """Get or create the games knowledge base collection."""
+    """Open the index; hybrid search supplies explicit BGE query vectors."""
     client = _get_client()
-    embedder = get_embedder()
-    return client.get_or_create_collection(
+    return client.get_collection(
         name=current_games_collection_name(),
-        embedding_function=_chroma_embedding_wrapper(embedder),
-        metadata={"hnsw:space": "cosine"},
+        embedding_function=None,
     )
 
 
@@ -90,12 +90,47 @@ def index_compatibility() -> dict:
             "expected": RERANKER_MODEL,
             "actual": manifest.get("reranker_model"),
         }
+    expected_dimension = _embedding_dimension()
+    manifest_dimension = manifest.get("embedding_dimension")
+    if manifest_dimension is None:
+        mismatches["embedding_dimension"] = {
+            "expected": expected_dimension,
+            "actual": None,
+            "reason": "manifest_missing",
+        }
+    elif int(manifest_dimension) != expected_dimension:
+        mismatches["embedding_dimension"] = {
+            "expected": expected_dimension,
+            "actual": manifest_dimension,
+        }
+    for key, expected in (
+        ("embedding_revision", EMBEDDING_REVISION),
+        ("reranker_revision", RERANKER_REVISION),
+        ("chroma_version", chromadb.__version__),
+        ("sentence_transformers_version", __import__('sentence_transformers').__version__),
+    ):
+        if key in manifest and manifest[key] != expected:
+            mismatches[key] = {"expected": expected, "actual": manifest[key]}
+    if manifest.get("game_count", 0) < 1:
+        mismatches["game_count"] = {"expected": "positive", "actual": manifest.get("game_count")}
+    for library, actual in manifest.get("runtime_versions", {}).items():
+        expected = str(__import__(library).__version__)
+        if actual != expected:
+            mismatches[library] = {"expected": expected, "actual": actual}
     return {
         "status": "ok" if not mismatches else "incompatible",
         "compatible": not mismatches,
         "mismatches": mismatches,
         "index_version": manifest.get("index_version", ""),
     }
+
+
+def _embedding_dimension() -> int:
+    """Return the configured model dimension, rather than assuming a value."""
+    dimension = get_embedder().get_sentence_embedding_dimension()
+    if not dimension:
+        raise RuntimeError("embedding_dimension_unavailable")
+    return int(dimension)
 
 
 def _chroma_embedding_wrapper(model):

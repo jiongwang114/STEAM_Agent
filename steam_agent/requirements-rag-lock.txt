@@ -1,0 +1,7 @@
+# Linux x86_64 CPU deployment of the verified local RAG index.
+--extra-index-url https://download.pytorch.org/whl/cpu
+chromadb==1.5.9
+sentence-transformers==5.5.1
+torch==2.12.0+cpu
+transformers==5.9.0
+tokenizers==0.22.2

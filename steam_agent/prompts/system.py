@@ -4,9 +4,10 @@ from ..config import MEMORY_SNAPSHOT_MAX_CHARS, MEMORY_SNAPSHOT_MAX_ITEMS
 from ..memory.insight_store import get_insights
 from .modules import (
     DECISION_POLICY,
-    GROUNDING_POLICY,
+    EVIDENCE_POLICY,
     IDENTITY,
     MEMORY_POLICY,
+    OUTPUT_FORMAT,
     PROMPT_VERSION,
     STYLE,
     TOOL_RESULT_POLICY,
@@ -45,7 +46,8 @@ def build_system_prompt(
         "## 当前上下文\n" + "\n".join(context),
         DECISION_POLICY,
         TOOL_RESULT_POLICY,
-        GROUNDING_POLICY,
+        EVIDENCE_POLICY,
+        OUTPUT_FORMAT,
         MEMORY_POLICY,
         STYLE,
     ]))
