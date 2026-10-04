@@ -374,10 +374,10 @@ def build_llm(
     role: str = "agent",
     experiment: dict | None = None,
 ):
-    from langchain_openai import ChatOpenAI
+    from ..llm_client import create_chat_model
 
     selection = select_model(role, experiment)
-    return ChatOpenAI(
+    return create_chat_model(
         model=selection.model,
         temperature=LLM_TEMPERATURE,
         max_tokens=max_tokens or LLM_MAX_TOKENS,

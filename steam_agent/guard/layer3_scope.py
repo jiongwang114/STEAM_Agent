@@ -43,9 +43,9 @@ def check(text: str) -> tuple[bool, str]:
     """Returns (blocked, reason)."""
 
     def _call_llm(prompt: str) -> str:
-        from langchain_openai import ChatOpenAI
+        from ..llm_client import create_chat_model
 
-        llm = ChatOpenAI(
+        llm = create_chat_model(
             model=select_model("guard").model,
             temperature=0.0,
             max_tokens=8,

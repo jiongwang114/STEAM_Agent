@@ -7,11 +7,35 @@ BASE_DIR: Path = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 # --- LLM ---
-DEEPSEEK_API_KEY: str = os.environ["DEEPSEEK_API_KEY"]
-DEEPSEEK_BASE_URL: str = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-LLM_MODEL: str = os.environ.get("LLM_MODEL", "deepseek-chat")
-LLM_FAST_MODEL: str = os.environ.get("LLM_FAST_MODEL", LLM_MODEL)
-LLM_CANDIDATE_MODEL: str = os.environ.get("LLM_CANDIDATE_MODEL", LLM_MODEL)
+LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "deepseek").lower()
+CUSTOM_LLM_API_KEY: str = os.environ.get("CUSTOM_LLM_API_KEY", "")
+CUSTOM_LLM_BASE_URL: str = os.environ.get(
+    "CUSTOM_LLM_BASE_URL", "https://codex.wlbclub.com"
+)
+CUSTOM_LLM_MODEL: str = os.environ.get("CUSTOM_LLM_MODEL", "gpt-5.6-sol")
+CUSTOM_LLM_REASONING_EFFORT: str = os.environ.get(
+    "CUSTOM_LLM_REASONING_EFFORT", "low"
+).lower()
+if CUSTOM_LLM_REASONING_EFFORT not in {"low", "medium", "high"}:
+    raise ValueError("CUSTOM_LLM_REASONING_EFFORT must be low, medium, or high")
+
+if LLM_PROVIDER == "custom":
+    if not CUSTOM_LLM_API_KEY:
+        raise RuntimeError("CUSTOM_LLM_API_KEY is required when LLM_PROVIDER=custom")
+    DEEPSEEK_API_KEY: str = CUSTOM_LLM_API_KEY
+    DEEPSEEK_BASE_URL: str = CUSTOM_LLM_BASE_URL
+    # Custom provider has one canonical model setting; do not require LLM_MODEL.
+    LLM_MODEL: str = CUSTOM_LLM_MODEL
+else:
+    DEEPSEEK_API_KEY: str = os.environ["DEEPSEEK_API_KEY"]
+    DEEPSEEK_BASE_URL: str = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    LLM_MODEL: str = os.environ.get("LLM_MODEL", "deepseek-chat")
+if LLM_PROVIDER == "custom":
+    LLM_FAST_MODEL: str = LLM_MODEL
+    LLM_CANDIDATE_MODEL: str = LLM_MODEL
+else:
+    LLM_FAST_MODEL: str = os.environ.get("LLM_FAST_MODEL", LLM_MODEL)
+    LLM_CANDIDATE_MODEL: str = os.environ.get("LLM_CANDIDATE_MODEL", LLM_MODEL)
 LLM_TEMPERATURE: float = float(os.environ.get("LLM_TEMPERATURE", "0.3"))
 LLM_MAX_TOKENS: int = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
 LLM_REQUEST_TIMEOUT_SECONDS: float = float(

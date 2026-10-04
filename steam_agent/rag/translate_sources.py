@@ -5,17 +5,26 @@ import json
 import re
 from pathlib import Path
 
-from langchain_openai import ChatOpenAI
-from ..config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
+from ..llm_client import create_chat_model
+from ..config import (
+    DEEPSEEK_API_KEY,
+    DEEPSEEK_BASE_URL,
+    LLM_MAX_RETRIES,
+    LLM_REQUEST_TIMEOUT_SECONDS,
+)
+from ..model_routing import select_model
 from .ingest import _strip_html
 
 
 def main(directory):
     output = directory / 'translations.json'
     translations = json.loads(output.read_text(encoding='utf-8')) if output.exists() else {}
-    model = ChatOpenAI(model='deepseek-chat', temperature=0, max_tokens=8192,
+    selection = select_model('translate')
+    model = create_chat_model(model=selection.model, temperature=0, max_tokens=8192,
                        api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
-                       timeout=120, max_retries=2, model_kwargs={'response_format': {'type': 'json_object'}})
+                       timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+                       max_retries=LLM_MAX_RETRIES,
+                       model_kwargs={'response_format': {'type': 'json_object'}})
     for path in sorted(directory.glob('batch-*.json')):
         for record in json.loads(path.read_text(encoding='utf-8')):
             detail = record['detail']
@@ -35,7 +44,7 @@ def main(directory):
             translated = json.loads(response.content)
             if set(translated) != set(original) or not all(isinstance(v,str) and v.strip() for v in translated.values()):
                 raise ValueError('Invalid translation')
-            translations[key] = {'source_sha256': digest, 'model': 'deepseek-chat', 'text': translated}
+            translations[key] = {'source_sha256': digest, 'model': selection.model, 'text': translated}
             output.write_text(json.dumps(translations, ensure_ascii=False, indent=2), encoding='utf-8')
             print('Translated', key, flush=True)
     print('Translation count', len(translations), flush=True)

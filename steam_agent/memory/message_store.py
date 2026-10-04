@@ -186,9 +186,6 @@ def archive_sqlite_turn(
                 "VALUES(?,?,?,?)",
                 (user_id, thread_id, turn_number, json.dumps(_public_execution(execution), ensure_ascii=False)),
             )
-        from .async_memory import enqueue_memory_extraction
-
-        enqueue_memory_extraction(conn, user_id, thread_id, turn_number)
         return {"turn_number": turn_number, "status": "complete"}
 
 

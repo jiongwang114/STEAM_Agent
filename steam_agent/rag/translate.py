@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from langchain_openai import ChatOpenAI
+from ..llm_client import create_chat_model
 
 from ..config import (
     DEEPSEEK_API_KEY,
@@ -8,9 +8,10 @@ from ..config import (
     LLM_MAX_RETRIES,
     LLM_REQUEST_TIMEOUT_SECONDS,
 )
+from ..model_routing import select_model
 
-_translate_llm = ChatOpenAI(
-    model="deepseek-chat",
+_translate_llm = create_chat_model(
+    model=select_model("translate").model,
     temperature=0.0,
     max_tokens=512,
     api_key=DEEPSEEK_API_KEY,
@@ -45,4 +46,3 @@ def translate_to_english(query: str) -> str:
     }]
     response = _translate_llm.invoke(messages)
     return response.content.strip()
-

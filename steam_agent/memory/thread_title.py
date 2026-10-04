@@ -165,7 +165,7 @@ def auto_generate_title(user_id: str, thread_id: str, user_message: str) -> str:
     if not _auto_title_is_running(user_id, thread_id) and not claim_auto_title_generation(user_id, thread_id):
         return get_thread_title(user_id, thread_id)
     try:
-        from langchain_openai import ChatOpenAI
+        from ..llm_client import create_chat_model
         from ..config import (
             DEEPSEEK_API_KEY,
             DEEPSEEK_BASE_URL,
@@ -174,7 +174,7 @@ def auto_generate_title(user_id: str, thread_id: str, user_message: str) -> str:
         )
         from ..model_routing import select_model
 
-        llm = ChatOpenAI(
+        llm = create_chat_model(
             model=select_model("title").model, temperature=0.0, max_tokens=32,
             api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
             timeout=LLM_REQUEST_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES,

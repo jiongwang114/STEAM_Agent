@@ -79,13 +79,6 @@ async def lifespan(app: FastAPI):
     logging.info("Steam Agent API ready.")
 
     from ..memory.message_store import retry_pending_thread_deletions
-    from ..config import (
-        MEMORY_AGENT_BATCH_SIZE,
-        MEMORY_AGENT_ENABLED,
-        MEMORY_AGENT_POLL_SECONDS,
-    )
-    from ..memory.async_memory import run_pending_memory_tasks
-
     try:
         outcomes = await asyncio.to_thread(retry_pending_thread_deletions)
         failed = sum(item["status"] == "partial" for item in outcomes)
@@ -96,15 +89,6 @@ async def lifespan(app: FastAPI):
             "thread_cleanup_retry_failed",
             extra={"fields": {"error_type": type(exc).__name__}},
         )
-
-    if MEMORY_AGENT_ENABLED:
-        try:
-            await asyncio.to_thread(run_pending_memory_tasks, MEMORY_AGENT_BATCH_SIZE)
-        except Exception as exc:
-            logging.warning(
-                "memory_agent_startup_retry_failed",
-                extra={"fields": {"error_type": type(exc).__name__}},
-            )
 
     async def cleanup_retry_worker():
         while True:
@@ -125,44 +109,15 @@ async def lifespan(app: FastAPI):
                     extra={"fields": {"error_type": type(exc).__name__}},
                 )
 
-    async def memory_agent_worker():
-        while True:
-            await asyncio.sleep(MEMORY_AGENT_POLL_SECONDS)
-            try:
-                outcomes = await asyncio.to_thread(
-                    run_pending_memory_tasks, MEMORY_AGENT_BATCH_SIZE
-                )
-                failed = sum(item["status"] in {"retry", "failed"} for item in outcomes)
-                if failed:
-                    logging.warning(
-                        "memory_agent_retry_incomplete",
-                        extra={"fields": {"failed": failed}},
-                    )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logging.warning(
-                    "memory_agent_worker_failed",
-                    extra={"fields": {"error_type": type(exc).__name__}},
-                )
-
     cleanup_task = asyncio.create_task(cleanup_retry_worker())
-    memory_task = asyncio.create_task(memory_agent_worker()) if MEMORY_AGENT_ENABLED else None
     try:
         yield
     finally:
         cleanup_task.cancel()
-        if memory_task:
-            memory_task.cancel()
         try:
             await cleanup_task
         except asyncio.CancelledError:
             pass
-        if memory_task:
-            try:
-                await memory_task
-            except asyncio.CancelledError:
-                pass
 
 
 app = FastAPI(title="Steam Game Recommendation Agent", version="0.1.0", lifespan=lifespan)
@@ -311,7 +266,14 @@ def health():
 def ready():
     """Readiness endpoint for operators and load balancers."""
     checks: dict[str, object] = {
-        "config": bool(os.environ.get("DEEPSEEK_API_KEY") and os.environ.get("STEAM_API_KEY")),
+        "config": bool(
+            os.environ.get("STEAM_API_KEY")
+            and (
+                os.environ.get("DEEPSEEK_API_KEY")
+                if os.environ.get("LLM_PROVIDER", "deepseek").lower() != "custom"
+                else os.environ.get("CUSTOM_LLM_API_KEY")
+            )
+        ),
         "sqlite": False,
         "chroma": False,
         "index_manifest": False,
