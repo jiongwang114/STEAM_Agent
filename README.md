@@ -8,7 +8,7 @@ STEAM Agent 是面向 Steam 玩家的 AI 游戏发现助手。它把自然语言
 
 当前正式前端入口是 `night-museum-frontend/index.html`，后端启动后会直接托管该页面。以下为未登录首页预览，登录和 Steam 绑定不是浏览首页的前置条件。
 
-首页截图尚未保存为仓库图片文件；可通过上方在线地址查看当前页面。
+![STEAM Agent 未登录首页](docs/images/homepage-logged-out.jpg)
 
 ## 完整运行流程
 
