@@ -46,27 +46,22 @@ jobs:
             --exclude '.git/' --exclude '.venv/' \
             -e "ssh -p ${DEPLOY_PORT}" ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
 
-      - name: Install and restart service
+      - name: Restart Docker service
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s -- "${DEPLOY_PATH}" "${DEPLOY_USER}" <<'REMOTE'
+          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s -- "${DEPLOY_PATH}" <<'REMOTE'
           set -euo pipefail
           APP_PATH="$1"
-          SERVICE_USER="$2"
           cd "$APP_PATH"
           test -f .env
-          python3 -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/pip install -r requirements.txt
-          .venv/bin/python -m compileall -q api graph guard memory prompts rag tools
-          sudo install -m 0644 deploy/steam-agent.service /etc/systemd/system/steam-agent@.service
-          sudo systemctl daemon-reload
-          sudo systemctl enable "steam-agent@${SERVICE_USER}"
-          sudo systemctl restart "steam-agent@${SERVICE_USER}"
+          docker rm -f steam-agent-new2 2>/dev/null || true
+          docker run -d --name steam-agent-new2 --restart unless-stopped \
+            -p 8000:8000 --env-file "$APP_PATH/.env" \
+            -v "$APP_PATH:/app" -w /app steam-agent:github python -m api.main
           REMOTE
 
       - name: Verify deployment
