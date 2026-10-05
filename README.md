@@ -50,7 +50,6 @@ flowchart TD
 
 ```text
 
-├─ 
 ├─ api/                  # FastAPI 接口、SSE、认证和静态前端挂载
 ├─ graph/                # LangGraph 节点、AgentState 和条件路由
 ├─ guard/                # 分层安全检查和范围控制
@@ -67,7 +66,7 @@ flowchart TD
 ├─ llm_client.py         # DeepSeek/custom OpenAI 兼容客户端
 ├─ model_routing.py      # 快速模型和候选模型选择
 ├─ requirements.txt      # Python 运行依赖
-├─ tests/                # 单元、接口和 RAG 测试
+├─ .github/workflows/    # GitHub Actions 自动部署
 ├─ docs/                    # API、部署、前端和评测文档
 └─ README.md                # 项目总览和部署入口
 ```
@@ -85,7 +84,7 @@ Agent 不是一次性调用模型，而是围绕 `AgentState` 进行可恢复的
 ## 本地运行
 
 ```powershell
-git clone https://github.com/jiongwang114/git
+git clone https://github.com/jiongwang114/STEAM_Agent.git
 cd STEAM_Agent
 python -m venv .venv
 .venv\Scripts\activate
@@ -94,7 +93,7 @@ Copy-Item .env.example .env
 python -m api.main
 ```
 
-后端默认监听 `http://localhost:8000`，并托管当前正式前端；健康检查为 `/health`，就绪检查为 `/ready`，交互式 API 文档为 `/docs`。首次使用 RAG 时可执行 `python -m rag.ingest --from-cache` 构建本地索引。
+后端默认监听 `http://localhost:8000`，并托管当前正式前端；健康检查为 `/health`，就绪检查为 `/ready`，交互式 API 文档为 `/docs`。首次使用 RAG 时可执行 `python -m rag.ingest --from-cache` 构建本地索引。推送到 `main` 后，GitHub Actions 会通过 SSH 更新 Ubuntu 上的 Docker 服务并检查 `/health` 和 `/ready`。
 
 ## 模型配置
 
@@ -110,7 +109,7 @@ python -m api.main
 - `/health`、`/ready`、`/metrics`：健康、就绪和指标
 
 ```bash
-pytest -q tests
+python -m compileall -q api graph guard memory prompts rag tools
 ```
 
 更多说明见 [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)、[`docs/BACKEND_DEPLOYMENT.md`](docs/BACKEND_DEPLOYMENT.md) 和 [`docs/FRONTEND_DESIGN.md`](docs/FRONTEND_DESIGN.md)。
