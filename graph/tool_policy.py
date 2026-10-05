@@ -69,6 +69,12 @@ def evaluate_tool_call(
     prior_calls: Sequence[dict[str, Any]],
     position_in_round: int,
 ) -> PolicyDecision:
+    if name == "get_user_playtime" and not str(arguments.get("steam_id") or "").strip():
+        return PolicyDecision(
+            False,
+            "steam_binding_required",
+            "未检测到已绑定的 Steam ID，不能读取游戏库或游玩记录。",
+        )
     if position_in_round >= AGENT_MAX_TOOL_CALLS_PER_ROUND:
         return PolicyDecision(
             False,

@@ -77,10 +77,19 @@ def _search_store(query: str) -> dict:
     import json
 
     from urllib.parse import urlencode
-    url = f"{STEAM_STORE_URL}/storesearch/?{urlencode({'term': query, 'cc': 'cn', 'l': 'schinese'})}"
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=10.0) as resp:
-        return json.loads(resp.read())
+    # Steam occasionally returns an empty localized result even when the game
+    # exists. Retry with the default English catalog before reporting empty.
+    for country, language in (("cn", "schinese"), ("us", "english")):
+        url = f"{STEAM_STORE_URL}/storesearch/?{urlencode({'term': query, 'cc': country, 'l': language})}"
+        req = urllib.request.Request(url, headers=HEADERS)
+        try:
+            with urllib.request.urlopen(req, timeout=10.0) as resp:
+                data = json.loads(resp.read())
+            if data.get("items"):
+                return data
+        except Exception:
+            continue
+    return {"items": []}
 
 
 def _fetch_app_detail_sync(appid: int) -> dict | None:

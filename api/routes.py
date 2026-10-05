@@ -54,6 +54,8 @@ router = APIRouter()
 
 _thread_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 _thread_locks_guard = threading.Lock()
+_active_sync_threads: set[tuple[str, str]] = set()
+_active_sync_threads_guard = threading.Lock()
 
 
 @dataclass
@@ -378,11 +380,20 @@ def _execution_summary(
         if not tool_name or tool_name == "save_user_insight":
             continue
         raw_status = str(item.get("status", "unknown"))
+        # Keep arguments in replay traces so evaluators can verify tool
+        # routing and filters. Remove identity-like fields before exposing it.
+        raw_arguments = item.get("arguments") if isinstance(item.get("arguments"), dict) else {}
+        arguments = {
+            str(key): value
+            for key, value in raw_arguments.items()
+            if str(key) not in {"user_id", "steam_id", "token", "password", "api_key"}
+        }
         steps.append({
             "name": _TOOL_DISPLAY_NAMES.get(tool_name, "执行检索步骤"),
             "status": _PUBLIC_STEP_STATUS.get(raw_status, "failed"),
             "duration_ms": max(0, round(float(item.get("duration_seconds", 0) or 0) * 1000)),
             "round": max(0, int(item.get("round", 0) or 0)),
+            "arguments": arguments,
         })
     if not steps:
         seen: set[str] = set()
@@ -742,6 +753,14 @@ async def chat(
         )
     _schedule_title_generation(user_id, req.thread_id, req.message)
     steam_id = _steam_id_for_user(user_id, current_user, req.steam_id)
+    sync_key = (user_id, req.thread_id)
+    with _active_sync_threads_guard:
+        if sync_key in _active_sync_threads:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "thread_run_active", "message": "该会话仍有回答正在生成"},
+            )
+        _active_sync_threads.add(sync_key)
     events = _execute_agent_events(
         req,
         user_id=user_id,
@@ -749,13 +768,17 @@ async def chat(
         mode="sync",
         started=time.perf_counter(),
     )
-    async for event in events:
-        if event.get("event") == "done":
-            return ChatResponse.model_validate(event["data"])
-    raise HTTPException(
-        status_code=500,
-        detail={"code": "agent_incomplete", "message": "Agent 未能完成本次请求"},
-    )
+    try:
+        async for event in events:
+            if event.get("event") == "done":
+                return ChatResponse.model_validate(event["data"])
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "agent_incomplete", "message": "Agent 未能完成本次请求"},
+        )
+    finally:
+        with _active_sync_threads_guard:
+            _active_sync_threads.discard(sync_key)
 
 
 @router.post("/chat/stream")

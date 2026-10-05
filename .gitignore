@@ -1,4 +1,21 @@
 .env
+# Keep only the documented template; never stage local evaluator credentials.
+!.env.example
+tests/eval.local.env
+tests/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+test-artifacts/
+docs/Agent测试记录/
+AGENTS.md
+rag/chroma_data/
+checkpoints.db
+data.db
+*.db-shm
+*.db-wal
+*.cookies
+tests/eval.local.env
 *.db
 *.db-shm
 *.db-wal
