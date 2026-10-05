@@ -71,5 +71,13 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "curl --fail --silent --show-error http://127.0.0.1:8000/health"
-          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "curl --fail --silent --show-error http://127.0.0.1:8000/ready"
+          for attempt in $(seq 1 30); do
+            if ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "curl --fail --silent --show-error http://127.0.0.1:8000/health"; then
+              if ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "curl --fail --silent --show-error http://127.0.0.1:8000/ready"; then
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+          echo 'Deployment did not become ready within 5 minutes.' >&2
+          exit 1
