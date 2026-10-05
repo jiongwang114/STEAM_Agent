@@ -43,7 +43,8 @@ jobs:
             --exclude '*.sqlite3' --exclude '*.sqlite3-shm' --exclude '*.sqlite3-wal' \
             --exclude 'rag/chroma_data/' \
             --exclude 'test-artifacts/' --exclude 'tests/' \
-            --exclude '.git/' --exclude '.venv/' \
+            --exclude '.git/' --exclude '.venv/' --exclude '__pycache__/' \
+            --exclude '*.pyc' --exclude 'logs/' \
             -e "ssh -p ${DEPLOY_PORT}" ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
 
       - name: Restart Docker service
