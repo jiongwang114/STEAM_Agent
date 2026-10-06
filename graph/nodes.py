@@ -381,6 +381,7 @@ def build_llm(
         model=selection.model,
         temperature=LLM_TEMPERATURE,
         max_tokens=max_tokens or LLM_MAX_TOKENS,
+        streaming=True,
         api_key=DEEPSEEK_API_KEY,
         base_url=DEEPSEEK_BASE_URL,
         timeout=LLM_REQUEST_TIMEOUT_SECONDS,

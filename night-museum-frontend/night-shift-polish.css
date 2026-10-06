@@ -9,7 +9,7 @@
 .museum-rail{transform:translate3d(calc(var(--parallax-x) * -.12),calc(var(--parallax-y) * -.12),0);transition:transform 1.2s var(--ease-archive),background .6s ease}
 .intro-rule{transform-origin:left;animation:ruleDevelop 1.1s var(--ease-archive) both .15s}
 .intro .eyebrow{animation:develop 700ms var(--ease-archive) both .35s}
-.intro h2{animation:develop 820ms var(--ease-archive) both .5s;filter:blur(5px)}
+.intro h2{animation:develop 820ms var(--ease-archive) both .5s;filter:none}
 .intro-copy{animation:develop 760ms var(--ease-archive) both .78s;letter-spacing:.05em}
 .new-session,.send-btn,.quiet-btn,.steam-link,.session-menu-btn{position:relative;overflow:hidden;transition:transform 220ms var(--ease-archive),border-color 220ms ease,background 220ms ease,box-shadow 220ms ease}
 .new-session:hover,.send-btn:hover,.quiet-btn:hover,.steam-link:hover,.session-menu-btn:hover{transform:translate3d(var(--magnet-x,0px),var(--magnet-y,0px),0)}
@@ -33,13 +33,13 @@
 @keyframes projectorSweep{0%{transform:translate3d(-2%,1%,0);opacity:.35}100%{transform:translate3d(3%,-1%,0);opacity:.7}}
 @keyframes grainFlicker{50%{opacity:.07}100%{opacity:.045}}
 @keyframes ruleDevelop{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
-@keyframes develop{from{opacity:0;filter:blur(6px);transform:translateY(11px);letter-spacing:.09em}to{opacity:1;filter:blur(0);transform:none;letter-spacing:normal}}
+@keyframes develop{from{opacity:0;transform:translateY(11px);letter-spacing:.09em}to{opacity:1;transform:none;letter-spacing:normal}}
 @keyframes drawerOpen{0%{transform:translateY(2px) scaleX(.985);filter:brightness(.85)}45%{transform:translateY(-1px) scaleX(1.01)}100%{transform:none;filter:none}}
 @keyframes scanline{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 @keyframes standby{0%,100%{opacity:.55;box-shadow:0 0 5px rgba(157,164,122,.3)}50%{opacity:1;box-shadow:0 0 13px rgba(157,164,122,.75)}}
 @keyframes ledSweep{0%{clip-path:inset(0 100% 0 0);opacity:1}100%{clip-path:inset(0 0 0 0);opacity:.7}}
-@keyframes sedimentBlock{from{opacity:.78;filter:blur(3px);transform:translateY(5px)}to{opacity:1;filter:none;transform:none}}
-@keyframes sediment{from{opacity:.72;filter:blur(2px)}to{opacity:1;filter:none}}
+@keyframes sedimentBlock{from{opacity:.78;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes sediment{from{opacity:.72}to{opacity:1}}
 @keyframes sedimentLine{from{opacity:.82;transform:translateY(4px)}to{opacity:1;transform:none}}
 @keyframes archiveCard{from{opacity:0;transform:translate(-10px,14px) rotate(-1deg)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.ambient,.ambient:before,.grain,.dust,.intro-rule,.intro .eyebrow,.intro h2,.intro-copy,.new-session.is-opening,.assistant-block,.assistant-block .answer,.assistant-block .answer>*,.status-line,.session-row{animation:none!important}.main-stage,.museum-rail,.torch{transition:none!important}.composer:focus-within .composer-inner:before{display:none}}

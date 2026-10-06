@@ -49,6 +49,8 @@ logger = logging.getLogger(__name__)
 
 _DEADLINE_REPLY = "这次检索超过了时间预算，我先停在这里，避免拿不完整的结果硬凑答案。请缩小一个条件后再试。"
 _MODEL_ERROR_REPLY = "模型服务暂时不可用，这次无法可靠完成回答。请稍后重试；我不会用不完整结果拼凑答案。"
+_SSE_REPLY_CHUNK_SIZE = 24
+_SSE_REPLY_CHUNK_DELAY_SECONDS = 0.03
 
 router = APIRouter()
 
@@ -549,6 +551,7 @@ async def _execute_agent_events(
     tool_calls_seen: list[str] = []
     termination_reason = ""
     metrics_recorded = False
+    public_stream_nodes = {"finalize", "repair"}
 
     def record(status_value: str, tools: list[str] | None = None) -> None:
         nonlocal metrics_recorded
@@ -586,14 +589,13 @@ async def _execute_agent_events(
                             },
                         }
                     if kind == "on_chat_model_stream":
-                        if metadata.get("langgraph_node") == "guard":
+                        if node_name not in public_stream_nodes:
                             continue
                         chunk = event.get("data", {}).get("chunk")
                         content = getattr(chunk, "content", None)
                         if isinstance(content, str) and content:
                             first_token_at = first_token_at or time.perf_counter()
                             reply += content
-                            yield {"event": "token", "data": content}
                     elif kind == "on_tool_start":
                         tool_name = event.get("name", "")
                         if tool_name and tool_name != "save_user_insight":
@@ -619,7 +621,6 @@ async def _execute_agent_events(
         termination_reason = "deadline"
         reply = _DEADLINE_REPLY
         yield {"event": "error", "data": {"code": "agent_timeout", "message": _DEADLINE_REPLY}}
-        yield {"event": "token", "data": _DEADLINE_REPLY}
     except asyncio.CancelledError:
         termination_reason = "cancelled"
         if reply.strip():
@@ -660,7 +661,6 @@ async def _execute_agent_events(
         logger.warning("agent_model_error", extra={"error_type": type(exc).__name__})
         reply = _MODEL_ERROR_REPLY
         yield {"event": "error", "data": {"code": "agent_unavailable", "message": _MODEL_ERROR_REPLY}}
-        yield {"event": "token", "data": _MODEL_ERROR_REPLY}
 
     messages = final_state.get("messages") or []
     if not reply:
@@ -735,6 +735,14 @@ async def _execute_agent_events(
         run_metadata=metadata,
     )
     record(response_status, tool_calls)
+    for offset in range(0, len(reply), _SSE_REPLY_CHUNK_SIZE):
+        if first_token_at is None:
+            first_token_at = time.perf_counter()
+        yield {
+            "event": "token",
+            "data": reply[offset:offset + _SSE_REPLY_CHUNK_SIZE],
+        }
+        await asyncio.sleep(_SSE_REPLY_CHUNK_DELAY_SECONDS)
     yield {"event": "done", "data": response.model_dump(mode="json")}
 
 

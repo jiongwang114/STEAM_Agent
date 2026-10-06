@@ -1,6 +1,8 @@
 const MAX_MESSAGE_LENGTH = 666;
 const $ = (selector) => document.querySelector(selector);
-const state = { user: null, sessions: [], threadId: null, messages: [], pending: null, stream: null, busy: false, authExpired: false };
+const VIEW_THREAD_KEY = 'steam-agent.current-thread';
+const VIEW_SCROLL_PREFIX = 'steam-agent.scroll:';
+const state = { user: null, sessions: [], threadId: localStorage.getItem(VIEW_THREAD_KEY), messages: [], pending: null, stream: null, busy: false, authExpired: false };
 let revealObserver;
 let steamIdValue = '';
 let steamBindingKnown = false;
@@ -152,19 +154,79 @@ function renderSessions() {
   }
 }
 async function refreshSessions() { const result = await api.getSessions(); state.sessions = result.threads || []; renderSessions(); }
+function saveViewState() {
+  if (!state.threadId) return;
+  localStorage.setItem(VIEW_THREAD_KEY, state.threadId);
+  const feed = $('#chatFeed');
+  const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+  localStorage.setItem(VIEW_SCROLL_PREFIX + state.threadId, JSON.stringify({ top: feed.scrollTop, atBottom }));
+}
+function restoreViewState(threadId) {
+  const feed = $('#chatFeed');
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(VIEW_SCROLL_PREFIX + threadId) || 'null'); } catch (_) { saved = null; }
+  if (!saved) return;
+  const restore = () => {
+    if (state.threadId !== threadId) return;
+    const maxTop = Math.max(0, feed.scrollHeight - feed.clientHeight);
+    feed.scrollTop = saved.atBottom ? maxTop : Math.min(Math.max(0, Number(saved.top) || 0), maxTop);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(restore));
+}
 function renameSession(session) { const dialog = $('#titleDialog'); const input = $('#titleInput'); const error = $('#titleError'); input.value = session.title || '新夜班记录'; error.textContent = ''; dialog.returnValue = ''; const submit = () => { const title = input.value.trim(); if (!title) { error.textContent = '标题不能为空'; return; } if (title.length > 50) { error.textContent = '标题最多 50 字'; return; } dialog.close('save'); }; dialog.onclose = async () => { if (dialog.returnValue !== 'save') return; try { await api.renameSession(session.thread_id, input.value.trim()); await refreshSessions(); updateTitle(); toast('标题已更新'); } catch (caught) { showFailure(caught, () => renameSession(session)); } }; $('#titleCancel').onclick = () => dialog.close(); $('#titleSave').onclick = submit; dialog.showModal(); input.focus(); input.select(); }
 function deleteSession(session) { const dialog = $('#deleteDialog'); $('#deletePrompt').textContent = `确定删除“${session.title || '新夜班记录'}”？删除后无法恢复。`; dialog.returnValue = ''; dialog.onclose = async () => { if (dialog.returnValue !== 'delete') return; try { const result = await api.deleteSession(session.thread_id); if (state.threadId === session.thread_id) newSession(); await refreshSessions(); toast(result.status === 'partial' ? '记录已移除，后台仍在完成清理' : '夜班记录已删除'); } catch (caught) { showFailure(caught, () => deleteSession(session)); } }; $('#deleteCancel').onclick = () => dialog.close(); $('#deleteConfirm').onclick = () => dialog.close('delete'); dialog.showModal(); }
 function updateTitle() { $('#currentTitle').textContent = state.sessions.find((s) => s.thread_id === state.threadId)?.title || '新夜班记录'; }
-function newSession() { state.stream?.abort(); state.stream = null; state.threadId = api.createSession(); state.messages = []; state.pending = null; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail(); $('#prompt').focus({ preventScroll: true }); }
+function newSession() { state.stream?.abort(); state.stream = null; state.threadId = api.createSession(); localStorage.setItem(VIEW_THREAD_KEY, state.threadId); state.messages = []; state.pending = null; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail(); $('#prompt').focus({ preventScroll: true }); }
 async function selectSession(id) {
-  if (state.threadId === id) { closeMobileRail(); return; }
-  state.stream?.abort(); state.stream = null; state.threadId = id; state.pending = null; state.messages = []; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail();
-  try { const messages = (await api.getMessages(id)).messages || []; if (state.threadId !== id) return; state.messages = messages; renderMessages(); if (state.sessions.find((s) => s.thread_id === id)?.is_running) await attachRun(id); }
+  if (state.threadId === id && state.messages.length) { closeMobileRail(); return; }
+  state.stream?.abort(); state.stream = null; state.threadId = id; localStorage.setItem(VIEW_THREAD_KEY, id); state.pending = null; state.messages = []; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail();
+  try { const messages = (await api.getMessages(id)).messages || []; if (state.threadId !== id) return; state.messages = messages; renderMessages(); if (state.sessions.find((s) => s.thread_id === id)?.is_running) await attachRun(id); restoreViewState(id); }
   catch (error) { if (state.threadId === id) showFailure(error, () => selectSession(id)); }
 }
 
 const recommendationPattern = /\*\*\[([^\]]+)\]\((https:\/\/(?:store\.steampowered\.com\/app\/\d+[^\s)]*))\)\*\*(?:[^\n]*)\n?(?:\[!\[[^\]]*\]\((https:\/\/[^\s)]+)\)\]\(https:\/\/store\.steampowered\.com\/app\/\d+[^\s)]*\)\s*)?/g;
 function inlineMarkdown(value) { return String(value || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/__([^_]+?)__/g, '$1').replace(/`([^`]+?)`/g, '$1'); }
+function streamPreview(raw) {
+  const text = String(raw || '');
+  const summary = text.match(/"summary"\s*:\s*"((?:\\.|[^"\\])*)/s);
+  if (summary) {
+    try { return JSON.parse(`"${summary[1]}"`); } catch (_) { return summary[1]; }
+  }
+  return text.trim().startsWith('{') ? '正在整理馆藏记录…' : text;
+}
+function scheduleStreamPreview(assistant) {
+  if (assistant.previewTimer) return;
+  const tick = () => {
+    const target = assistant.previewTarget || '';
+    const current = assistant.previewContent || '';
+    if (current === target) {
+      assistant.previewTimer = null;
+      if (assistant.doneEvent) applyDoneEvent(assistant, assistant.doneEvent);
+      return;
+    }
+    const nextLength = Math.min(target.length, current.length + 1);
+    assistant.previewContent = target.slice(0, nextLength);
+    assistant.content = assistant.previewContent;
+    const index = state.messages.indexOf(assistant);
+    const answer = index >= 0 ? document.querySelector(`[data-message-index="${index}"] .answer`) : null;
+    if (answer) {
+      answer.classList.add('streaming-preview');
+      answer.replaceChildren(node('p', 'answer-lead plain-reply', inlineMarkdown(assistant.content || '正在整理馆藏记录…')));
+    }
+    assistant.previewTimer = setTimeout(tick, 45);
+  };
+  assistant.previewTimer = setTimeout(tick, 45);
+}
+function finishStreamPreview(assistant) {
+  if (assistant.previewTimer) { clearTimeout(assistant.previewTimer); assistant.previewTimer = null; }
+}
+function applyDoneEvent(assistant, event) {
+  assistant.doneEvent = null;
+  finishStreamPreview(assistant);
+  stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = event.data?.status !== 'success';
+  if (assistant.incomplete && !assistant.error) assistant.error = '回答可能未完整生成';
+  state.busy = false; setArchiveMode(assistant.incomplete ? 'uncertain' : 'presenting', assistant.incomplete ? 'ARCHIVE / UNRESOLVED' : 'ARCHIVE / MATCH FOUND'); renderMessages(); refreshSessions().catch(() => {});
+}
 function splitRecommendations(text) {
   const raw = String(text || '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
   try { const structured = JSON.parse(raw); if (Array.isArray(structured.games) && typeof structured.summary === 'string') return { structured: true, lead: structured.summary, games: structured.games.map((game) => ({ name: game.name || '', url: game.store_url || '', image: game.image_url || '', appid: game.appid || '', genre: game.genre || '', mood: game.mood || '', reason: game.reason || '', match: game.match || '', selected: Boolean(game.selected) })).filter((game) => game.name) }; } catch (_) { /* older Markdown responses remain supported */ }
@@ -260,6 +322,8 @@ function renderMessages() {
   if (isEmptyConversation) feed.scrollTop = 0;
   else if (wasAtBottom) feed.scrollTop = feed.scrollHeight;
 }
+$('#chatFeed').addEventListener('scroll', saveViewState, { passive: true });
+window.addEventListener('pagehide', saveViewState);
 function installRevealObserver() {
   revealObserver?.disconnect();
   const feed = $('#chatFeed');
@@ -304,7 +368,11 @@ function handleStreamEvent(event, assistant, threadId) {
     assistant.stage = stageLabels[assistant.stageCategory] || assistant.stage;
     renderMessages();
   }
-  if (event.event === 'token') { assistant.rawContent = (assistant.rawContent || '') + String(event.data || ''); }
+  if (event.event === 'token') {
+    assistant.rawContent = (assistant.rawContent || '') + String(event.data || '');
+    assistant.previewTarget = streamPreview(assistant.rawContent);
+    scheduleStreamPreview(assistant);
+  }
   if (event.event === 'snapshot') {
     const snapshot = event.data || {}; assistant.stage = snapshot.stream_status || assistant.stage;
     if (snapshot.error) assistant.error = typeof snapshot.error === 'string' ? snapshot.error : snapshot.error.message;
@@ -312,11 +380,11 @@ function handleStreamEvent(event, assistant, threadId) {
   }
   if (event.event === 'error') { assistant.error = event.data?.message || '生成途中遇到问题'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
   if (event.event === 'done') {
-    stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = event.data?.status !== 'success';
-    if (assistant.incomplete && !assistant.error) assistant.error = '回答可能未完整生成';
-    state.busy = false; setArchiveMode(assistant.incomplete ? 'uncertain' : 'presenting', assistant.incomplete ? 'ARCHIVE / UNRESOLVED' : 'ARCHIVE / MATCH FOUND'); renderMessages(); refreshSessions().catch(() => {});
+    assistant.doneEvent = event;
+    if ((assistant.previewContent || '') === (assistant.previewTarget || '')) applyDoneEvent(assistant, event);
+    else scheduleStreamPreview(assistant);
   }
-  if (event.event === 'cancelled') { stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = true; state.busy = false; renderMessages(); }
+  if (event.event === 'cancelled') { finishStreamPreview(assistant); stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = true; state.busy = false; renderMessages(); }
 }
 async function runMessage(text, retry = false) {
   if (state.busy) return; state.busy = true; setArchiveMode('retrieving', 'INDEX / SCANNING');
