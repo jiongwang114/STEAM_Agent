@@ -8,8 +8,10 @@ let steamIdValue = '';
 let steamBindingKnown = false;
 const archiveModes = ['listening', 'retrieving', 'presenting', 'uncertain'];
 const archiveVisual = { selected: null, timer: null, clearTimer: null, revision: 0 };
-const fallbackArchiveImage = 'generated-images/adventure.png';
-const fallbackArchiveImages = { adventure: fallbackArchiveImage, horror: 'generated-images/horror.png', strategy: 'generated-images/strategy.png', life: 'generated-images/life.png', scifi: 'generated-images/scifi.png', action: 'generated-images/action.png' };
+// Backgrounds use dedicated, downscaled WebP assets. Recommendation cards keep
+// their original artwork so their readable cover art is unaffected.
+const fallbackArchiveImage = 'generated-images/life-bg.webp';
+const fallbackArchiveImages = { adventure: 'generated-images/adventure-bg.webp', horror: 'generated-images/horror-bg.webp', strategy: 'generated-images/strategy-bg.webp', life: fallbackArchiveImage, scifi: 'generated-images/scifi-bg.webp', action: 'generated-images/action-bg.webp' };
 function ensureArchiveLayers() {
   const ambient = document.querySelector('.ambient'); if (!ambient || ambient.querySelector('.ambient-game-image')) return;
   const image = node('div', 'ambient-game-image ambient-game-image-a'); const nextImage = node('div', 'ambient-game-image ambient-game-image-b'); const type = node('div', 'ambient-type-layer');
