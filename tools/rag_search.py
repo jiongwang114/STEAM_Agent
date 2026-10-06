@@ -80,6 +80,10 @@ def rag_search_similar_games(
     free_only = parsed.free_only
     min_year = parsed.min_year
     has_multiplayer = parsed.has_multiplayer
+    has_singleplayer = parsed.has_singleplayer
+    has_coop = parsed.has_coop
+    has_online_coop = parsed.has_online_coop
+    supports_schinese = parsed.supports_schinese
     genre = parsed.genre
     min_metacritic = parsed.min_metacritic
     min_similarity = parsed.min_similarity
@@ -107,6 +111,14 @@ def rag_search_similar_games(
         conditions.append({"release_year": {"$gte": min_year}})
     if has_multiplayer is not None:
         conditions.append({"has_multiplayer": has_multiplayer})
+    if has_singleplayer is not None:
+        conditions.append({"has_singleplayer": has_singleplayer})
+    if has_coop is not None:
+        conditions.append({"has_coop": has_coop})
+    if has_online_coop is not None:
+        conditions.append({"has_online_coop": has_online_coop})
+    if supports_schinese is not None:
+        conditions.append({"supports_schinese": supports_schinese})
     if min_metacritic is not None:
         conditions.append({"metacritic": {"$gte": min_metacritic}})
 

@@ -1,0 +1,14 @@
+{
+  "official_terms_url": "https://steamcommunity.com/dev/apiterms",
+  "published_web_api_daily_limit": 100000,
+  "store_appdetails_and_search_published_limit": null,
+  "minimum_request_interval_seconds": 2.1,
+  "concurrency": 1,
+  "http_403_or_429": "pause collection; no bypass",
+  "transient_error_retries": 3,
+  "batch_size": 100,
+  "remote_role": "collect normalized official descriptions only",
+  "local_role": "verify SHA-256, audit sources, build and test index",
+  "deploy_index_to_remote": false,
+  "cleanup_scope": "/home/ubuntu/rag-collect-20260930 and /tmp/steam-apiterms-rag.html"
+}

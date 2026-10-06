@@ -14,6 +14,10 @@ class SearchPlan(BaseModel):
     free_only: bool = False
     min_year: int | None = Field(default=None, ge=1970, le=2100)
     has_multiplayer: bool | None = None
+    has_singleplayer: bool | None = None
+    has_coop: bool | None = None
+    has_online_coop: bool | None = None
+    supports_schinese: bool | None = None
     genre: str | None = Field(default=None, max_length=80)
     min_metacritic: int | None = Field(default=None, ge=0, le=100)
     top_k: int = Field(default=10, ge=1, le=20)

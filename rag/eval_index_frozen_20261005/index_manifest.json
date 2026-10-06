@@ -1,0 +1,29 @@
+{
+  "built_at": "2026-09-30T16:27:29.559806+00:00",
+  "started_at": "2026-09-30T16:14:08.884335+00:00",
+  "duration_seconds": 800.055,
+  "index_version": "games-20260930161408-21620",
+  "parent_version": "games",
+  "collection": "games_20260930161408_21620",
+  "game_count": 1000,
+  "vector_count": 2088,
+  "failure_count": 0,
+  "chunk_schema_version": "game-document-v3-token-chunks",
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "embedding_revision": "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
+  "embedding_dimension": 768,
+  "normalize_embeddings": true,
+  "chroma_version": "1.5.9",
+  "sentence_transformers_version": "5.6.0",
+  "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "reranker_revision": "233902d25c440f23af6f7d6e94d2946bac0bee0a",
+  "code_version": "working-tree",
+  "cache_sha256": "fa79660bd966b31b8fe1f6f5013df7fc3fe3781a7a6e2e9b9abe330a4af91929",
+  "documents_sha256": "ea2f0f511df216888d14c86d06507381aac1ac63f655a98cc526de48f8907599",
+  "runtime_versions": {
+    "torch": "2.13.0+cu130",
+    "transformers": "5.13.1",
+    "tokenizers": "0.22.2"
+  },
+  "source_audit_sha256": "3c4cefc8f534911c93ef35993b3aab6f1898e7f779e514a36d88152c46fe12be"
+}

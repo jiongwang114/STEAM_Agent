@@ -154,6 +154,8 @@ def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) ->
         "gameplay_modes": ", ".join(gameplay_modes) or "Unknown",
         "has_singleplayer": "Single-player" in all_categories,
         "has_coop": any("Co-op" in c for c in gameplay_modes),
+        "has_online_coop": "Online Co-op" in all_categories,
+        "supports_schinese": "Simplified Chinese" in detail.get("supported_languages", ""),
         "genres": ", ".join(genres),
         "categories": ", ".join(all_categories),
         "supported_languages": _strip_html(detail.get("supported_languages", "")),

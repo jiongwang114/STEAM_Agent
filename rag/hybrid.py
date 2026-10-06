@@ -53,13 +53,18 @@ def hybrid_search(
 
     dense_started = time.perf_counter()
     dense_error = ""
+    # Chroma can only filter metadata that was present when the frozen index
+    # was built. New boolean fields are enforced again after retrieval using
+    # the cache-backed lexical metadata, so a stale index cannot silently
+    # ignore a hard constraint.
+    chroma_where, post_filter = _split_where(where)
     if use_dense:
         try:
             collection = get_games_collection()
             dense_raw = collection.query(
                 query_embeddings=embed_query([query]),
                 n_results=RAG_DENSE_CANDIDATES * 3,
-                **({"where": where} if where else {}),
+                **({"where": chroma_where} if chroma_where else {}),
             )
         except Exception as exc:
             dense_raw = {"ids": [[]], "distances": [[]]}
@@ -99,7 +104,9 @@ def hybrid_search(
     rerank_started = time.perf_counter()
     candidate_docs = [
         documents[doc_id] for doc_id in candidates
-        if doc_id in documents and _genre_matches(documents[doc_id].metadata, required_genre)
+        if doc_id in documents
+        and _genre_matches(documents[doc_id].metadata, required_genre)
+        and (not post_filter or _matches(documents[doc_id].metadata, post_filter))
     ]
     if use_reranker:
         rerank_scores, reranker_used = rerank(
@@ -185,6 +192,28 @@ def _metadata_predicate(where: dict | None, *, required_genre: str | None = None
         return _matches(metadata, where) and _genre_matches(metadata, required_genre)
 
     return predicate
+
+
+_CHROMA_FILTER_FIELDS = {"is_free", "release_year", "has_multiplayer", "metacritic"}
+
+
+def _split_where(where: dict | None) -> tuple[dict | None, dict | None]:
+    """Split filters supported by the frozen Chroma schema from cache filters."""
+    if not where:
+        return None, None
+    if "$and" in where:
+        chroma, post = [], []
+        for child in where["$and"]:
+            c, p = _split_where(child)
+            if c:
+                chroma.append(c)
+            if p:
+                post.append(p)
+        return ({"$and": chroma} if len(chroma) > 1 else (chroma[0] if chroma else None)), ({"$and": post} if len(post) > 1 else (post[0] if post else None))
+    chroma, post = {}, {}
+    for key, value in where.items():
+        (chroma if key in _CHROMA_FILTER_FIELDS else post)[key] = value
+    return chroma or None, post or None
 
 
 def _genre_matches(metadata: dict, required_genre: str | None) -> bool:
