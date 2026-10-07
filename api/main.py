@@ -36,6 +36,7 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "night-museum-frontend"
+_readiness_compatibility: dict = {"compatible": False, "status": "starting"}
 
 
 @asynccontextmanager
@@ -66,7 +67,9 @@ async def lifespan(app: FastAPI):
     from memory.thread_title import init_threads_table
     init_threads_table()
     from rag.vector_store import index_compatibility
+    global _readiness_compatibility
     compatibility = index_compatibility()
+    _readiness_compatibility = compatibility
     if not compatibility.get("compatible"):
         logging.warning(
             "rag_index_not_compatible",
@@ -107,17 +110,36 @@ async def lifespan(app: FastAPI):
                 logging.warning(
                     "thread_cleanup_retry_failed",
                     extra={"fields": {"error_type": type(exc).__name__}},
-                )
+                    )
+
+    async def memory_worker():
+        while True:
+            try:
+                from memory.async_memory import run_pending_memory_tasks
+                await asyncio.to_thread(run_pending_memory_tasks, 10)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logging.warning("memory_worker_failed", extra={"fields": {"error_type": type(exc).__name__}})
+            await asyncio.sleep(5)
 
     cleanup_task = asyncio.create_task(cleanup_retry_worker())
+    memory_task = asyncio.create_task(memory_worker())
     try:
         yield
     finally:
         cleanup_task.cancel()
+        memory_task.cancel()
         try:
             await cleanup_task
         except asyncio.CancelledError:
             pass
+        try:
+            await memory_task
+        except asyncio.CancelledError:
+            pass
+        from graph.builder import close_graph
+        await close_graph()
 
 
 app = FastAPI(title="Steam Game Recommendation Agent", version="0.1.0", lifespan=lifespan)
@@ -300,8 +322,7 @@ def ready():
     manifest_path = Path(CHROMA_PERSIST_DIR) / "index_manifest.json"
     if manifest_path.exists():
         try:
-            from rag.vector_store import index_compatibility
-            checks["index_manifest"] = index_compatibility()["compatible"]
+            checks["index_manifest"] = bool(_readiness_compatibility.get("compatible"))
         except Exception:
             pass
     ready_status = all(bool(value) for value in checks.values())

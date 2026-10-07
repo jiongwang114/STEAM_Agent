@@ -9,7 +9,7 @@
 @media (prefers-reduced-motion:reduce){.ambient:before,.dust,.torch{animation:none!important}.torch{transition:none!important}}
 /* paper object feedback */
 .paper{--paper-tilt:0deg;--paper-lift:0px;transition:transform .45s cubic-bezier(.2,.8,.2,1),filter .45s ease,box-shadow .45s ease;background-image:linear-gradient(112deg,rgba(255,245,193,.08),transparent 33%,rgba(53,31,17,.1) 78%),linear-gradient(125deg,#b39c6b,#d0bb83)}
-.hero-paper{transform:rotate(calc(-.6deg + var(--paper-tilt))) translateY(var(--paper-lift))}.small-paper{transform:rotate(calc(.7deg + var(--paper-tilt))) translateY(var(--paper-lift))}.paper-three{transform:rotate(calc(-.8deg + var(--paper-tilt))) translateY(var(--paper-lift))}
+
 .paper:hover{--paper-tilt:0deg;--paper-lift:1px;filter:drop-shadow(1px 2px 1px rgba(0,0,0,.22)) drop-shadow(-1px 7px 8px rgba(0,0,0,.16))}.paper.selected{--paper-lift:-2px;filter:drop-shadow(0 0 10px rgba(241,217,130,.2)) drop-shadow(0 7px 12px rgba(0,0,0,.22));box-shadow:inset 0 0 0 1px rgba(241,217,130,.5),var(--shadow)}
 .paper.selected:before{opacity:.28}.paper.selected:after{opacity:.5}.paper.selected .paper-head:after{content:'已选中';color:#603327;font:10px 'DM Mono';margin-left:10px}.paper.flip-open{perspective:900px}.paper.flip-open .paper-grid{animation:paperFlip .55s cubic-bezier(.2,.8,.2,1)}
 .reason{transform-origin:top;perspective:900px}.reason.open{animation:reasonTurn .45s ease both}.paper:focus-visible,.session:focus-visible,.quiet-btn:focus-visible,.send-btn:focus-visible,.new-session:focus-visible,.reason-toggle:focus-visible{outline:2px solid var(--yellow);outline-offset:3px}

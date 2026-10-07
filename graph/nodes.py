@@ -1,5 +1,7 @@
 import inspect
+import asyncio
 import logging
+import json
 import re
 import time
 
@@ -32,7 +34,7 @@ from tools.contracts import (
     ToolStatus,
     policy_blocked_result,
 )
-from tools.executor import execute_tool, execute_tool_batch
+from tools.executor import ToolExecutionContext, execute_tool, execute_tool_batch
 from graph.run_context import (
     add_usage,
     budget_reason,
@@ -51,22 +53,21 @@ from graph.tool_policy import (
 logger = logging.getLogger(__name__)
 
 
-def initialize_context_node(state: AgentState) -> dict:
+async def initialize_context_node(state: AgentState) -> dict:
     """Load per-thread snapshots once; subsequent requests use checkpoint state."""
     update: dict = {}
-    if "constraints" not in state:
-        from graph.constraints import extract_constraints
-        human_text = ""
-        for message in reversed(state.get("messages") or []):
-            if getattr(message, "type", "") == "human":
-                human_text = str(getattr(message, "content", ""))
-                break
-        update["constraints"] = extract_constraints(human_text)
+    from graph.constraints import extract_constraints
+    human_text = ""
+    for message in reversed(state.get("messages") or []):
+        if getattr(message, "type", "") == "human":
+            human_text = str(getattr(message, "content", ""))
+            break
+    update["constraints"] = extract_constraints(human_text)
     user_id = state.get("user_id", "")
     thread_id = state.get("thread_id", "")
 
     if "memory_snapshot" not in state:
-        rows = get_insights(user_id, limit=12) if user_id else []
+        rows = await asyncio.to_thread(get_insights, user_id, limit=12) if user_id else []
         update["memory_snapshot"] = rows
 
     if "steam_profile_snapshot" not in state:
@@ -76,13 +77,17 @@ def initialize_context_node(state: AgentState) -> dict:
         if steam_id:
             try:
                 from memory.game_profile import get_game_profile
-                profile = get_game_profile(steam_id) or ""
+                profile = await asyncio.to_thread(get_game_profile, steam_id) or ""
             except Exception:
                 logger.warning("steam_profile_snapshot_failed", exc_info=True)
         update["steam_profile_snapshot"] = profile
 
     if "conversation_summary" not in state:
-        saved = get_latest_session_summary(user_id, thread_id) if user_id and thread_id else None
+        saved = (
+            await asyncio.to_thread(get_latest_session_summary, user_id, thread_id)
+            if user_id and thread_id
+            else None
+        )
         update["conversation_summary"] = saved["summary"] if saved else ""
         update["summary_version"] = int(saved["version"]) if saved else 0
         update["summary_covered_to_turn"] = int(saved["covered_to_turn"]) if saved else 0
@@ -192,7 +197,6 @@ def _prepare_model_context(
                     "conversation_summary": new_summary,
                     "summary_version": version,
                     "summary_covered_to_turn": covered_to,
-                    "summary_persisted": bool(thread_id),
                 })
                 removals = [RemoveMessage(id=message_id) for message_id in message_ids]
                 update["context_stats"] = {
@@ -310,16 +314,7 @@ def _history_budget(
 
 
 def guard_node(state: AgentState) -> dict:
-    """Three-layer guard before the main agent.
-
-    Layer 1: regex/rule-based — zero-width chars + political forbidden words (zero cost)
-    Layer 2: LLM jailbreak / role-hijack classifier (~0.5s)
-    Layer 3: LLM red-line classifier — adult content + politics (~0.5s)
-
-    Short messages (< 4 chars) skip the LLM layer.
-    On any layer blocking: returns AIMessage with GUARD_BLOCK marker.
-    On all pass: returns empty dict (transparent).
-    """
+    """Run one combined LLM check for injection and sensitive content."""
     messages = state["messages"]
     if not messages:
         return {"messages": []}
@@ -335,36 +330,12 @@ def guard_node(state: AgentState) -> dict:
         # Empty message — let agent handle gracefully
         return {"messages": []}
 
-    # Short messages don't carry injection/scope risk — skip LLM guard layers
-    if len(text.strip()) < 4:
-        from guard.layer1_rules import check as layer1_check
-        blocked, reason = layer1_check(text)
-        if blocked:
-            return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
-        return {"messages": []}
+    from guard.classifier import check as safety_check
 
-    # ── Layer 1: Regex rules (zero cost, zero latency) ──
-    from guard.layer1_rules import check as layer1_check
-
-    blocked, reason = layer1_check(text)
+    blocked, _reason = safety_check(text)
     if blocked:
-        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
+        return {"guard_blocked": True, "termination_reason": "guard_blocked"}
 
-    # ── Layer 2: jailbreak and role-hijack intent ──
-    from guard.layer2_intent import check as layer2_check
-
-    blocked, reason = layer2_check(text)
-    if blocked:
-        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
-
-    # ── Layer 3: red-line classifier ──
-    from guard.layer3_scope import check as layer3_check
-
-    blocked, reason = layer3_check(text)
-    if blocked:
-        return {"messages": [AIMessage(content=f"GUARD_BLOCK:{reason}")]}
-
-    # All clear
     return {"messages": []}
 
 
@@ -494,6 +465,7 @@ def tool_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
                 tool_map[tool_name],
                 tool_args,
                 deadline_at=(state.get("budget") or {}).get("deadline_at"),
+                execution_context=_tool_execution_context(state),
             )
             duration = time.perf_counter() - started
             content = result.model_dump_json(exclude_none=True)
@@ -536,6 +508,14 @@ def tool_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
         ),
         "constraints": update_constraint_status(list(state.get("constraints") or []), evidence),
     }
+
+
+def _tool_execution_context(state: AgentState) -> ToolExecutionContext:
+    return ToolExecutionContext(
+        user_id=str(state.get("user_id") or ""),
+        steam_id=str(state.get("steam_id_snapshot", state.get("steam_id")) or ""),
+        thread_id=str(state.get("thread_id") or ""),
+    )
 
 
 def _inject_tool_context(tool_name: str, tool_args: dict, state: AgentState) -> dict:
@@ -611,6 +591,7 @@ def _parallel_tool_node(state: AgentState, config: RunnableConfig | None) -> dic
                 "function": tool_map[name],
                 "arguments": arguments,
                 "deadline_at": (state.get("budget") or {}).get("deadline_at"),
+                "execution_context": _tool_execution_context(state),
             })
         prior_calls.append({"name": name, "args": arguments})
 
@@ -761,6 +742,12 @@ _PROTOCOL_LEAK_PATTERN = re.compile(
 
 def validate_answer_node(state: AgentState) -> dict:
     answer = _latest_ai_content(state["messages"])
+    structured_violations = _structured_evidence_violations(answer, state.get("evidence", []))
+    constraint_violations = [
+        f"unsatisfied_constraint:{item.get('id', item.get('type', 'unknown'))}"
+        for item in state.get("constraints", [])
+        if item.get("status") != "satisfied"
+    ]
     recommended = list(dict.fromkeys(_APP_URL_PATTERN.findall(answer)))
     evidence = list(state.get("evidence", []))
     supported = {str(item.get("appid")) for item in evidence if item.get("appid") is not None}
@@ -774,6 +761,8 @@ def validate_answer_node(state: AgentState) -> dict:
         answer, evidence, _DISCOUNT_PATTERN, "discount_percent"
     )
     violations = [f"unsupported_appid:{appid}" for appid in unsupported]
+    violations.extend(structured_violations)
+    violations.extend(constraint_violations)
     violations.extend(
         f"unsupported_name:{item['appid']}:{item['claimed']}"
         for item in unsupported_names
@@ -804,6 +793,8 @@ def validate_answer_node(state: AgentState) -> dict:
             "unsupported_discounts": unsupported_discounts,
             "violations": violations,
             "protocol_leak": protocol_leak,
+            "structured_violations": structured_violations,
+            "constraint_violations": constraint_violations,
             "evidence_coverage": (
                 (len(recommended) - len(unsupported)) / len(recommended)
                 if recommended else 1.0
@@ -813,6 +804,59 @@ def validate_answer_node(state: AgentState) -> dict:
     if passed and not state.get("termination_reason"):
         update["termination_reason"] = "completed"
     return update
+
+
+def _structured_evidence_violations(answer: str, evidence: list[dict]) -> list[str]:
+    """Validate canonical JSON fields against the exact evidence record."""
+    try:
+        payload = json.loads(answer)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
+        return []
+    by_appid = {str(item.get("appid")): item for item in evidence if item.get("appid") is not None}
+    violations = []
+    for game in payload["games"]:
+        if not isinstance(game, dict):
+            violations.append("structured_game_invalid")
+            continue
+        appid = str(game.get("appid", ""))
+        item = by_appid.get(appid)
+        if item is None:
+            violations.append(f"structured_unsupported_appid:{appid}")
+            continue
+        evidence_name = str(item.get("name") or (item.get("payload") or {}).get("name") or "").strip()
+        if evidence_name and str(game.get("name", "")).strip().casefold() != evidence_name.casefold():
+            violations.append(f"structured_unsupported_name:{appid}")
+        expected_url = f"https://store.steampowered.com/app/{appid}"
+        if str(game.get("store_url", "")).rstrip("/") != expected_url:
+            violations.append(f"structured_invalid_store_url:{appid}")
+        payload = item.get("payload") or {}
+        price = payload.get("price") or {}
+        if "price" in game and not _structured_number_matches(game.get("price"), price.get("final"), price.get("initial")):
+            violations.append(f"structured_unsupported_price:{appid}")
+        if "metacritic" in game and not _structured_number_matches(game.get("metacritic"), payload.get("metacritic")):
+            violations.append(f"structured_unsupported_metacritic:{appid}")
+        if "discount_percent" in game and not _structured_number_matches(game.get("discount_percent"), price.get("discount_percent")):
+            violations.append(f"structured_unsupported_discount:{appid}")
+    return violations
+
+
+def _structured_number_matches(claimed, *allowed) -> bool:
+    try:
+        claimed_value = float(claimed)
+    except (TypeError, ValueError):
+        return False
+    for value in allowed:
+        try:
+            if claimed_value == float(value):
+                return True
+            # Price fields may be represented in cents by evidence and yuan by JSON.
+            if claimed_value == round(float(value) / 100, 2):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def repair_node(state: AgentState) -> dict:
@@ -877,8 +921,31 @@ def repair_node(state: AgentState) -> dict:
 
 
 def safe_fallback_node(state: AgentState) -> dict:
+    evidence = [item for item in (state.get("evidence") or []) if item.get("appid")]
+    games = []
+    for item in evidence[:10]:
+        payload = item.get("payload") or {}
+        game = {
+            "appid": str(item["appid"]),
+            "name": str(item.get("name") or payload.get("name") or ""),
+            "store_url": str(payload.get("store_url") or ""),
+            "image_url": str(payload.get("image_url") or payload.get("header_image") or ""),
+            "reason": "仅列出本轮证据中已确认的内容；匹配度或其他属性尚未完全验证。",
+        }
+        if game["name"]:
+            games.append(game)
+    if games:
+        summary = (
+            "目前只有部分证据，以下仅列出已验证的游戏信息；缺少的匹配条件、价格或属性我不会凭常识补全。"
+            "请补充预算、玩法或偏好，我再继续核实。"
+        )
+    else:
+        summary = (
+            "目前没有足够可靠的检索证据，暂时无法可靠推荐具体游戏。"
+            "请补充一个喜欢的游戏、预算或想要的玩法，我再按明确条件检索。"
+        )
     return {
-        "messages": [AIMessage(content="现有检索结果不足以支持可靠推荐。你可以再告诉我一个喜欢的游戏、预算或想要的玩法，我再按这个条件帮你找。")],
+        "messages": [AIMessage(content=json.dumps({"summary": summary, "games": games}, ensure_ascii=False))],
         "termination_reason": "insufficient_evidence",
     }
 

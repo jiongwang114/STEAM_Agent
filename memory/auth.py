@@ -27,6 +27,7 @@ from config import (
 _PASSWORD_HASHER = PasswordHasher()
 _USERNAME_PATTERN = re.compile(r"^[^\x00-\x1f\x7f]{2,64}$")
 _STEAM_ID_PATTERN = re.compile(r"^\d{17}$")
+_SCHEMA_READY = False
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -53,6 +54,9 @@ def _transaction():
 
 
 def init_auth_table() -> None:
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
     with _transaction() as conn:
         conn.execute(
             """
@@ -103,6 +107,7 @@ def init_auth_table() -> None:
         )
         # Migrate existing databases: a Steam profile may be shared by accounts.
         conn.execute("DROP INDEX IF EXISTS idx_users_steam_unique")
+    _SCHEMA_READY = True
 
 
 def validate_username(username: str) -> str:

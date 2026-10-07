@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # The API request and the background retry worker can observe the same task.
 # Serialize cleanup so legacy Chroma deletion is not run concurrently.
 _THREAD_CLEANUP_LOCK = Lock()
+_SCHEMA_READY = False
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -43,6 +44,9 @@ def _transaction():
 
 
 def init_messages_table() -> None:
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
     with _transaction() as conn:
         conn.execute(
             """
@@ -64,6 +68,14 @@ def init_messages_table() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_messages_user_time "
             "ON messages(user_id, created_at DESC)"
+        )
+        conn.execute(
+            "DELETE FROM messages WHERE id NOT IN ("
+            "SELECT MIN(id) FROM messages GROUP BY user_id, thread_id, turn_number, role)"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_messages_turn_role "
+            "ON messages(user_id, thread_id, turn_number, role)"
         )
         conn.execute(
             """
@@ -103,6 +115,7 @@ def init_messages_table() -> None:
         from memory.async_memory import create_memory_tasks_table
 
         create_memory_tasks_table(conn)
+    _SCHEMA_READY = True
 
 
 def reserve_turn_number(user_id: str, thread_id: str) -> int:
@@ -186,6 +199,8 @@ def archive_sqlite_turn(
                 "VALUES(?,?,?,?)",
                 (user_id, thread_id, turn_number, json.dumps(_public_execution(execution), ensure_ascii=False)),
             )
+        from memory.async_memory import enqueue_memory_extraction
+        enqueue_memory_extraction(conn, user_id, thread_id, turn_number)
         return {"turn_number": turn_number, "status": "complete"}
 
 

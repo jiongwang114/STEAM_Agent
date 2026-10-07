@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from config import SQLITE_DB_PATH
+_SCHEMA_READY = False
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -17,6 +18,9 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_session_summaries_table() -> None:
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
     conn = _get_conn()
     conn.execute(
         """
@@ -40,6 +44,7 @@ def init_session_summaries_table() -> None:
     )
     conn.commit()
     conn.close()
+    _SCHEMA_READY = True
 
 
 def get_latest_session_summary(user_id: str, thread_id: str) -> dict | None:

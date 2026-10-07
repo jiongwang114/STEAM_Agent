@@ -16,50 +16,50 @@
   --archive-border-hover: rgba(143,123,76,.8);
   --archive-inset: inset 0 1px 7px rgba(0,0,0,.28);
 }
-body button,
-body .steam-row #steamProfile,
-body .curation-card .text-btn {
-  background: var(--archive-surface) !important;
-  color: #eee7da !important;
-  border: 1px solid var(--archive-border) !important;
+ .app-shell button,
+ .app-shell .steam-row #steamProfile,
+ .app-shell .curation-card .text-btn {
+  background: var(--archive-surface);
+  color: #eee7da;
+  border: 1px solid var(--archive-border);
   border-radius: 12px;
-  box-shadow: var(--archive-inset) !important;
-  transition: border-color .18s ease !important;
-  transform: none !important;
-  animation: none !important;
+  box-shadow: var(--archive-inset);
+  transition: border-color .18s ease;
+  transform: none;
+  animation: none;
   opacity: 1;
 }
-body button:hover,
-body .steam-row #steamProfile:hover,
-body .curation-card .text-btn:hover {
-  border-color: var(--archive-border-hover) !important;
+ .app-shell button:hover,
+ .app-shell .steam-row #steamProfile:hover,
+ .app-shell .curation-card .text-btn:hover {
+  border-color: var(--archive-border-hover);
 }
-body button::after,
-body .steam-row #steamProfile::after { display: none !important; }
-body button:focus-visible,
-body .steam-row #steamProfile:focus-visible {
+ .app-shell button::after,
+ .app-shell .steam-row #steamProfile::after { display: none; }
+ .app-shell button:focus-visible,
+ .app-shell .steam-row #steamProfile:focus-visible {
   outline: 2px solid #cbb77c;
   outline-offset: 3px;
 }
-body button:disabled { opacity: .45; cursor: not-allowed; }
-body .session.active { border-color: #cbb77c !important; }
+ .app-shell button:disabled { opacity: .45; cursor: not-allowed; }
+ .app-shell .session.active { border-color: #cbb77c; }
 .steam-row .steam-card-action { border-radius: 12px; }
 .steam-row { border: 0; }
 /* The inline copy icon retains the ID's font size and compact placement. */
-body .copy-steam { border-radius: 4px; }
-body .account-menu,
-body .session-actions,
-body .museum-dialog {
+ .app-shell .copy-steam { border-radius: 4px; }
+ .app-shell .account-menu,
+ .app-shell .session-actions,
+ .app-shell .museum-dialog {
   background: var(--archive-surface);
   border: 1px solid var(--archive-border);
   border-radius: 12px;
   box-shadow: var(--archive-inset);
   color: #eee7da;
 }
-body .account-menu,
-body .session-actions { padding: 6px; }
-body .account-menu > button,
-body .session-actions > button { margin-block: 2px; }
+ .app-shell .account-menu,
+ .app-shell .session-actions { padding: 6px; }
+ .app-shell .account-menu > button,
+ .app-shell .session-actions > button { margin-block: 2px; }
 @media (prefers-reduced-motion: reduce) {
-  body button, body .steam-row #steamProfile, body .curation-card .text-btn { transition: none !important; }
+  .app-shell button, .app-shell .steam-row #steamProfile, .app-shell .curation-card .text-btn { transition: none; }
 }

@@ -35,7 +35,11 @@ def setup_langsmith():
 
 def set_trace_context(user_id: str = "", thread_id: str = ""):
     """Set per-request trace metadata."""
-    _trace_context.set({"user_id": user_id, "thread_id": thread_id})
+    return _trace_context.set({"user_id": user_id, "thread_id": thread_id})
+
+
+def reset_trace_context(token) -> None:
+    _trace_context.reset(token)
 
 
 def get_trace_metadata() -> dict[str, Any]:

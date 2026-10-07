@@ -27,6 +27,28 @@ _index_collection_name = ""
 _lock = threading.Lock()
 
 
+def reset_retrieval_cache() -> None:
+    """Reset process-local lexical state between independent evaluations."""
+    global _index, _documents, _index_collection_name
+    with _lock:
+        _index = None
+        _documents = {}
+        _index_collection_name = ""
+
+
+def _cache_signature() -> tuple[int, int]:
+    try:
+        path = CACHE_PATH
+        pointer = Path(CHROMA_PERSIST_DIR) / "current_index.json"
+        if pointer.exists():
+            value = json.loads(pointer.read_text(encoding="utf-8"))
+            path = Path(CHROMA_PERSIST_DIR) / str(value.get("cache", path.name))
+        stat = path.stat()
+        return stat.st_mtime_ns, stat.st_size
+    except OSError:
+        return (0, 0)
+
+
 def hybrid_search(
     query: str,
     *,
@@ -48,7 +70,7 @@ def hybrid_search(
         _genre_matches(document.metadata, required_genre)
         for document in documents.values()
     ):
-        required_genre = None
+        return {"results": [], "retrieval": {"status": "unsupported_filter", "unsupported_filter": "genre"}}
     timings["index_load_ms"] = _ms(started)
 
     dense_started = time.perf_counter()
@@ -84,6 +106,19 @@ def hybrid_search(
             break
     timings["dense_ms"] = _ms(dense_started)
 
+    if dense_error and use_dense:
+        timings["total_ms"] = _ms(started)
+        return {
+            "results": [],
+            "retrieval": {
+                "status": "degraded",
+                "dense_error": dense_error,
+                "reranker_used": False,
+                "mode": {"dense": use_dense, "lexical": use_lexical, "reranker": use_reranker},
+                "timings": timings,
+            },
+        }
+
     lexical_started = time.perf_counter()
     predicate = _metadata_predicate(where, required_genre=required_genre)
     lexical_rows = (
@@ -97,7 +132,14 @@ def hybrid_search(
     fusion_started = time.perf_counter()
     rankings = [ranking for ranking in (dense_ids, lexical_ids) if ranking]
     fused = reciprocal_rank_fusion(rankings)
-    candidates = [doc_id for doc_id, _ in fused[:RAG_RERANK_CANDIDATES]]
+    # Apply hard filters before truncating the fused ranking so matching games
+    # cannot be pushed out by unrelated high-scoring candidates.
+    candidates = [
+        doc_id for doc_id, _ in fused
+        if doc_id in documents
+        and _genre_matches(documents[doc_id].metadata, required_genre)
+        and (not post_filter or _matches(documents[doc_id].metadata, post_filter))
+    ][:RAG_RERANK_CANDIDATES]
     fusion_scores = dict(fused)
     timings["fusion_ms"] = _ms(fusion_started)
 
@@ -144,6 +186,7 @@ def hybrid_search(
     return {
         "results": rows[:top_k],
         "retrieval": {
+            "status": "degraded" if dense_error else "ok",
             "dense_candidates": len(dense_ids),
             "lexical_candidates": len(lexical_ids),
             "fused_candidates": len(fused),
@@ -163,12 +206,19 @@ def hybrid_search(
 def _get_lexical_index() -> tuple[BM25Index, dict[str, LexicalDocument]]:
     global _index, _documents, _index_collection_name
     collection_name = current_games_collection_name()
-    if _index is None or _index_collection_name != collection_name:
+    signature = _cache_signature()
+    cache_key = f"{collection_name}:{signature[0]}:{signature[1]}"
+    if _index is None or _index_collection_name != cache_key:
         with _lock:
-            if _index is None or _index_collection_name != collection_name:
+            if _index is None or _index_collection_name != cache_key:
+                cache_path = CACHE_PATH
+                pointer = Path(CHROMA_PERSIST_DIR) / "current_index.json"
+                if pointer.exists():
+                    value = json.loads(pointer.read_text(encoding="utf-8"))
+                    cache_path = Path(CHROMA_PERSIST_DIR) / str(value.get("cache", cache_path.name))
                 records = (
-                    json.loads(CACHE_PATH.read_text(encoding="utf-8"))
-                    if CACHE_PATH.exists()
+                    json.loads(cache_path.read_text(encoding="utf-8"))
+                    if cache_path.exists()
                     else []
                 )
                 documents = []
@@ -180,7 +230,7 @@ def _get_lexical_index() -> tuple[BM25Index, dict[str, LexicalDocument]]:
                     documents.append(document)
                 _documents = {document.doc_id: document for document in documents}
                 _index = BM25Index(documents)
-                _index_collection_name = collection_name
+                _index_collection_name = cache_key
     return _index, _documents
 
 

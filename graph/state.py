@@ -28,3 +28,4 @@ class AgentState(TypedDict):
     model_history: NotRequired[list[dict[str, str]]]
     no_progress_rounds: NotRequired[int]
     constraints: NotRequired[list[dict[str, Any]]]
+    guard_blocked: NotRequired[bool]

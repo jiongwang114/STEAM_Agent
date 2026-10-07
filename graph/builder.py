@@ -1,8 +1,9 @@
-import threading
+import asyncio
 
 import aiosqlite
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph import END, StateGraph
+from langchain_core.messages import AIMessage
 
 from config import CHECKPOINT_DB_PATH
 from graph.nodes import (
@@ -22,7 +23,7 @@ from graph.state import AgentState
 
 _graph = None
 _conn: aiosqlite.Connection | None = None
-_lock = threading.Lock()
+_lock = asyncio.Lock()
 
 
 async def build_graph(checkpointer=None):
@@ -32,13 +33,24 @@ async def build_graph(checkpointer=None):
         return _compile(checkpointer)
 
     if _graph is None:
-        with _lock:
+        async with _lock:
             if _graph is None:
                 _conn = await aiosqlite.connect(CHECKPOINT_DB_PATH)
                 cp = AsyncSqliteSaver(_conn)
                 _graph = _compile(cp)
 
     return _graph
+
+
+async def close_graph() -> None:
+    """Close the process-wide checkpoint connection during application shutdown."""
+    global _graph, _conn
+    async with _lock:
+        connection = _conn
+        _conn = None
+        _graph = None
+        if connection is not None:
+            await connection.close()
 
 
 def _compile(checkpointer):
@@ -59,8 +71,10 @@ def _compile(checkpointer):
     workflow.add_conditional_edges(
         "guard",
         _guard_decision,
-        {"pass": "agent", "block": END},
+        {"pass": "agent", "block": "guard_block"},
     )
+    workflow.add_node("guard_block", guard_block_node)
+    workflow.add_edge("guard_block", END)
     workflow.add_conditional_edges(
         "agent",
         should_continue,
@@ -90,6 +104,14 @@ def _guard_decision(state: AgentState) -> str:
         return "block"
     last_msg = messages[-1]
     content = getattr(last_msg, "content", "") if hasattr(last_msg, "content") else str(last_msg)
-    if "GUARD_BLOCK:" in content:
+    if state.get("guard_blocked") or "GUARD_BLOCK:" in content:
         return "block"
     return "pass"
+
+
+def guard_block_node(state: AgentState) -> dict:
+    return {
+        "messages": [AIMessage(content="这个请求我无法协助处理。请换一个安全、合法的游戏推荐问题。")],
+        "guard_blocked": True,
+        "termination_reason": "guard_blocked",
+    }

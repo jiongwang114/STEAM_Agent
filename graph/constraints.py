@@ -20,17 +20,21 @@ def extract_constraints(text: str) -> list[dict[str, Any]]:
 
 def update_constraint_status(constraints: list[dict[str, Any]], evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Use evidence payloads for deterministic hard-constraint updates."""
-    blob = repr(evidence).lower()
     updated = []
     for item in constraints:
         status = item.get("status", "unresolved")
-        if item["type"] == "free_only" and ("is_free': true" in blob or '"is_free": true' in blob):
+        matching = [row for row in evidence if str(row.get("appid", ""))]
+        if item["type"] == "free_only" and any((row.get("payload") or {}).get("is_free") is True for row in matching):
             status = "satisfied"
-        elif item["type"] == "multiplayer" and any(word in blob for word in ("multiplayer", "co-op", "coop", "多人")):
+        elif item["type"] == "multiplayer" and any((row.get("payload") or {}).get("has_multiplayer") is True for row in matching):
             status = "satisfied"
         elif item["type"] == "min_year":
-            years = [int(y) for y in re.findall(r"(?:19|20)\d{2}", blob)]
+            years = [int((row.get("payload") or {}).get("release_year")) for row in matching if str((row.get("payload") or {}).get("release_year", "")).isdigit()]
             if years and min(years) >= int(item["value"]):
                 status = "satisfied"
-        updated.append({**item, "status": status})
+        if status == "satisfied":
+            evidence_ids = [str(row.get("appid")) for row in matching]
+        else:
+            evidence_ids = list(item.get("evidence_ids") or [])
+        updated.append({**item, "status": status, "evidence_ids": evidence_ids})
     return updated

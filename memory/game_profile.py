@@ -11,6 +11,7 @@ import json
 import sqlite3
 import time
 import urllib.request
+import threading
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlencode
@@ -22,6 +23,13 @@ GAME_CACHE_PATH = Path(__file__).resolve().parent.parent / "rag" / "chroma_data"
 
 # In-memory: steam_id -> (profile_text, unix_timestamp)
 _memory_cache: dict[str, tuple[str, float]] = {}
+_profile_locks: dict[str, threading.Lock] = {}
+_profile_locks_guard = threading.Lock()
+
+
+def _profile_lock(steam_id: str) -> threading.Lock:
+    with _profile_locks_guard:
+        return _profile_locks.setdefault(steam_id, threading.Lock())
 
 
 def init_game_profile_table():
@@ -47,7 +55,12 @@ def get_game_profile(steam_id: str) -> str:
     if not steam_id or not STEAM_API_KEY:
         return ""
 
-    # Level 1: memory
+    with _profile_lock(steam_id):
+        return _get_game_profile_locked(steam_id)
+
+
+def _get_game_profile_locked(steam_id: str) -> str:
+    # Level 1: memory, including a short-lived negative cache.
     if steam_id in _memory_cache:
         text, ts = _memory_cache[steam_id]
         if time.time() - ts < CACHE_TTL:
@@ -72,6 +85,7 @@ def get_game_profile(steam_id: str) -> str:
     try:
         profile = _fetch_and_build(steam_id)
         if not profile:
+            _memory_cache[steam_id] = ("", time.time())
             return ""
 
         now = time.time()
@@ -88,6 +102,7 @@ def get_game_profile(steam_id: str) -> str:
 
         return profile
     except Exception:
+        _memory_cache[steam_id] = ("", time.time())
         return ""
 
 

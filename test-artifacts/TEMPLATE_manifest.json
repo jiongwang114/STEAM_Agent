@@ -1,0 +1,17 @@
+{
+  "run_id": null,
+  "step": "05",
+  "status": "not_started",
+  "created_at": null,
+  "code_revision": null,
+  "model": null,
+  "prompt_version": null,
+  "tool_config_version": null,
+  "knowledge_version": null,
+  "memory_version": null,
+  "runtime_config_fingerprint": null,
+  "test_set_version": "T0",
+  "criteria_version": "C0",
+  "evaluator": "not_started",
+  "secrets_included": false
+}

@@ -27,7 +27,7 @@ if LLM_PROVIDER == "custom":
     # Custom provider has one canonical model setting; do not require LLM_MODEL.
     LLM_MODEL: str = CUSTOM_LLM_MODEL
 else:
-    DEEPSEEK_API_KEY: str = os.environ["DEEPSEEK_API_KEY"]
+    DEEPSEEK_API_KEY: str = os.environ.get("DEEPSEEK_API_KEY", "")
     DEEPSEEK_BASE_URL: str = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     LLM_MODEL: str = os.environ.get("LLM_MODEL", "deepseek-chat")
 if LLM_PROVIDER == "custom":
@@ -152,7 +152,7 @@ if not 0 <= AGENT_EXPERIMENT_CANDIDATE_PERCENT <= 100:
     raise ValueError("AGENT_EXPERIMENT_CANDIDATE_PERCENT must be between 0 and 100")
 
 # --- Steam ---
-STEAM_API_KEY: str = os.environ["STEAM_API_KEY"]
+STEAM_API_KEY: str = os.environ.get("STEAM_API_KEY", "")
 STEAM_API_URL: str = "https://api.steampowered.com"
 STEAM_STORE_URL: str = "https://store.steampowered.com/api"
 
@@ -203,7 +203,10 @@ HOST: str = os.environ.get("HOST", "0.0.0.0")
 PORT: int = int(os.environ.get("PORT", "8000"))
 SESSION_COOKIE_NAME: str = os.environ.get("SESSION_COOKIE_NAME", "steam_session")
 SESSION_TTL_SECONDS: int = int(os.environ.get("SESSION_TTL_SECONDS", str(7 * 24 * 3600)))
-SESSION_COOKIE_SECURE: bool = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+SESSION_COOKIE_SECURE: bool = os.environ.get(
+    "SESSION_COOKIE_SECURE",
+    "true" if os.environ.get("APP_ENV", "development").lower() == "production" else "false",
+).lower() == "true"
 SESSION_COOKIE_SAMESITE: str = os.environ.get("SESSION_COOKIE_SAMESITE", "lax").lower()
 AUTH_RATE_LIMIT_WINDOW_SECONDS: int = int(
     os.environ.get("AUTH_RATE_LIMIT_WINDOW_SECONDS", "900")
@@ -222,6 +225,8 @@ if SESSION_TTL_SECONDS < 300:
     raise ValueError("SESSION_TTL_SECONDS must be at least 300 seconds")
 if SESSION_COOKIE_SAMESITE not in {"lax", "strict", "none"}:
     raise ValueError("SESSION_COOKIE_SAMESITE must be lax, strict, or none")
+if SESSION_COOKIE_SAMESITE == "none" and not SESSION_COOKIE_SECURE:
+    raise ValueError("SESSION_COOKIE_SECURE must be true when SameSite=None")
 if AUTH_RATE_LIMIT_WINDOW_SECONDS < 60 or AUTH_RATE_LIMIT_MAX_FAILURES < 1:
     raise ValueError("Authentication rate-limit settings are invalid")
 if MAX_REQUEST_BODY_BYTES < 1024:

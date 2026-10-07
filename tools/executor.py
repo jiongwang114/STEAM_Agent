@@ -13,7 +13,9 @@ from config import (
     TOOL_RESULT_MAX_CHARS,
     TOOL_TIMEOUT_SECONDS,
 )
-from tools.contracts import ToolError, ToolResult, ToolStatus, exception_result, normalize_tool_result
+from tools.contracts import (
+    ToolError, ToolResult, ToolStatus, exception_result, normalize_tool_result, policy_blocked_result,
+)
 
 
 _POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="agent-tool")
@@ -63,6 +65,26 @@ class ToolCircuitBreaker:
                 state.opened_at = now
 
 
+@dataclass(frozen=True)
+class ToolExecutionContext:
+    user_id: str = ""
+    steam_id: str = ""
+    thread_id: str = ""
+
+
+def authorize_tool_arguments(tool_name: str, arguments: dict[str, Any], context: ToolExecutionContext | None) -> ToolResult | None:
+    """Enforce ownership checks immediately before any callable is submitted."""
+    if context is None or not context.user_id:
+        return policy_blocked_result("missing_execution_identity", "当前用户身份不可用，已拒绝工具执行。")
+    if "user_id" in arguments and arguments.get("user_id") != context.user_id:
+        return policy_blocked_result("user_identity_mismatch", "工具请求的用户身份与当前会话不一致。")
+    if tool_name == "get_user_playtime":
+        if not context.steam_id or arguments.get("steam_id") != context.steam_id:
+            return policy_blocked_result("steam_resource_ownership_mismatch", "Steam 资源不属于当前会话用户或未完成绑定。")
+    if tool_name == "recall_message_detail" and arguments.get("thread_id") != context.thread_id:
+        return policy_blocked_result("thread_ownership_mismatch", "只能访问当前用户当前会话的历史记录。")
+    return None
+
 _CIRCUITS = ToolCircuitBreaker(
     TOOL_CIRCUIT_FAILURE_THRESHOLD,
     TOOL_CIRCUIT_COOLDOWN_SECONDS,
@@ -78,7 +100,11 @@ def execute_tool(
     timeout_seconds: float = TOOL_TIMEOUT_SECONDS,
     max_retries: int = TOOL_MAX_RETRIES,
     circuit_breaker: ToolCircuitBreaker = _CIRCUITS,
+    execution_context: ToolExecutionContext | None = None,
 ) -> ToolResult:
+    authorization_error = authorize_tool_arguments(tool_name, arguments, execution_context)
+    if authorization_error is not None:
+        return authorization_error
     if not circuit_breaker.allow(tool_name):
         return ToolResult(
             status=ToolStatus.UPSTREAM_ERROR,
@@ -133,19 +159,37 @@ def execute_tool(
     return result
 
 
-def execute_tool_batch(requests: list[dict[str, Any]]) -> list[ToolResult]:
+def execute_tool_batch(requests: list[dict[str, Any]], deadline_at: float | None = None) -> list[ToolResult]:
     """Execute policy-approved independent calls concurrently, preserving order."""
+    deadlines = [
+        float(request["deadline_at"])
+        for request in requests
+        if request.get("deadline_at") is not None
+    ]
+    batch_deadline = min(deadlines) if deadlines else deadline_at
     futures = [
         _BATCH_POOL.submit(
             execute_tool,
             request["tool_name"],
             request["function"],
             request["arguments"],
-            deadline_at=request.get("deadline_at"),
+            deadline_at=request.get("deadline_at", deadline_at),
+            execution_context=request.get("execution_context"),
         )
         for request in requests
     ]
-    return [future.result() for future in futures]
+    results = []
+    for future in futures:
+        remaining = _remaining_seconds(batch_deadline)
+        if remaining is not None and remaining <= 0:
+            results.append(_timeout_result("Agent deadline reached while waiting for tool batch."))
+            continue
+        try:
+            results.append(future.result(timeout=remaining))
+        except concurrent.futures.TimeoutError:
+            future.cancel()
+            results.append(_timeout_result("Agent deadline reached while waiting for tool batch."))
+    return results
 
 
 def _remaining_seconds(deadline_at: float | None) -> float | None:

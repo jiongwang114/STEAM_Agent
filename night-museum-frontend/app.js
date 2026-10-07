@@ -2,12 +2,12 @@ const MAX_MESSAGE_LENGTH = 666;
 const $ = (selector) => document.querySelector(selector);
 const VIEW_THREAD_KEY = 'steam-agent.current-thread';
 const VIEW_SCROLL_PREFIX = 'steam-agent.scroll:';
-const state = { user: null, sessions: [], threadId: localStorage.getItem(VIEW_THREAD_KEY), messages: [], pending: null, stream: null, busy: false, authExpired: false };
+const state = { user: null, sessions: [], threadId: localStorage.getItem(VIEW_THREAD_KEY), messages: [], stream: null, busy: false, authExpired: false };
 let revealObserver;
 let steamIdValue = '';
 let steamBindingKnown = false;
 const archiveModes = ['listening', 'retrieving', 'presenting', 'uncertain'];
-const archiveVisual = { selected: null, timer: null, clearTimer: null, revision: 0 };
+const archiveVisual = { timer: null, clearTimer: null, revision: 0 };
 // Backgrounds use dedicated, downscaled WebP assets. Recommendation cards keep
 // their original artwork so their readable cover art is unaffected.
 const fallbackArchiveImage = 'generated-images/life-bg.webp';
@@ -38,7 +38,7 @@ function setArchiveRoom(game, immediate = false) {
     }, 650);
     return;
   }
-  const type = inferGameType(game || {}); const url = game?.image || fallbackArchiveImages[type] || fallbackArchiveImage;
+  const type = inferGameType(game || {}); const url = safeImageUrl(game?.image) || fallbackArchiveImages[type] || fallbackArchiveImage;
   ambient.dataset.gameType = type; ambient.dataset.archive = game ? `ARCHIVE / ${game.appid || '07'}` : 'ROOM 07 / NIGHT SHIFT'; ambient.classList.toggle('game-selected', Boolean(game));
   const current = layers.find((layer) => layer.classList.contains('active')) || layers[0]; const incoming = current === layers[0] ? layers[1] : layers[0];
   incoming.style.backgroundImage = game ? `linear-gradient(90deg,rgba(12,9,7,.82) 0%,rgba(20,14,10,.45) 48%,rgba(8,8,8,.68) 100%),url("${url}")` : 'none'; incoming.classList.toggle('has-image', Boolean(game)); incoming.classList.add('active'); current.classList.remove('active');
@@ -46,8 +46,6 @@ function setArchiveRoom(game, immediate = false) {
   const code = document.querySelector('#projectionCode'); if (code) code.textContent = game ? `ARCHIVE / ${game.appid || '07'}` : 'ROOM 07 / NIGHT SHIFT';
   document.querySelectorAll('.curation-card.selected').forEach((card) => { card.classList.remove('selected'); card.removeAttribute('aria-current'); });
 }
-function previewArchiveRoom(game) { ensureArchiveLayers(); const ambient = document.querySelector('.ambient'); const layer = ambient?.querySelector('.ambient-game-image'); if (!layer || !game) return; const type = inferGameType(game); layer.classList.add('fade-image'); layer.classList.remove('previewing'); layer.style.setProperty('--preview-image', `url("${game.image || fallbackArchiveImages[type] || fallbackArchiveImage}")`); requestAnimationFrame(() => { layer.classList.remove('fade-image'); layer.classList.add('previewing'); }); }
-function clearArchivePreview() { const layer = document.querySelector('.ambient-game-image'); if (!layer || !layer.classList.contains('previewing')) return; layer.classList.add('fade-image'); layer.classList.remove('previewing'); requestAnimationFrame(() => layer.classList.remove('fade-image')); }
 window.addEventListener('DOMContentLoaded', ensureArchiveLayers);
 function setArchiveMode(mode, code) {
   const ambient = document.querySelector('.ambient'); if (!ambient) return;
@@ -57,10 +55,14 @@ function setArchiveMode(mode, code) {
   const projection = document.querySelector('#projectionCode'); if (projection && code) projection.textContent = code;
 }
 function setSteamProfile(steamId) { const link = $('#steamProfile'); if (!link) return; const valid = /^\d{17}$/.test(steamId); link.hidden = !valid; if (valid) link.href = `https://steamcommunity.com/profiles/${steamId}`; else link.removeAttribute('href'); }
+function safeSteamUrl(value, appid = '') { try { const url = new URL(String(value || '')); if (url.protocol !== 'https:' || url.hostname !== 'store.steampowered.com') return ''; const path = url.pathname.replace(/\/$/, ''); if (appid && path !== `/app/${appid}`) return ''; const resolved = appid || path.split('/')[2]; return /^\d+$/.test(resolved) ? `https://store.steampowered.com/app/${resolved}` : ''; } catch (_) { return ''; } }
+function safeImageUrl(value) { try { const url = new URL(String(value || '')); const hosts = new Set(['cdn.akamai.steamstatic.com', 'steamcdn-a.akamaihd.net', 'shared.akamai.steamstatic.com']); return url.protocol === 'https:' && hosts.has(url.hostname) ? url.href : ''; } catch (_) { return ''; } }
 // When the standalone frontend is opened from disk, route API calls to the
 // local FastAPI server instead of attempting fetches against the file origin.
-const apiBase = new URLSearchParams(location.search).get('api')
-  || (location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '');
+const requestedApi = new URLSearchParams(location.search).get('api');
+const apiBase = location.protocol === 'file:'
+  ? 'http://127.0.0.1:8000'
+  : (requestedApi && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(requestedApi) ? requestedApi : '');
 
 class ApiError extends Error {
   constructor(status, payload) {
@@ -178,10 +180,10 @@ function restoreViewState(threadId) {
 function renameSession(session) { const dialog = $('#titleDialog'); const input = $('#titleInput'); const error = $('#titleError'); input.value = session.title || '新夜班记录'; error.textContent = ''; dialog.returnValue = ''; const submit = () => { const title = input.value.trim(); if (!title) { error.textContent = '标题不能为空'; return; } if (title.length > 50) { error.textContent = '标题最多 50 字'; return; } dialog.close('save'); }; dialog.onclose = async () => { if (dialog.returnValue !== 'save') return; try { await api.renameSession(session.thread_id, input.value.trim()); await refreshSessions(); updateTitle(); toast('标题已更新'); } catch (caught) { showFailure(caught, () => renameSession(session)); } }; $('#titleCancel').onclick = () => dialog.close(); $('#titleSave').onclick = submit; dialog.showModal(); input.focus(); input.select(); }
 function deleteSession(session) { const dialog = $('#deleteDialog'); $('#deletePrompt').textContent = `确定删除“${session.title || '新夜班记录'}”？删除后无法恢复。`; dialog.returnValue = ''; dialog.onclose = async () => { if (dialog.returnValue !== 'delete') return; try { const result = await api.deleteSession(session.thread_id); if (state.threadId === session.thread_id) newSession(); await refreshSessions(); toast(result.status === 'partial' ? '记录已移除，后台仍在完成清理' : '夜班记录已删除'); } catch (caught) { showFailure(caught, () => deleteSession(session)); } }; $('#deleteCancel').onclick = () => dialog.close(); $('#deleteConfirm').onclick = () => dialog.close('delete'); dialog.showModal(); }
 function updateTitle() { $('#currentTitle').textContent = state.sessions.find((s) => s.thread_id === state.threadId)?.title || '新夜班记录'; }
-function newSession() { state.stream?.abort(); state.stream = null; state.threadId = api.createSession(); localStorage.setItem(VIEW_THREAD_KEY, state.threadId); state.messages = []; state.pending = null; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail(); $('#prompt').focus({ preventScroll: true }); }
+function newSession() { state.stream?.abort(); state.stream = null; state.threadId = api.createSession(); localStorage.setItem(VIEW_THREAD_KEY, state.threadId); state.messages = []; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail(); $('#prompt').focus({ preventScroll: true }); }
 async function selectSession(id) {
   if (state.threadId === id && state.messages.length) { closeMobileRail(); return; }
-  state.stream?.abort(); state.stream = null; state.threadId = id; localStorage.setItem(VIEW_THREAD_KEY, id); state.pending = null; state.messages = []; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail();
+  state.stream?.abort(); state.stream = null; state.threadId = id; localStorage.setItem(VIEW_THREAD_KEY, id); state.messages = []; state.busy = false; clearNotice(); renderMessages(); updateTitle(); renderSessions(); closeMobileRail();
   try { const messages = (await api.getMessages(id)).messages || []; if (state.threadId !== id) return; state.messages = messages; renderMessages(); if (state.sessions.find((s) => s.thread_id === id)?.is_running) await attachRun(id); restoreViewState(id); }
   catch (error) { if (state.threadId === id) showFailure(error, () => selectSession(id)); }
 }
@@ -231,7 +233,7 @@ function applyDoneEvent(assistant, event) {
 }
 function splitRecommendations(text) {
   const raw = String(text || '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
-  try { const structured = JSON.parse(raw); if (Array.isArray(structured.games) && typeof structured.summary === 'string') return { structured: true, lead: structured.summary, games: structured.games.map((game) => ({ name: game.name || '', url: game.store_url || '', image: game.image_url || '', appid: game.appid || '', genre: game.genre || '', mood: game.mood || '', reason: game.reason || '', match: game.match || '', selected: Boolean(game.selected) })).filter((game) => game.name) }; } catch (_) { /* older Markdown responses remain supported */ }
+  try { const structured = JSON.parse(raw); if (Array.isArray(structured.games) && typeof structured.summary === 'string') return { structured: true, lead: structured.summary, games: structured.games.map((game) => ({ name: game.name || '', appid: String(game.appid || ''), url: safeSteamUrl(game.store_url, String(game.appid || '')), image: safeImageUrl(game.image_url), genre: game.genre || '', mood: game.mood || '', reason: game.reason || '', match: game.match || '', selected: Boolean(game.selected) })).filter((game) => game.name && game.url) }; } catch (_) { /* older Markdown responses remain supported */ }
   const lines = String(text || '').split(/\r?\n/);
   const tableStart = lines.findIndex((line, index) => line.trim().startsWith('|') && lines[index + 1]?.includes('---'));
   if (tableStart >= 0) {
@@ -251,7 +253,7 @@ function splitRecommendations(text) {
     const end = matches[index + 1]?.index ?? text.length;
     const description = text.slice(match.index + match[0].length, end).trim();
     const url = new URL(match[2]);
-    games.push({ name: match[1], url: url.href, image: match[3] || '', reason: description, start: match.index, end });
+    games.push({ name: match[1], url: safeSteamUrl(url.href), image: safeImageUrl(match[3]), reason: description, start: match.index, end });
   }
   return { structured: false, lead: text.slice(0, games[0]?.start || 0).trim(), games };
 }
@@ -262,12 +264,12 @@ function paperFor(game, index) {
   paper.dataset.archiveType = inferGameType(game);
   const head = node('div', 'paper-head'); head.append(node('span', 'mono', `EXHIBIT ${String(index + 1).padStart(2, '0')}`), node('span', 'match', '匹配度未提供'));
   const grid = node('div', 'paper-grid'); const cover = node('div', 'cover');
-  if (game.image) { const img = node('img'); img.src = game.image; img.alt = `${game.name} 游戏封面`; img.loading = 'lazy'; img.onerror = () => img.remove(); cover.append(img); }
+  const imageUrl = safeImageUrl(game.image); if (imageUrl) { const img = node('img'); img.src = imageUrl; img.alt = `${game.name} 游戏封面`; img.loading = 'lazy'; img.onerror = () => img.remove(); cover.append(img); }
   else cover.append(node('span', '', game.name));
   const copy = node('div', 'paper-copy');
   // Keep the card focused on the title; the recommendation evidence lives in the expandable note below.
   copy.append(node('h3', '', inlineMarkdown(game.name)));
-  const link = node('a', 'text-btn', '在 Steam 查看 ↗'); link.href = game.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; copy.append(link); grid.append(cover, copy);
+  const link = node('a', 'text-btn', '在 Steam 查看 ↗'); link.href = safeSteamUrl(game.url, String(game.appid || '')); link.target = '_blank'; link.rel = 'noopener noreferrer'; copy.append(link); grid.append(cover, copy);
   const toggle = button('展开依据 ＋', 'reason-toggle', () => { reason.classList.toggle('open'); toggle.setAttribute('aria-expanded', String(reason.classList.contains('open'))); toggle.textContent = reason.classList.contains('open') ? '收起依据 −' : '展开依据 ＋'; });
   toggle.setAttribute('aria-expanded', 'false');
   const reason = node('div', 'reason'); reason.append(node('span', 'mono', "CURATOR'S NOTE"), node('p', '', inlineMarkdown(game.reason || '后端本轮未提供更详细的推荐依据。')));
@@ -377,6 +379,11 @@ function handleStreamEvent(event, assistant, threadId) {
   }
   if (event.event === 'snapshot') {
     const snapshot = event.data || {}; assistant.stage = snapshot.stream_status || assistant.stage;
+    if (typeof snapshot.reply === 'string' && snapshot.reply) {
+      assistant.rawContent = snapshot.reply;
+      assistant.previewTarget = streamPreview(snapshot.reply);
+      assistant.content = assistant.previewTarget;
+    }
     if (snapshot.error) assistant.error = typeof snapshot.error === 'string' ? snapshot.error : snapshot.error.message;
     renderMessages();
   }
@@ -400,16 +407,16 @@ async function runMessage(text, retry = false) {
     if (!finished) { stopStages(assistant); assistant.incomplete = true; assistant.error = '连接中断，回答尚未完成'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
   } catch (error) {
     stopStages(assistant); if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = !!assistant.content; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); if (error.status === 401) { $('#prompt').value = text; $('#charCount').textContent = `${text.length} / ${MAX_MESSAGE_LENGTH}`; expireLogin(); } renderMessages(); }
-  } finally { if (state.stream === controller) state.stream = null; state.busy = false; refreshSessions().catch(() => {}); }
+  } finally { if (state.stream === controller) { state.stream = null; state.busy = false; } refreshSessions().catch(() => {}); }
 }
 async function attachRun(threadId) {
   const assistant = { role: 'assistant', content: '', processing: true, stage: stages[0] }; state.messages.push(assistant); renderMessages(); startStages(assistant);
   const controller = new AbortController(); state.stream = controller;
   try { const attached = await api.attachRun(threadId, (event) => handleStreamEvent(event, assistant, threadId), controller.signal); if (!attached) { state.messages.pop(); renderMessages(); } }
   catch (error) { if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = true; renderMessages(); } }
-  finally { stopStages(assistant); state.stream = null; state.busy = false; }
+  finally { stopStages(assistant); if (state.stream === controller) { state.stream = null; state.busy = false; } }
 }
-async function continueGeneration(message) { if (state.busy) return; const id = state.threadId; try { const attached = await api.attachRun(id, (event) => handleStreamEvent(event, message, id)); if (!attached) await runMessage('请继续刚才未完成的回答'); } catch (error) { showFailure(error, () => continueGeneration(message)); } }
+async function continueGeneration(message) { if (state.busy) return; state.busy = true; const id = state.threadId; const controller = new AbortController(); state.stream = controller; try { const attached = await api.attachRun(id, (event) => handleStreamEvent(event, message, id), controller.signal); if (!attached) await runMessage('请继续刚才未完成的回答'); } catch (error) { showFailure(error, () => continueGeneration(message)); } finally { if (state.stream === controller) { state.stream = null; state.busy = false; } } }
 
 function closeAccountMenu() { $('#accountMenu').hidden = true; $('#avatar').setAttribute('aria-expanded', 'false'); }
 function openAuth() { closeAccountMenu(); $('#authError').textContent = ''; $('#authDialog').showModal(); }

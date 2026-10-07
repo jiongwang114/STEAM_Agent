@@ -25,5 +25,6 @@
     "transformers": "5.13.1",
     "tokenizers": "0.22.2"
   },
-  "source_audit_sha256": "3c4cefc8f534911c93ef35993b3aab6f1898e7f779e514a36d88152c46fe12be"
+  "source_audit_sha256": "3c4cefc8f534911c93ef35993b3aab6f1898e7f779e514a36d88152c46fe12be",
+  "runtime_profile": "cuda-cu130"
 }

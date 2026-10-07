@@ -6,6 +6,7 @@ from prompts.modules import (
     DECISION_POLICY,
     EVIDENCE_POLICY,
     IDENTITY,
+    INTERNAL_INFORMATION_POLICY,
     MEMORY_POLICY,
     OUTPUT_FORMAT,
     PROMPT_VERSION,
@@ -43,6 +44,7 @@ def build_system_prompt(
             context.append("Steam 游戏档案（缓存摘要，仅用于个性化线索）：\n" + profile[:1800])
     return SystemMessage(content="\n\n".join([
         IDENTITY,
+        INTERNAL_INFORMATION_POLICY,
         "## 当前上下文\n" + "\n".join(context),
         DECISION_POLICY,
         TOOL_RESULT_POLICY,

@@ -6,6 +6,7 @@ import time
 import weakref
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -33,9 +34,9 @@ from memory.auth import (
 from model_routing import assign_experiment
 from memory.message_store import get_thread_list, get_thread_messages
 from observability import record_agent_run
-from graph.run_context import new_run_context, run_metadata
+from graph.run_context import extract_token_usage, new_run_context, run_metadata
 from memory.session_summary import get_latest_session_summary
-from tracing import set_trace_context
+from tracing import reset_trace_context, set_trace_context
 from api.security import direct_call_user, qualified_thread_id, require_user
 from api.schemas import (
     AuthRequest,
@@ -437,19 +438,6 @@ def _schedule_title_generation(user_id: str, thread_id: str, message: str) -> No
     )
 
 
-def _extract_token_usage(msg) -> dict | None:
-    for attr in ("usage_metadata", "response_metadata"):
-        meta = getattr(msg, attr, None)
-        if meta and isinstance(meta, dict):
-            for key in ("token_usage", "usage"):
-                usage = meta.get(key)
-                if usage and isinstance(usage, dict):
-                    return usage
-            if "prompt_tokens" in meta or "input_tokens" in meta:
-                return meta
-    return None
-
-
 def _extract_executed_tool_calls(messages) -> list[str]:
     """Return attempted calls minus calls rejected by the deterministic policy."""
     attempted: list[tuple[str, str]] = []
@@ -502,17 +490,39 @@ def _normalize_reply(raw_reply: str) -> tuple[str, dict]:
         for item in parsed["games"]:
             if not isinstance(item, dict) or not item.get("appid") or not item.get("name") or not item.get("store_url"):
                 continue
+            appid = str(item.get("appid", ""))
+            store_url = _safe_store_url(item.get("store_url"), appid)
+            image_url = _safe_image_url(item.get("image_url"))
+            if not store_url:
+                continue
             games.append({
-                "appid": str(item.get("appid", "")),
+                "appid": appid,
                 "name": str(item.get("name", "")),
-                "store_url": str(item.get("store_url", "")),
-                "image_url": str(item.get("image_url", "")),
+                "store_url": store_url,
+                "image_url": image_url,
                 "reason": str(item.get("reason", ""))[:300],
             })
         envelope = {"summary": parsed["summary"], "games": games}
     else:
         envelope = {"summary": raw, "games": []}
     return json.dumps(envelope, ensure_ascii=False, separators=(",", ":")), envelope
+
+
+def _safe_store_url(value, appid: str) -> str:
+    parsed = urlparse(str(value or ""))
+    if parsed.scheme != "https" or parsed.netloc.lower() != "store.steampowered.com":
+        return ""
+    if parsed.path.rstrip("/") != f"/app/{appid}":
+        return ""
+    return f"https://store.steampowered.com/app/{appid}"
+
+
+def _safe_image_url(value) -> str:
+    parsed = urlparse(str(value or ""))
+    allowed = {"cdn.akamai.steamstatic.com", "steamcdn-a.akamaihd.net", "shared.akamai.steamstatic.com"}
+    if parsed.scheme != "https" or parsed.netloc.lower() not in allowed:
+        return ""
+    return parsed.geturl()
 
 
 async def _execute_agent_events(
@@ -525,18 +535,20 @@ async def _execute_agent_events(
 ) -> AsyncGenerator[dict, None]:
     """Single LangGraph execution path shared by sync and SSE endpoints."""
     thread_key = qualified_thread_id(user_id, req.thread_id)
-    set_trace_context(user_id=user_id, thread_id=req.thread_id)
+    trace_token = set_trace_context(user_id=user_id, thread_id=req.thread_id)
     config = {
         "configurable": {"thread_id": thread_key},
         "metadata": {
             "user_id": user_id,
             "thread_id": req.thread_id,
             "qualified_thread_id": thread_key,
+            "run_id": f"run-{time.time_ns():x}",
         },
     }
     initial_state: AgentState = {
         "messages": [HumanMessage(content=req.message)],
         "steam_id": steam_id,
+        "steam_id_snapshot": steam_id,
         "user_id": user_id,
         "thread_id": req.thread_id,
         **new_run_context(),
@@ -608,10 +620,10 @@ async def _execute_agent_events(
                         if metadata.get("langgraph_node") == "guard":
                             continue
                         output = event.get("data", {}).get("output")
-                        usage = _extract_token_usage(output) if output is not None else None
+                        usage = extract_token_usage(output) if output is not None else None
                         if usage:
-                            input_tokens += int(usage.get("prompt_tokens", usage.get("input_tokens", 0)))
-                            output_tokens += int(usage.get("completion_tokens", usage.get("output_tokens", 0)))
+                            input_tokens += int(usage.get("input_tokens", 0))
+                            output_tokens += int(usage.get("output_tokens", 0))
             try:
                 snapshot = await graph.aget_state(config)
                 final_state = dict(snapshot.values)
@@ -638,6 +650,7 @@ async def _execute_agent_events(
                 execution=execution,
             )
         record("cancelled", tool_calls_seen)
+        reset_trace_context(trace_token)
         return
     except GeneratorExit:
         if reply.strip():
@@ -655,6 +668,7 @@ async def _execute_agent_events(
                 execution=execution,
             )
         record("cancelled", tool_calls_seen)
+        reset_trace_context(trace_token)
         raise
     except Exception as exc:
         termination_reason = "model_error"
@@ -662,13 +676,16 @@ async def _execute_agent_events(
         reply = _MODEL_ERROR_REPLY
         yield {"event": "error", "data": {"code": "agent_unavailable", "message": _MODEL_ERROR_REPLY}}
 
+    reset_trace_context(trace_token)
     messages = final_state.get("messages") or []
-    if not reply:
+    if not termination_reason:
         for message in reversed(messages):
             content = getattr(message, "content", "")
-            if isinstance(content, str) and content and not getattr(message, "tool_calls", None):
+            if getattr(message, "type", "") == "ai" and isinstance(content, str) and content and not getattr(message, "tool_calls", None):
                 reply = content
                 break
+    elif final_state.get("guard_blocked"):
+        reply = "这个请求我无法协助处理。请换一个安全、合法的游戏推荐问题。"
 
     reply, _reply_payload = _normalize_reply(reply)
 

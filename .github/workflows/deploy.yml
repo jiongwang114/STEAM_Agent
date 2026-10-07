@@ -13,7 +13,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile application modules
+        run: python -m compileall -q api graph memory rag tools
+      - name: Check tracked Markdown links
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          missing = []
+          for path in Path('docs').glob('*.md'):
+              for target in re.findall(r'\]\(([^)#]+)', path.read_text(encoding='utf-8')):
+                  if '://' in target or target.startswith('#'):
+                      continue
+                  if not (path.parent / target).exists():
+                      missing.append(f'{path}: {target}')
+          if missing:
+              raise SystemExit('\n'.join(missing))
+          PY
   deploy:
+    needs: quality
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -60,9 +88,15 @@ jobs:
           cd "$APP_PATH"
           test -f .env
           docker rm -f steam-agent-new2 2>/dev/null || true
+          docker stop steam-agent-old 2>/dev/null || true
+          docker rename steam-agent steam-agent-old 2>/dev/null || true
           docker run -d --name steam-agent-new2 --restart unless-stopped \
             -p 8000:8000 --env-file "$APP_PATH/.env" \
             -v "$APP_PATH:/app" -w /app steam-agent:github python -m api.main
+          if ! docker inspect --format='{{.State.Running}}' steam-agent-new2 | grep -q true; then
+            docker start steam-agent-old 2>/dev/null || true
+            exit 1
+          fi
           REMOTE
 
       - name: Verify deployment
@@ -80,5 +114,6 @@ jobs:
             fi
             sleep 10
           done
-          echo 'Deployment did not become ready within 5 minutes.' >&2
+          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "docker rm -f steam-agent-new2 2>/dev/null || true; docker start steam-agent-old 2>/dev/null || true"
+          echo 'Deployment did not become ready; previous container was restored.' >&2
           exit 1

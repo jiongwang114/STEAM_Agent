@@ -167,13 +167,13 @@ def build_chunk(appid: int, detail: dict, user_tags: list[str] | None = None) ->
 
 # ── local cache ───────────────────────────────────────────────────────
 
-def save_cache(records: list[dict]):
+def save_cache(records: list[dict], path: Path = CACHE_PATH):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    temp_path = CACHE_PATH.with_suffix(".json.tmp")
+    temp_path = path.with_suffix(".json.tmp")
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(records, f, ensure_ascii=False, indent=2)
-    os.replace(temp_path, CACHE_PATH)
-    print(f"  Saved {len(records)} games to {CACHE_PATH.name}")
+    os.replace(temp_path, path)
+    print(f"  Saved {len(records)} games to {path.name}")
 
 
 def load_cache() -> list[dict]:
@@ -194,6 +194,7 @@ def write_index_manifest(
     started_at: str | None = None,
     duration_seconds: float = 0.0,
     vector_count: int = 0,
+    cache_path: Path = CACHE_PATH,
 ) -> dict:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     index_version = index_version or "legacy"
@@ -222,25 +223,30 @@ def write_index_manifest(
         "reranker_model": RERANKER_MODEL,
         "reranker_revision": RERANKER_REVISION,
         "code_version": os.environ.get("GIT_SHA", "working-tree"),
-        "cache_sha256": hashlib.sha256(CACHE_PATH.read_bytes()).hexdigest()
-        if CACHE_PATH.exists() else "",
+        "cache_sha256": hashlib.sha256(cache_path.read_bytes()).hexdigest()
+        if cache_path.exists() else "",
+        "cache_path": cache_path.name,
+        "runtime_profile": os.environ.get("RAG_RUNTIME_PROFILE", "cpu"),
         "documents_sha256": hashlib.sha256(
             json.dumps(documents, ensure_ascii=False, separators=(",", ":")).encode()
         ).hexdigest(),
     }
-    temp_path = INDEX_MANIFEST_PATH.with_suffix(".json.tmp")
+    manifest_path = DATA_DIR / f"index_manifest_{index_version}.json"
+    temp_path = manifest_path.with_suffix(".json.tmp")
     temp_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(temp_path, INDEX_MANIFEST_PATH)
+    os.replace(temp_path, manifest_path)
     return manifest
 
 
-def _switch_current_index(index_version: str, collection_name: str) -> None:
+def _switch_current_index(index_version: str, collection_name: str, manifest_path: Path, cache_path: Path) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     temp_path = CURRENT_INDEX_PATH.with_suffix(".json.tmp")
     temp_path.write_text(
         json.dumps({
             "index_version": index_version,
             "collection": collection_name,
+            "manifest": manifest_path.name,
+            "cache": cache_path.name,
             "switched_at": datetime.now(timezone.utc).isoformat(),
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -303,7 +309,8 @@ def _build_collection(
             print(f"Indexed {min(end, len(ids_list))}/{len(ids_list)} chunks", flush=True)
     if collection.count() != len(ids_list):
         raise RuntimeError(f"index validation failed: expected {len(ids_list)}, got {collection.count()}")
-    save_cache(records)
+    cache_path = DATA_DIR / f"game_cache_{index_version}.json"
+    save_cache(records, cache_path)
     write_index_manifest(
         records,
         index_version=index_version,
@@ -313,8 +320,9 @@ def _build_collection(
         started_at=started_at,
         duration_seconds=time.perf_counter() - started,
         vector_count=len(ids_list),
+        cache_path=cache_path,
     )
-    _switch_current_index(index_version, collection_name)
+    _switch_current_index(index_version, collection_name, DATA_DIR / f"index_manifest_{index_version}.json", cache_path)
     return index_version, collection_name, 0
 
 

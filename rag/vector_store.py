@@ -67,6 +67,12 @@ def current_games_collection_name() -> str:
 
 def index_manifest() -> dict:
     path = _DATA_DIR / "index_manifest.json"
+    if _CURRENT_INDEX_PATH.exists():
+        try:
+            pointer = json.loads(_CURRENT_INDEX_PATH.read_text(encoding="utf-8"))
+            path = _DATA_DIR / str(pointer.get("manifest", path.name))
+        except (OSError, ValueError):
+            pass
     if not path.exists():
         return {}
     try:

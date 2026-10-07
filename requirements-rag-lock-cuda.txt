@@ -1,0 +1,7 @@
+# Runtime lock for the committed eval indexes whose manifests record CUDA.
+--extra-index-url https://download.pytorch.org/whl/cu130
+chromadb==1.5.9
+sentence-transformers==5.6.0
+torch==2.13.0+cu130
+transformers==5.13.1
+tokenizers==0.22.2

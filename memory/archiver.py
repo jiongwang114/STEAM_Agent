@@ -19,6 +19,8 @@ def archive_conversation(
         metrics.increment("conversation_archive_total", status="skipped")
         return {"status": "skipped", "turn_number": None, "layers": {}}
 
+    if turn_number is not None:
+        raise ValueError("turn_number is allocated by archive_sqlite_turn")
     task = archive_sqlite_turn(
         user_id,
         thread_id,

@@ -25,6 +25,8 @@ python -m api.main
 - `GET /docs`：FastAPI 生成的接口文档。
 - `GET /metrics`：运行时指标；配置 `METRICS_TOKEN` 后需要 `X-Metrics-Token`。
 
+当前运行模型是每个部署实例一个 Uvicorn 进程和一个 API 容器。`/chat/runs` 的运行队列与 SSE 监听器保存在进程内；在引入 Redis 或持久化队列前，不应横向扩展多个 API worker/实例，否则重连可能找不到原运行。
+
 API 进程启动时会初始化 SQLite 表、恢复待清理会话，并领取待处理的异步记忆任务。会话清理和记忆任务各自有后台重试 worker；记忆任务失败不会阻塞聊天响应。
 
 会话删除的请求线程和后台补偿 worker 共用进程内互斥，并在执行前重新读取持久化清理任务，避免并发旧向量清理导致重复执行或重新写回已完成任务。
@@ -52,7 +54,7 @@ Steam Web API 条款公布每天 100,000 次调用上限（https://steamcommunit
 
 本次流程仅在远程采集、本地建立索引，不向远程部署索引。批次下载、来源审计通过后清理本次专用远程临时目录，保留既有服务器项目和数据库。
 
-Linux x86_64 CPU 部署可安装 `requirements-rag-lock.txt` 来匹配本次验证环境。17 条非英文正文保留官方原文及独立英文译文，译文标记为派生内容；Steam 图片式简介不足的两款游戏补充 CD PROJEKT RED 官方产品网页正文，并保留网页 SHA-256 和来源 URL。审计报告记录排除项、备用项与覆盖统计。
+`requirements-rag-lock.txt` 是 CPU 环境重新构建索引的锁文件；仓库内两个已提交 eval index manifest 标记为 `cuda-cu130`，应使用 `requirements-rag-lock-cuda.txt`。CPU 环境加载这些 CUDA 构建产物时，`index_compatibility()` 必须拒绝服务，不能把不同运行时当成兼容。17 条非英文正文保留官方原文及独立英文译文，译文标记为派生内容；Steam 图片式简介不足的两款游戏补充 CD PROJEKT RED 官方产品网页正文，并保留网页 SHA-256 和来源 URL。审计报告记录排除项、备用项与覆盖统计。
 
 本地重建与验证（从仓库父目录运行）：
 

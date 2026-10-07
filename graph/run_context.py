@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-import json
 from typing import Any, Sequence
 
 from config import (
@@ -34,6 +33,7 @@ def new_run_context() -> dict[str, Any]:
         "repair_attempts": 0,
         "no_progress_rounds": 0,
         "constraints": [],
+        "guard_blocked": False,
         "validation": {
             "passed": True,
             "unsupported_appids": [],
@@ -131,25 +131,6 @@ def merge_unique_evidence(existing: Sequence[dict], additions: Sequence[dict]) -
     return list(merged.values())
 
 
-def compact_messages(messages: Sequence[Any], max_tokens: int) -> tuple[list[Any], dict[str, int]]:
-    groups = message_groups(messages)
-
-    selected: list[list[Any]] = []
-    estimated = 0
-    for group in reversed(groups):
-        group_tokens = sum(_message_tokens(message) for message in group)
-        if selected and estimated + group_tokens > max_tokens:
-            break
-        selected.append(group)
-        estimated += group_tokens
-    selected.reverse()
-    flattened = [message for group in selected for message in group]
-    return flattened, {
-        "dropped_turns": max(0, len(groups) - len(selected)),
-        "estimated_tokens": estimated,
-    }
-
-
 def message_groups(messages: Sequence[Any]) -> list[list[Any]]:
     """Group a user turn with every following tool call and result."""
     groups: list[list[Any]] = []
@@ -163,11 +144,3 @@ def message_groups(messages: Sequence[Any]) -> list[list[Any]]:
     if current:
         groups.append(current)
     return groups
-
-
-def _message_tokens(message: Any) -> int:
-    content = str(getattr(message, "content", "") or "")
-    tool_calls = getattr(message, "tool_calls", None) or []
-    payload = content + (json.dumps(tool_calls, ensure_ascii=False, default=str) if tool_calls else "")
-    ascii_count = sum(ord(character) < 128 for character in payload)
-    return max(1, round(ascii_count / 4 + (len(payload) - ascii_count) / 1.5))

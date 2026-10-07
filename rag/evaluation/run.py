@@ -20,7 +20,7 @@ from config import (
     RERANKER_MODEL,
     RERANKER_REVISION,
 )
-from rag.hybrid import hybrid_search
+from rag.hybrid import hybrid_search, reset_retrieval_cache
 from rag.translate import translate_to_english
 from rag.vector_store import get_games_collection, index_compatibility, index_manifest
 
@@ -152,6 +152,7 @@ def main():
         selected = {name.strip() for name in args.configs.split(',')}
         configs = {name: value for name, value in configs.items() if name in selected}
     for name, (dense, lexical, rerank) in configs.items():
+        reset_retrieval_cache()
         # Warm up with a neutral query; do not include model loading in latency.
         hybrid_search('cooperative puzzle adventure', top_k=10, use_dense=dense, use_lexical=lexical, use_reranker=rerank)
         rows = []
@@ -170,20 +171,25 @@ def main():
             query = case.get(args.query_field) or case['query']
             search_query, translated = _translate_query(query)
             output = hybrid_search(search_query, top_k=10, where=expression, use_dense=dense, use_lexical=lexical, use_reranker=rerank)
+            retrieval_status = output.get('retrieval', {}).get('status', 'ok')
             ids = [str(row['appid']) for row in output['results']]
-            rows.append({'id': case['id'], 'query': search_query, 'query_original': query, 'translated': translated, 'status': 'executed', 'results': [{'appid': str(r['appid']), 'name': r['metadata'].get('name'), 'score': r['final_score']} for r in output['results']], 'metrics': metrics(ids, case), 'latency_ms': (time.perf_counter() - started) * 1000, 'retrieval': output['retrieval'], 'applied_where': expression, 'unsupported_filters': unsupported})
-            print(name, case['id'], 'returned', len(ids), 'dense_error', output['retrieval']['dense_error'], flush=True)
+            rows.append({'id': case['id'], 'query': search_query, 'query_original': query, 'translated': translated, 'status': 'error' if retrieval_status in {'dense_error', 'unsupported_filter'} else 'executed', 'results': [{'appid': str(r['appid']), 'name': r['metadata'].get('name'), 'score': r['final_score']} for r in output['results']], 'metrics': metrics(ids, case), 'latency_ms': (time.perf_counter() - started) * 1000, 'retrieval': output['retrieval'], 'applied_where': expression, 'unsupported_filters': unsupported})
+            print(name, case['id'], 'returned', len(ids), 'dense_error', output['retrieval'].get('dense_error', ''), flush=True)
         executed_rows = [row for row in rows if row.get('status') == 'executed']
+        error_rows = [row for row in rows if row.get('status') == 'error']
+        skipped_rows = [row for row in rows if row.get('status') == 'skipped_unsupported_filters']
         aggregate = {}
         for key in sorted({k for row in executed_rows for k in row['metrics']}):
             aggregate[key] = statistics.mean(row['metrics'][key] for row in executed_rows if key in row['metrics'])
         latencies = sorted(r['latency_ms'] for r in executed_rows)
         if latencies:
             aggregate.update({'latency_mean_ms': statistics.mean(latencies), 'latency_p50_ms': statistics.median(latencies), 'latency_p95_ms': latencies[math.ceil(.95 * len(latencies)) - 1]})
-        aggregate.update({'filter_precision': None, 'filter_recall': None, 'evidence_coverage': None, 'evaluated_cases': len(executed_rows), 'skipped_cases': len(rows) - len(executed_rows)})
-        valid = bool(executed_rows) and not any(r['retrieval']['dense_error'] or (rerank and r['results'] and not r['retrieval']['reranker_used']) for r in executed_rows)
-        report['configurations'][name] = {'valid_execution': valid, 'aggregate': aggregate, 'cases': rows}
-        args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        aggregate.update({'filter_precision': None, 'filter_recall': None, 'evidence_coverage': None, 'evaluated_cases': len(executed_rows), 'skipped_cases': len(skipped_rows), 'error_cases': len(error_rows), 'coverage': len(executed_rows) / len(rows) if rows else 0.0})
+        valid = bool(executed_rows) and not error_rows and len(executed_rows) == len(rows) and not any(r['retrieval'].get('dense_error') or (rerank and r['results'] and not r['retrieval']['reranker_used']) for r in executed_rows)
+        report['configurations'][name] = {'valid_execution': valid, 'cache_policy': 'lexical cache reset per configuration; model/client caches may remain warm', 'aggregate': aggregate, 'cases': rows}
+        temporary_output = args.output.with_suffix(args.output.suffix + '.tmp')
+        temporary_output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        temporary_output.replace(args.output)
     print('REPORT', args.output, flush=True)
 
 

@@ -122,6 +122,7 @@ def _extract_evidence(tool_name: str, value: Any) -> list[EvidenceItem]:
                 "name", "price", "metacritic", "tags", "description",
                 "short_description", "playtime_forever", "playtime_2weeks",
                 "is_free", "release_year", "has_multiplayer",
+                "store_url", "image_url", "header_image", "discount_percent",
             ) if key in row
         ]
         evidence.append(EvidenceItem(

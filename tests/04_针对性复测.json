@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "stage": "targeted-retest",
+  "test_set_version": "T1-targeted",
+  "criteria_version": "C1",
+  "cases": [
+    {"id":"CAP-06-N01","capability":"CAP-06","class":"normal","prompt":"找一款类似 Slay the Spire、支持中文且价格可接受的游戏。","expect":"按策略调用检索和商店工具，参数与顺序可追溯。"},
+    {"id":"CAP-09-B02","capability":"CAP-09","class":"boundary","prompt":"发送空消息。","expect":"返回明确输入错误，不启动Agent运行。"}
+  ]
+}

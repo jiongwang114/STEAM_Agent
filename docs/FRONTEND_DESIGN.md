@@ -1,12 +1,14 @@
 # Steam Agent 前端页面与实施设计
 
+> 当前运行入口是 `night-museum-frontend/index.html`，由 FastAPI 直接托管，页面使用原生 HTML/CSS/JavaScript 和 SSE。本文中保留的 `static/`、`frontend/`、React/Vite 内容属于历史方案记录，不代表当前目录结构。
+
 ## 文档状态
 
 - 状态：页面结构与核心交互已确认，第一版接口适配已完成，视觉方案仍待最终确认。
 - 更新时间：2026-09-27。
 - 当前阶段：前端真实后端联调和本地浏览器验收完成，等待最终视觉确认。
-- 旧前端位置：`static/index.html`，在新前端完成前保持不动。
-- 新前端位置：`frontend/`，使用 React/Vite 独立开发和预览。
+- 当前前端位置：`night-museum-frontend/`。
+- 当前预览方式：启动 FastAPI 后访问 `http://localhost:8000/`。
 
 ## 一、产品目标与范围
 

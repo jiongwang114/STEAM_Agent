@@ -3,6 +3,7 @@
 import sqlite3
 
 from config import SQLITE_DB_PATH
+_SCHEMA_READY = False
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -13,6 +14,9 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_threads_table():
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
     conn = _get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS threads_meta (
@@ -47,6 +51,7 @@ def init_threads_table():
         )
     conn.commit()
     conn.close()
+    _SCHEMA_READY = True
 
 
 def set_thread_title(user_id: str, thread_id: str, title: str):
