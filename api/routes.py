@@ -50,8 +50,9 @@ logger = logging.getLogger(__name__)
 
 _DEADLINE_REPLY = "这次检索超过了时间预算，我先停在这里，避免拿不完整的结果硬凑答案。请缩小一个条件后再试。"
 _MODEL_ERROR_REPLY = "模型服务暂时不可用，这次无法可靠完成回答。请稍后重试；我不会用不完整结果拼凑答案。"
-_SSE_REPLY_CHUNK_SIZE = 24
-_SSE_REPLY_CHUNK_DELAY_SECONDS = 0.03
+_SSE_REPLY_CHUNK_SIZE = 6
+_SSE_REPLY_CHUNK_DELAY_SECONDS = 0.035
+_SSE_CARD_DELAY_SECONDS = 0.24
 
 router = APIRouter()
 
@@ -76,6 +77,7 @@ class _ChatRun:
     reply: str = ""
     stream_status: str = "正在理解问题"
     progress: list[dict] = field(default_factory=list)
+    presentation: dict | None = None
     result: dict | None = None
     last_error: dict | None = None
     state: str = "running"
@@ -91,6 +93,10 @@ class _ChatRun:
             "status": self.state,
             "stream_status": self.stream_status,
             "progress": list(self.progress),
+            "presentation": (
+                {**self.presentation, "games": list(self.presentation["games"])}
+                if self.presentation is not None else None
+            ),
             "error": self.last_error,
             "result": self.result,
         }
@@ -100,6 +106,16 @@ class _ChatRun:
         data = event.get("data")
         if event_name == "token" and isinstance(data, str):
             self.reply += data
+        elif event_name == "presentation" and isinstance(data, dict):
+            self.presentation = {"total_games": data["total_games"], "games": []}
+            self.stream_status = "回答已整理，正在展示结果"
+        elif event_name == "card" and isinstance(data, dict) and self.presentation is not None:
+            if data.get("index") == len(self.presentation["games"]):
+                self.presentation["games"].append(data["game"])
+                self.stream_status = f"正在展示推荐 · {len(self.presentation['games'])} / {self.presentation['total_games']}"
+        elif event_name == "stage" and isinstance(data, dict):
+            if data.get("status") == "started" and data.get("message"):
+                self.stream_status = data["message"]
         elif event_name == "status" and isinstance(data, str):
             self.stream_status = data
             for step in self.progress:
@@ -242,10 +258,27 @@ async def _chat_run_stream(
 
 # Friendly status text shown while tools are running
 _TOOL_STATUS: dict[str, str] = {
-    "get_user_playtime": "让我翻翻你的游戏库...",
-    "rag_search_similar_games": "帮你找找对味的游戏...",
-    "search_steam_store": "瞄一眼商店价格...",
-    "recall_message_detail": "翻翻之前的对话记录...",
+    "get_user_playtime": "正在读取你的游戏库和游玩记录",
+    "rag_search_similar_games": "正在根据你的条件查找候选游戏",
+    "search_steam_store": "正在查询候选游戏的 Steam 商店信息",
+    "recall_message_detail": "正在查阅与你的问题相关的历史对话",
+}
+
+_TOOL_COMPLETED_STATUS: dict[str, str] = {
+    "get_user_playtime": "游戏库查询已结束，正在结合返回信息分析偏好",
+    "rag_search_similar_games": "候选检索已结束，正在检查返回结果与你的条件是否匹配",
+    "search_steam_store": "商店查询已结束，正在结合返回信息整理推荐依据",
+    "recall_message_detail": "历史对话查询已结束，正在结合返回信息理解你的需求",
+}
+
+_STAGE_MESSAGES: dict[str, str] = {
+    "initialize_context": "正在整理当前问题和对话上下文",
+    "guard": "正在确认请求是否可以处理",
+    "agent": "正在结合你的条件和已获得的信息筛选游戏",
+    "validate": "回答草稿已生成，正在核对游戏信息和你的条件",
+    "repair": "正在调整尚未通过核对的回答",
+    "finalize": "正在根据已获得的信息整理回答",
+    "safe_fallback": "正在保留有依据的结果并说明限制",
 }
 
 # Internal LangGraph nodes are intentionally hidden behind a small public
@@ -508,6 +541,24 @@ def _normalize_reply(raw_reply: str) -> tuple[str, dict]:
     return json.dumps(envelope, ensure_ascii=False, separators=(",", ":")), envelope
 
 
+async def _presentation_events(payload: dict) -> AsyncGenerator[dict, None]:
+    games = payload["games"]
+    yield {"event": "presentation", "data": {"total_games": len(games)}}
+    yield {"event": "token", "data": '{"summary":'}
+    summary = json.dumps(payload["summary"], ensure_ascii=False)
+    for offset in range(0, len(summary), _SSE_REPLY_CHUNK_SIZE):
+        yield {"event": "token", "data": summary[offset:offset + _SSE_REPLY_CHUNK_SIZE]}
+        await asyncio.sleep(_SSE_REPLY_CHUNK_DELAY_SECONDS)
+    yield {"event": "token", "data": ',"games":['}
+    for index, game in enumerate(games):
+        if index:
+            await asyncio.sleep(_SSE_CARD_DELAY_SECONDS)
+        serialized = json.dumps(game, ensure_ascii=False, separators=(",", ":"))
+        yield {"event": "token", "data": ("," if index else "") + serialized}
+        yield {"event": "card", "data": {"index": index, "game": game}}
+    yield {"event": "token", "data": "]}"}
+
+
 def _safe_store_url(value, appid: str) -> str:
     parsed = urlparse(str(value or ""))
     if parsed.scheme != "https" or parsed.netloc.lower() != "store.steampowered.com":
@@ -598,6 +649,7 @@ async def _execute_agent_events(
                                 "category": category,
                                 "node": node_name,
                                 "status": "started" if kind == "on_chain_start" else "completed",
+                                "message": _STAGE_MESSAGES.get(node_name, "") if kind == "on_chain_start" else "",
                             },
                         }
                     if kind == "on_chat_model_stream":
@@ -616,6 +668,10 @@ async def _execute_agent_events(
                                 "event": "status",
                                 "data": _TOOL_STATUS.get(tool_name, "马上就好..."),
                             }
+                    elif kind == "on_tool_end":
+                        completed_status = _TOOL_COMPLETED_STATUS.get(event.get("name", ""))
+                        if completed_status:
+                            yield {"event": "status", "data": completed_status}
                     elif kind == "on_chat_model_end":
                         if metadata.get("langgraph_node") == "guard":
                             continue
@@ -752,14 +808,9 @@ async def _execute_agent_events(
         run_metadata=metadata,
     )
     record(response_status, tool_calls)
-    for offset in range(0, len(reply), _SSE_REPLY_CHUNK_SIZE):
-        if first_token_at is None:
-            first_token_at = time.perf_counter()
-        yield {
-            "event": "token",
-            "data": reply[offset:offset + _SSE_REPLY_CHUNK_SIZE],
-        }
-        await asyncio.sleep(_SSE_REPLY_CHUNK_DELAY_SECONDS)
+    if mode == "stream":
+        async for event in _presentation_events(_reply_payload):
+            yield event
     yield {"event": "done", "data": response.model_dump(mode="json")}
 
 

@@ -1,4 +1,5 @@
 const MAX_MESSAGE_LENGTH = 666;
+const INITIAL_PROGRESS = '正在理解问题';
 const $ = (selector) => document.querySelector(selector);
 const VIEW_THREAD_KEY = 'steam-agent.current-thread';
 const VIEW_SCROLL_PREFIX = 'steam-agent.scroll:';
@@ -194,46 +195,63 @@ function streamPreview(raw) {
   const text = String(raw || '');
   const summary = text.match(/"summary"\s*:\s*"((?:\\.|[^"\\])*)/s);
   if (summary) {
-    try { return JSON.parse(`"${summary[1]}"`); } catch (_) { return summary[1]; }
+    for (let trim = 0; trim <= Math.min(6, summary[1].length); trim += 1) {
+      try { return JSON.parse('"' + summary[1].slice(0, summary[1].length - trim) + '"'); } catch (_) {}
+    }
+    return '';
   }
-  return text.trim().startsWith('{') ? '正在整理馆藏记录…' : text;
+  return text.trim().startsWith('{') ? '' : text;
 }
-function scheduleStreamPreview(assistant) {
-  if (assistant.previewTimer) return;
-  const tick = () => {
-    const target = assistant.previewTarget || '';
-    const current = assistant.previewContent || '';
-    if (current === target) {
-      assistant.previewTimer = null;
-      if (assistant.doneEvent) applyDoneEvent(assistant, assistant.doneEvent);
-      return;
-    }
-    const nextLength = Math.min(target.length, current.length + 1);
-    assistant.previewContent = target.slice(0, nextLength);
-    assistant.content = assistant.previewContent;
-    const index = state.messages.indexOf(assistant);
-    const answer = index >= 0 ? document.querySelector(`[data-message-index="${index}"] .answer`) : null;
-    if (answer) {
-      answer.classList.add('streaming-preview');
-      answer.replaceChildren(node('p', 'answer-lead plain-reply', inlineMarkdown(assistant.content || '正在整理馆藏记录…')));
-    }
-    assistant.previewTimer = setTimeout(tick, 45);
-  };
-  assistant.previewTimer = setTimeout(tick, 45);
+function presentationGame(game) {
+  return { name: String(game.name || ''), appid: String(game.appid || ''), url: safeSteamUrl(game.store_url, String(game.appid || '')), image: safeImageUrl(game.image_url), genre: game.genre || '', mood: game.mood || '', reason: String(game.reason || ''), match: game.match || '', selected: Boolean(game.selected) };
 }
-function finishStreamPreview(assistant) {
-  if (assistant.previewTimer) { clearTimeout(assistant.previewTimer); assistant.previewTimer = null; }
+function updatePresentation(assistant) {
+  const index = state.messages.indexOf(assistant);
+  const outer = index >= 0 ? document.querySelector('[data-message-index="' + index + '"]') : null;
+  const answer = outer?.querySelector('.answer');
+  if (!answer || !assistant.presentation) return;
+  const feed = $('#chatFeed');
+  const wasAtBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+  const lead = answer.querySelector('.answer-lead');
+  if (lead) { lead.textContent = inlineMarkdown(assistant.presentation.summary); lead.hidden = !assistant.presentation.summary; }
+  const grid = answer.querySelector('.curation-grid');
+  if (grid) {
+    const games = assistant.presentation.games;
+    answer.querySelector('.curation-summary').hidden = !games.length;
+    answer.querySelector('.curation-wall').hidden = !games.length;
+    while (grid.children.length < games.length) {
+      const cardIndex = grid.children.length;
+      const card = paperFor(games[cardIndex], cardIndex + 1);
+      card.classList.add('card-arriving');
+      grid.append(card);
+    }
+  }
+  const stage = outer.querySelector('.status-stage');
+  if (stage) stage.textContent = assistant.stage;
+  if (wasAtBottom) feed.scrollTop = feed.scrollHeight;
 }
 function applyDoneEvent(assistant, event) {
-  assistant.doneEvent = null;
-  finishStreamPreview(assistant);
-  stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = event.data?.status !== 'success';
+  assistant.processing = false; assistant.content = event.data?.reply || assistant.content; assistant.incomplete = event.data?.status !== 'success';
   if (assistant.incomplete && !assistant.error) assistant.error = '回答可能未完整生成';
-  state.busy = false; setArchiveMode(assistant.incomplete ? 'uncertain' : 'presenting', assistant.incomplete ? 'ARCHIVE / UNRESOLVED' : 'ARCHIVE / MATCH FOUND'); renderMessages(); refreshSessions().catch(() => {});
+  state.busy = false; setArchiveMode(assistant.incomplete ? 'uncertain' : 'presenting', assistant.incomplete ? 'ARCHIVE / UNRESOLVED' : 'ARCHIVE / MATCH FOUND');
+  const parsed = splitRecommendations(assistant.content);
+  const index = state.messages.indexOf(assistant);
+  const outer = index >= 0 ? document.querySelector('[data-message-index="' + index + '"]') : null;
+  if (outer && assistant.presentation && parsed?.structured && parsed.games.length === assistant.presentation.totalGames && !assistant.incomplete && !assistant.error) {
+    assistant.presentation.summary = parsed.lead;
+    assistant.presentation.games = parsed.games;
+    updatePresentation(assistant);
+    outer.querySelector('.status-line')?.remove();
+    if (index === state.messages.length - 1 && !outer.querySelector('.followup-btn')) outer.append(button('继续追问 ↗', 'followup-btn', () => $('#prompt').focus()));
+  } else {
+    assistant.presentation = null;
+    renderMessages();
+  }
+  refreshSessions().catch(() => {});
 }
 function splitRecommendations(text) {
   const raw = String(text || '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
-  try { const structured = JSON.parse(raw); if (Array.isArray(structured.games) && typeof structured.summary === 'string') return { structured: true, lead: structured.summary, games: structured.games.map((game) => ({ name: game.name || '', appid: String(game.appid || ''), url: safeSteamUrl(game.store_url, String(game.appid || '')), image: safeImageUrl(game.image_url), genre: game.genre || '', mood: game.mood || '', reason: game.reason || '', match: game.match || '', selected: Boolean(game.selected) })).filter((game) => game.name && game.url) }; } catch (_) { /* older Markdown responses remain supported */ }
+  try { const structured = JSON.parse(raw); if (Array.isArray(structured.games) && typeof structured.summary === 'string') return { structured: true, lead: structured.summary, games: structured.games.map(presentationGame).filter((game) => game.name && game.url) }; } catch (_) { /* older Markdown responses remain supported */ }
   const lines = String(text || '').split(/\r?\n/);
   const tableStart = lines.findIndex((line, index) => line.trim().startsWith('|') && lines[index + 1]?.includes('---'));
   if (tableStart >= 0) {
@@ -281,17 +299,34 @@ function paperFor(game, index) {
   paper.addEventListener('keydown', (event) => { if (event.target !== paper) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); paper.click(); } });
   return paper;
 }
-function renderAssistantText(answer, text) {
-  answer.replaceChildren(); const parsed = splitRecommendations(text);
-  if (parsed?.structured && !parsed.games.length) { answer.append(node('p', 'answer-lead plain-reply', inlineMarkdown(parsed.lead || '正在整理馆藏记录…'))); return; }
-  if (!parsed?.games?.length) { answer.append(node('p', 'answer-lead plain-reply', inlineMarkdown(text || '正在整理馆藏记录…'))); return; }
-  if (parsed.lead) answer.append(node('p', 'answer-lead', parsed.lead));
+function renderAssistantText(answer, text, parsed = splitRecommendations(text), reveal = true) {
+  answer.replaceChildren();
+  const totalGames = parsed?.totalGames ?? parsed?.games?.length ?? 0;
+  const leadText = inlineMarkdown(parsed?.structured || totalGames ? parsed.lead : text);
+  const lead = node('p', 'answer-lead' + (totalGames ? '' : ' plain-reply'), leadText || (reveal ? '正在整理馆藏记录…' : ''));
+  lead.hidden = !reveal && !leadText;
+  answer.append(lead);
+  if (!totalGames) return;
   const summary = node('div', 'curation-summary');
   const summaryTitle = node('strong', 'curation-summary-title');
-  summaryTitle.append('根据你的条件，我找到了 ', node('em', 'curation-summary-count', `${parsed.games.length} 款 Steam 游戏`), '。');
-  summary.append(summaryTitle, node('span', 'curation-summary-meta', `${parsed.games.length} 款结果${parsed.games.some((game) => game.url) ? ' · 可直接查看 Steam 页面' : ''}`));
+  summaryTitle.append('根据你的条件，我找到了 ', node('em', 'curation-summary-count', totalGames + ' 款 Steam 游戏'), '。');
+  summary.append(summaryTitle, node('span', 'curation-summary-meta', totalGames + ' 款结果 · 可直接查看 Steam 页面'));
+  summary.hidden = !reveal && !parsed.games.length;
   answer.append(summary);
-  const stack = node('div', 'curation-wall'); const selected = parsed.games.find((game) => game.selected); if (selected) { const feature = node('section', 'curation-featured'); feature.append(node('div', 'section-label', `当前选择：${selected.name}`), paperFor(selected, 0)); stack.append(feature); } const others = node('section', 'curation-others'); others.append(node('div', 'section-label', '其他推荐')); const grid = node('div', 'curation-grid'); parsed.games.filter((game) => game !== selected).forEach((game, index) => grid.append(paperFor(game, index + 1))); others.append(grid); stack.append(others); answer.append(stack);
+  const stack = node('div', 'curation-wall');
+  stack.hidden = !reveal && !parsed.games.length;
+  const selected = parsed.games.find((game) => game.selected);
+  if (selected) {
+    const feature = node('section', 'curation-featured');
+    feature.append(node('div', 'section-label', '当前选择：' + selected.name), paperFor(selected, 0));
+    stack.append(feature);
+  }
+  const others = node('section', 'curation-others');
+  others.append(node('div', 'section-label', '其他推荐'));
+  const grid = node('div', 'curation-grid');
+  parsed.games.filter((game) => game !== selected).forEach((game, index) => grid.append(paperFor(game, index + 1)));
+  others.append(grid); stack.append(others); answer.append(stack);
+  if (!reveal) return;
   [...answer.children].forEach((child, index) => {
     child.style.setProperty('--line-index', index);
     child.classList.add('scroll-reveal');
@@ -304,8 +339,14 @@ function renderAssistantText(answer, text) {
 function messageElement(message, index) {
   if (message.role === 'user') { const outer = node('div', 'message user-message'); const meta = node('div', 'message-meta'); meta.append(node('span', 'role-tag', '访客提问'), node('span', 'mono', timeText(message.time))); outer.append(meta, node('p', '', message.content)); return outer; }
   const outer = node('div', 'assistant-block'); outer.dataset.messageIndex = index; const meta = node('div', 'message-meta'); meta.append(node('span', 'role-tag assistant-tag', '夜班讲解'), node('span', 'mono', timeText(message.time))); outer.append(meta);
-  if (message.processing) { const line = node('div', 'status-line'); line.append(node('span', 'pulse'), node('span', 'status-stage', message.stage || '正在分析偏好')); outer.append(line); }
-  const answer = node('div', 'answer'); renderAssistantText(answer, message.content || ''); outer.append(answer);
+  if (message.processing) { const line = node('div', 'status-line'); line.append(node('span', 'pulse'), node('span', 'status-stage', message.stage || INITIAL_PROGRESS)); outer.append(line); }
+  const answer = node('div', 'answer');
+  if (message.presentation) {
+    const presentation = message.presentation;
+    answer.classList.add('presentation-answer');
+    renderAssistantText(answer, '', { structured: true, lead: presentation.summary, games: presentation.games, totalGames: presentation.totalGames }, false);
+  } else renderAssistantText(answer, message.content || '');
+  outer.append(answer);
   if (message.error) { const note = node('div', 'state-note'); note.append(node('strong', '', message.error)); if (message.retry) note.append(button('重试', 'state-action', message.retry)); outer.append(note); }
   if (message.incomplete) { const note = node('div', 'state-note'); note.append(node('strong', '', '回答尚未完成')); note.append(button('继续生成', 'state-action', () => continueGeneration(message))); outer.append(note); }
   const isLatest = index === state.messages.length - 1;
@@ -356,65 +397,84 @@ document.addEventListener('click', (event) => {
     if (toggle) toggle.textContent = '展开依据 ＋';
   });
 });
-const stages = ['正在分析偏好', '正在读取 Steam 信息', '正在比对游戏特征', '正在整理推荐理由'];
-const stageLabels = { analysis: '正在分析偏好', retrieval: '正在读取 Steam 信息', validation: '正在比对游戏特征', response: '正在整理推荐理由' };
-function startStages(message) { message.stage = stages[0]; }
-function stopStages(message) { message.processing = false; }
-
 function handleStreamEvent(event, assistant, threadId) {
   if (threadId !== state.threadId) return;
-  if (event.event === 'status') { assistant.stage = typeof event.data === 'string' ? event.data : stages[0]; renderMessages(); }
+  if (event.event === 'status') { assistant.stage = typeof event.data === 'string' ? event.data : INITIAL_PROGRESS; renderMessages(); }
   if (event.event === 'stage') {
     const stage = event.data || {};
-    assistant.stageCategory = stage.category || assistant.stageCategory;
-    assistant.stageNode = stage.node || assistant.stageNode;
-    assistant.stageStatus = stage.status || assistant.stageStatus;
-    assistant.stage = stageLabels[assistant.stageCategory] || assistant.stage;
+    if (stage.status === 'started') {
+      assistant.stage = stage.message || assistant.stage || INITIAL_PROGRESS;
+      renderMessages();
+    }
+  }
+  if (event.event === 'presentation') {
+    assistant.rawContent = '';
+    assistant.content = '';
+    assistant.presentation = { summary: '', games: [], totalGames: Number(event.data?.total_games) || 0 };
+    assistant.stage = '回答已整理，正在展示结果';
     renderMessages();
   }
   if (event.event === 'token') {
     assistant.rawContent = (assistant.rawContent || '') + String(event.data || '');
-    assistant.previewTarget = streamPreview(assistant.rawContent);
-    scheduleStreamPreview(assistant);
+    const summary = streamPreview(assistant.rawContent);
+    assistant.content = summary;
+    if (!assistant.presentation) {
+      assistant.presentation = { summary, games: [], totalGames: 0 };
+      renderMessages();
+    } else {
+      assistant.presentation.summary = summary;
+      updatePresentation(assistant);
+    }
+  }
+  if (event.event === 'card' && assistant.presentation) {
+    const card = event.data || {};
+    if (Number.isInteger(card.index) && card.index === assistant.presentation.games.length && card.game && typeof card.game === 'object') {
+      const game = presentationGame(card.game);
+      if (game.name && game.url) {
+        assistant.presentation.games.push(game);
+        assistant.stage = '正在展示推荐 · ' + assistant.presentation.games.length + ' / ' + assistant.presentation.totalGames;
+        updatePresentation(assistant);
+      }
+    }
   }
   if (event.event === 'snapshot') {
     const snapshot = event.data || {}; assistant.stage = snapshot.stream_status || assistant.stage;
-    if (typeof snapshot.reply === 'string' && snapshot.reply) {
-      assistant.rawContent = snapshot.reply;
-      assistant.previewTarget = streamPreview(snapshot.reply);
-      assistant.content = assistant.previewTarget;
+    assistant.rawContent = String(snapshot.reply || '');
+    assistant.content = streamPreview(assistant.rawContent);
+    if (snapshot.presentation) {
+      assistant.presentation = {
+        summary: assistant.content,
+        games: (snapshot.presentation.games || []).map(presentationGame).filter((game) => game.name && game.url),
+        totalGames: Number(snapshot.presentation.total_games) || 0,
+      };
     }
     if (snapshot.error) assistant.error = typeof snapshot.error === 'string' ? snapshot.error : snapshot.error.message;
     renderMessages();
   }
   if (event.event === 'error') { assistant.error = event.data?.message || '生成途中遇到问题'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
-  if (event.event === 'done') {
-    assistant.doneEvent = event;
-    if ((assistant.previewContent || '') === (assistant.previewTarget || '')) applyDoneEvent(assistant, event);
-    else scheduleStreamPreview(assistant);
-  }
-  if (event.event === 'cancelled') { finishStreamPreview(assistant); stopStages(assistant); assistant.content = event.data?.reply || assistant.content; assistant.incomplete = true; state.busy = false; renderMessages(); }
+  if (event.event === 'done') applyDoneEvent(assistant, event);
+  if (event.event === 'cancelled') { assistant.processing = false; assistant.content = assistant.presentation ? assistant.presentation.summary : streamPreview(event.data?.reply || assistant.content); assistant.incomplete = true; state.busy = false; renderMessages(); }
 }
 async function runMessage(text, retry = false) {
   if (state.busy) return; state.busy = true; setArchiveMode('retrieving', 'INDEX / SCANNING');
   const threadId = state.threadId || api.createSession(); state.threadId = threadId;
   if (!retry) state.messages.push({ role: 'user', content: text, time: new Date().toISOString() });
-  const assistant = { role: 'assistant', content: '', processing: true, stage: stages[0], retry: () => runMessage(text, true) };
-  state.messages.push(assistant); renderMessages(); startStages(assistant);
+  const assistant = { role: 'assistant', content: '', processing: true, stage: INITIAL_PROGRESS, retry: () => runMessage(text, true) };
+  state.messages.push(assistant); renderMessages();
   const controller = new AbortController(); state.stream = controller; let finished = false;
   try {
     await api.sendMessage(threadId, text, (event) => { handleStreamEvent(event, assistant, threadId); if (event.event === 'done' || event.event === 'cancelled') finished = true; }, controller.signal);
-    if (!finished) { stopStages(assistant); assistant.incomplete = true; assistant.error = '连接中断，回答尚未完成'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
+    if (!finished) { assistant.processing = false; assistant.incomplete = true; assistant.error = '连接中断，回答尚未完成'; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); renderMessages(); }
   } catch (error) {
-    stopStages(assistant); if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = !!assistant.content; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); if (error.status === 401) { $('#prompt').value = text; $('#charCount').textContent = `${text.length} / ${MAX_MESSAGE_LENGTH}`; expireLogin(); } renderMessages(); }
+    assistant.processing = false; if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = !!assistant.content; setArchiveMode('uncertain', 'ARCHIVE / UNRESOLVED'); if (error.status === 401) { $('#prompt').value = text; $('#charCount').textContent = `${text.length} / ${MAX_MESSAGE_LENGTH}`; expireLogin(); } renderMessages(); }
   } finally { if (state.stream === controller) { state.stream = null; state.busy = false; } refreshSessions().catch(() => {}); }
 }
 async function attachRun(threadId) {
-  const assistant = { role: 'assistant', content: '', processing: true, stage: stages[0] }; state.messages.push(assistant); renderMessages(); startStages(assistant);
+  const assistant = { role: 'assistant', content: '', processing: true, stage: INITIAL_PROGRESS }; state.messages.push(assistant); renderMessages();
   const controller = new AbortController(); state.stream = controller;
   try { const attached = await api.attachRun(threadId, (event) => handleStreamEvent(event, assistant, threadId), controller.signal); if (!attached) { state.messages.pop(); renderMessages(); } }
   catch (error) { if (error.name !== 'AbortError') { assistant.error = error.message; assistant.incomplete = true; renderMessages(); } }
-  finally { stopStages(assistant); if (state.stream === controller) { state.stream = null; state.busy = false; } }
+  finally { assistant.processing = false; if (state.stream === controller) { state.stream = null; state.busy = false; } }
 }
 async function continueGeneration(message) { if (state.busy) return; state.busy = true; const id = state.threadId; const controller = new AbortController(); state.stream = controller; try { const attached = await api.attachRun(id, (event) => handleStreamEvent(event, message, id), controller.signal); if (!attached) await runMessage('请继续刚才未完成的回答'); } catch (error) { showFailure(error, () => continueGeneration(message)); } finally { if (state.stream === controller) { state.stream = null; state.busy = false; } } }
 

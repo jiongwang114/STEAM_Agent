@@ -70,10 +70,12 @@
 
 | 事件 | `data` 类型 | 含义 |
 |---|---|---|
-| `snapshot` | object | 订阅建立时的当前运行快照：`run_id`、`thread_id`、`message`、累计 `reply`、`status`、`stream_status`、`progress`、`error` 和可选完整 `result`。 |
-| `stage` | object | LangGraph 节点生命周期：`{ "category": "analysis" | "retrieval" | "validation" | "response", "node": string, "status": "started" | "completed" }`。 |
-| `status` | string | 工具执行状态 |
-| `token` | string | 模型增量输出；客户端应暂存，不将片段直接作为最终结构化回答渲染 |
+| `snapshot` | object | 订阅建立时的当前运行快照：`run_id`、`thread_id`、`message`、累计 `reply`、`status`、`stream_status`、`progress`、`error`、可选完整 `result`，以及可为空的 `presentation`（`total_games` 与已发布的完整 `games`）。 |
+| `stage` | object | LangGraph 节点生命周期：`{ "category": "analysis" | "retrieval" | "validation" | "response", "node": string, "status": "started" | "completed", "message": string }`。开始时可展示面向用户的 `message`，结束事件不覆盖当前状态文案。 |
+| `status` | string | 工具开始、结束时的用户可见进展；不包含原始结果、参数或内部推理 |
+| `presentation` | object | 完整执行、校验/修复或安全兜底及归档完成后开始展示：`{ "total_games": number }`。并非模型实时生成。 |
+| `token` | string | 最终答案 JSON 的分块回放。拼接结果与 `done.data.reply` 完全一致；可逐步提取 `summary`，但不能直接显示半截 JSON。 |
+| `card` | object | 一张完整卡片：`{ "index": number, "game": { "appid", "name", "store_url", "image_url", "reason" } }`。`index` 从 0 开始，客户端应去重并追加，不重建已有卡片。 |
 | `error` | object | 可恢复错误：`{ "code", "message" }`；之后仍会发送兜底文字和 `done` |
 | `done` | object | 与 `/chat` 相同结构的完整 `ChatResponse` |
 | `cancelled` | object | 用户主动停止后发送，含已生成的部分回答 |
@@ -87,6 +89,8 @@
 
 运行快照仅驻留在服务进程内。进程重启会终止活动 Agent；SQLite 中已经归档的消息仍可通过 `GET /messages` 回放。
 会话列表中的 `is_running` 可用于在刷新后优先选择正在生成的会话。
+
+展示顺序为：实际进展 → `presentation` → 总结的 `token` 分块 → 每张游戏数据的 `token` 与对应 `card` → `done`。所有回答内容均在执行链路结束后回放，不提前发布待校验草稿。总结每 6 个字符分块、间隔 35 毫秒；卡片之间间隔 240 毫秒。前端直接更新最终样式的总结容器，并逐张追加完整卡片，不叠加另一层打字定时器，也不在 `done` 时重建成功回答。旧客户端可忽略新增事件，继续使用累计 `token` 和 `done`；同步 `POST /chat` 不等待展示延迟。
 
 ### 执行历史安全边界
 

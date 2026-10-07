@@ -47,5 +47,5 @@ class ChatResponse(BaseModel):
 
 
 class StreamEvent(BaseModel):
-    event: str  # "snapshot" | "stage" | "status" | "token" | "done" | "error" | "cancelled"
+    event: str = Field(description="snapshot | stage | status | presentation | token | card | done | error | cancelled")
     data: str | dict

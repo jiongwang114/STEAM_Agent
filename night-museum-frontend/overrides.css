@@ -107,7 +107,11 @@ html,body{height:100%;overflow:hidden}
 /* Scroll-led narrative: the answer enters as a sequence of exhibits. */
 .scroll-reveal{opacity:0;transform:translate3d(0,24px,0);clip-path:inset(0 0 14% 0);transition:opacity .8s cubic-bezier(.22,.8,.24,1),transform .9s cubic-bezier(.22,.8,.24,1),clip-path 1s cubic-bezier(.22,.8,.24,1);transition-delay:calc(var(--line-index, 0) * 110ms)}
 .scroll-reveal.is-visible{opacity:1;transform:none;clip-path:inset(0)}
-.answer.streaming-preview > *{animation:none!important;opacity:1!important;transform:none!important}
+.answer.presentation-answer{animation:none!important}
+.answer [hidden]{display:none!important}
+.curation-card.card-arriving{animation:card-arrive .38s ease-out both}
+@keyframes card-arrive{from{opacity:0;filter:brightness(.88)}to{opacity:1;filter:none}}
+@media(prefers-reduced-motion:reduce){.curation-card.card-arriving{animation:none}}
 .answer-lead.scroll-reveal{transform:translate3d(-18px,18px,0);letter-spacing:.01em}
 .curation-summary.scroll-reveal{transform:translate3d(0,14px,0) scale(.985);border-color:rgba(241,217,130,.2)}
 .curation-summary.scroll-reveal.is-visible{transform:none;border-color:rgba(143,123,76,.55);box-shadow:0 0 0 1px rgba(241,217,130,.06),inset 0 1px 7px rgba(0,0,0,.28)}
